@@ -126,7 +126,7 @@
                 <NSMicrophoneUsageDescription>"PAMGuard requires access to the microphone and sound cards for real time operation"</NSMicrophoneUsageDescription>
               </plist>
               <dmg>
-                <generate>false</generate>
+                <generate>true</generate>
                 <additionalResources>
                   <additionalResource>
                     <directory>${project.basedir}/target/bundle/</directory>
@@ -139,7 +139,7 @@
                 <includeDependencies>true</includeDependencies>
               </app>
               <jdk>
-                <include>true</include>
+                <include>false</include>
                 <location>/Library/Java/JavaVirtualMachines/amazon-corretto-21.jdk</location>
               </jdk>
               <codesign>
@@ -227,9 +227,6 @@
               </execution>
             </executions>
             <configuration>
-              <transformers>
-                <transformer />
-              </transformers>
               <filters>
                 <filter>
                   <artifact>*:*</artifact>

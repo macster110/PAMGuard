@@ -194,7 +194,7 @@
 								<NSMicrophoneUsageDescription>"PAMGuard requires access to the microphone and sound cards for real time operation"</NSMicrophoneUsageDescription>
 							</plist>
 							<dmg>
-								<generate>false</generate>
+								<generate>true</generate>
 								<additionalResources>
 									<additionalResource>
 										<directory>
@@ -317,11 +317,7 @@
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-shade-plugin</artifactId>
 						<version>3.6.0</version>
-						<configuration>
-							<transformers>
-								<transformer
-									implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-							</transformers>
+						<configuration>	
 							<filters>
 								<!-- Moved these filters up to here from where they were int <executions><execution><configurtion> 
 								based on advice at https://stackoverflow.com/questions/34738653/maven-shade-plugin-does-not-exclude-the-manifest-signature-files
@@ -353,8 +349,7 @@
 												<SplashScreen-Image>Resources/pgBlankSplash.png</SplashScreen-Image> <!--  this is from the orig ant build file -->
 											</manifestEntries>
 										</transformer>
-										<transformer
-											implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+										<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
 									</transformers>
 								</configuration>
 							</execution>
@@ -764,6 +759,7 @@
 		<!-- https://search.maven.org/artifact/org.kordamp.ikonli/ikonli-javafx/12.2.0/jar -->
 		<!-- Icon symbol pack to replace FontAwesome.  This is the core library, and the
 	     actual symbol packs need to be added separately (see below) -->
+	    <!-- Note: version 12.4.0 causes issues on symbols on mac so stick with 12.3.1 -->
 		<dependency>
 			<groupId>org.kordamp.ikonli</groupId>
 			<artifactId>ikonli-javafx</artifactId>
