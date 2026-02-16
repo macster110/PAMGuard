@@ -139,14 +139,41 @@
                 <includeDependencies>true</includeDependencies>
               </app>
               <jdk>
-                <include>false</include>
+                <include>true</include>
                 <location>/Library/Java/JavaVirtualMachines/amazon-corretto-21.jdk</location>
               </jdk>
               <codesign>
-                <enable>true</enable>
+                <enable>false</enable>
                 <identity>Apple Distribution: Jamie Macaulay (7365S9DZ34)</identity>
               </codesign>
             </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.5.0</version>
+            <executions>
+              <execution>
+                <id>sign-app</id>
+                <phase>deploy</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>-c</argument>
+                    <argument>echo ${project.basedir}/target/${project.build.finalName}.dmg
+											xattr -cr ${project.basedir}/target/PAMGuard.app
+											codesign --force --sign "3rd Party Mac Developer Application: Jamie Macaulay" ${project.basedir}/target/PAMGuard.app
+											cp -r ${project.basedir}/target/PAMGuard.app ${project.basedir}/target/bundle/PAMGuard.app
+											cd ${project.basedir}/target/bundle
+											hdiutil create -srcfolder ${project.basedir}/target/bundle -volname "PAMGuard" -fs HFS+ -o "${project.build.finalName}-signed.dmg"
+											rm -r ${project.basedir}/target/bundle/PAMGuard.app</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>
