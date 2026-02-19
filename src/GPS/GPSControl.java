@@ -16,9 +16,7 @@ import PamController.PamController;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamController.positionreference.PositionReference;
-import PamUtils.PlatformInfo;
-import PamUtils.PlatformInfo.OSType;
-import PamView.dialog.warn.WarnOnce;
+import PamUtils.PamCalendar;
 import PamguardMVC.PamDataBlock;
 import warnings.PamWarning;
 import warnings.WarningSystem;
@@ -415,5 +413,34 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 	@Override
 	public String getReferenceName() {
 		return getUnitName();
+	}
+	
+	
+	@Override
+	public String getModuleSummary(boolean clear) {
+		if (getGpsDataBlock().getUnitsCount() <= 0) {
+			return "<GPSSummary><status>no data</status></GPSSummary>";
+		}
+		GpsDataUnit lastUnit = getGpsDataBlock().getLastUnit();
+		GpsData gps = lastUnit.getGpsData();
+		Double trueHeading = gps.getTrueHeading();
+		Double magHeading  = gps.getMagneticHeading();
+		StringBuilder sb = new StringBuilder();
+		sb.append("<GPSSummary>");
+		sb.append("<status>ok</status>");
+		sb.append(String.format("<timestamp>%s</timestamp>", PamCalendar.formatDBDateTime(lastUnit.getTimeMilliseconds(), true)));
+		sb.append(String.format("<latitude>%.6f</latitude>", gps.getLatitude()));
+		sb.append(String.format("<longitude>%.6f</longitude>", gps.getLongitude()));
+		sb.append(String.format("<headingDeg>%.2f</headingDeg>", gps.getHeading()));
+		if (trueHeading != null) {
+			sb.append(String.format("<trueHeadingDeg>%.2f</trueHeadingDeg>", trueHeading));
+		}
+		if (magHeading != null) {
+			sb.append(String.format("<magneticHeadingDeg>%.2f</magneticHeadingDeg>", magHeading));
+		}
+//		sb.append(String.format("<courseOverGroundDeg>%.2f</courseOverGroundDeg>", gps.getCourseOverGround()));
+//		sb.append(String.format("<speedKnots>%.2f</speedKnots>", gps.getSpeed()));
+		sb.append("</GPSSummary>");
+		return sb.toString();
 	}
 }

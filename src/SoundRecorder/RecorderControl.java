@@ -22,6 +22,7 @@ import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamController.command.CommandManager;
 import PamUtils.FileFunctions;
+import PamUtils.PamArrayUtils;
 import PamUtils.PamCalendar;
 import PamUtils.PamUtils;
 import PamView.MenuItemEnabler;
@@ -664,18 +665,41 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 	@Override
 	public String getModuleSummary(boolean clear) {
 		File path = new File(recorderSettings.outputFolder);
-		long space = -1;
-		double freeSpace = -1;
+		double freeSpaceMB = -1;
 		try {
-			space = path.getFreeSpace();
-			freeSpace = (double) space / 1048576.;
+			freeSpaceMB = (double) path.getFreeSpace() / 1048576.;
 		}
 		catch (SecurityException e) {
-			freeSpace = -9999;
+			freeSpaceMB = -9999;
 		}
-		int currButton = pressedButton;
-		int currState = recorderStatus;
-		return String.format("%d,%d,%3.1f", currButton, currState, freeSpace);
+
+		String buttonName;
+		switch (pressedButton) {
+		case RecorderView.BUTTON_OFF:            buttonName = "off";            break;
+		case RecorderView.BUTTON_AUTO:           buttonName = "auto";           break;
+		case RecorderView.BUTTON_START:          buttonName = "start";          break;
+		case RecorderView.BUTTON_START_BUFFERED: buttonName = "startBuffered";  break;
+		default:                                 buttonName = "unknown";        break;
+		}
+
+		String stateName = (recorderStatus == RECORDING) ? "recording" : "idle";
+
+		double[] lastAmplitudes = recorderProcess.getLastAmplitudedB();
+
+		StringBuilder sb = new StringBuilder();
+		sb.append("<RecorderSummary>");
+		sb.append(String.format("<button>%s</button>", buttonName));
+		sb.append(String.format("<state>%s</state>", stateName));
+		sb.append(String.format("<freeSpaceMB>%.1f</freeSpaceMB>", freeSpaceMB));
+		sb.append("<channelAmplitudesdB>");
+		if (lastAmplitudes != null) {
+			for (int i = 0; i < lastAmplitudes.length; i++) {
+				sb.append(String.format("<channel index=\"%d\">%.2f</channel>", i, lastAmplitudes[i]));
+			}
+		}
+		sb.append("</channelAmplitudesdB>");
+		sb.append("</RecorderSummary>");
+		return sb.toString();
 	}
 
 }

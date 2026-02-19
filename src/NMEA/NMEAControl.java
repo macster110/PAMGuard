@@ -233,4 +233,24 @@ public class NMEAControl extends PamControlledUnit implements PamSettings {
 		return acquireNmeaData.getOutputDatablock();
 	}
 	
+	@Override
+	public String getModuleSummary(boolean clear) {
+		NMEADataUnit data = getNMEADataBLock().getLastUnit();
+		
+		String NMEAString;
+		if (data ==null) {
+			NMEAString = "none";
+		}
+		else {
+			NMEAString = data.getCharData().toString();
+		}
+				
+		StringBuilder sb = new StringBuilder();
+		sb.append("<NMEAraw>");
+		sb.append(NMEAString);
+		sb.append("</NMEAraw>");
+		
+		return NMEAString;
+	}
+	
 }

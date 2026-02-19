@@ -583,36 +583,26 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 	}
 	
 	public String getSummaryString(boolean clear) {
-		/*
-		 * 
-	sumString[0] = 0;
-	float rms, max, mean;
-	for (int i = 0; i < ringBufferChannels; i++) {
-		//		rms = sqrt(summaryTotals[i]/summaryCount);
-		rms = sqrt(summaryTotals2[i]/summaryCount) + 0.01;
-		max = (double)summaryMaxVal[i] + 0.01;
-		mean = summaryTotals[i]/summaryCount;
-		//		sprintf(sumString+strlen(sumString), "ch%d,%3.1f,%3.1f,", i, 20.*log10((double)summaryMaxVal[i]/32768.),
-		//				20*log10(rms/32768.));
-		sprintf(sumString+strlen(sumString), "ch%d,%3.1f,%3.1f,%3.1f,", i, mean, 20.*log10(max/32768.),
-				20.*log10(rms/32768.));
-	}
-		 */
-		String str = "";
 		int nChan = PamUtils.getNumChannels(getChannelMap());
+		StringBuilder sb = new StringBuilder();
+		sb.append("<RawDataSummary>");
 		synchronized(summaryTotals) {
 			for (int i = 0; i < nChan; i++) {
-				double rms = Math.sqrt(summaryTotals2[i]/summaryCount[i])+1e-6;
-				double max = summaryMaxVal[i]+1e-6;
-				double mean = summaryTotals[i]/summaryCount[i];
-				str += String.format("ch%d,%3.1f,%3.1f,%3.1f,", i, mean, 20.*Math.log10(max),
-						20.*Math.log10(rms));
+				double rms  = Math.sqrt(summaryTotals2[i] / summaryCount[i]) + 1e-6;
+				double max  = summaryMaxVal[i] + 1e-6;
+				double mean = summaryTotals[i] / summaryCount[i];
+				sb.append(String.format("<channel index=\"%d\">", i));
+				sb.append(String.format("<mean>%.1f</mean>", mean));
+				sb.append(String.format("<peakdB>%.1f</peakdB>", 20. * Math.log10(max)));
+				sb.append(String.format("<rmsdB>%.1f</rmsdB>", 20. * Math.log10(rms)));
+				sb.append("</channel>");
 			}
 		}
+		sb.append("</RawDataSummary>");
 		if (clear) {
 			clearSummaryData();
 		}
-		return str;
+		return sb.toString();
 	}
 	
 	public void clearSummaryData() {
