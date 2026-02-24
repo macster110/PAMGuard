@@ -40,6 +40,15 @@ That's it! The script will:
 
 ## What the Script Does
 
+### Phase 0: Configure Multiple Instances
+Modifies the `Info.plist` to allow users to launch multiple instances of PAMGuard:
+
+- Sets `LSMultipleInstancesProhibited` to `false`
+- Enables "New Instance" option in right-click menu
+- Applied before signing
+
+**Why:** Allows users to run multiple PAMGuard instances simultaneously for monitoring different audio streams or comparing configurations.
+
 ### Phase 1: JAR Processing
 Recursively finds all JAR files and processes those containing native libraries:
 
