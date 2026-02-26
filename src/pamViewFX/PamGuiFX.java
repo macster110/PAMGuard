@@ -598,7 +598,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 			this.setRight(rightHBox);
 			
 			this.setPrefHeight(prefHeight);
-//			this.getStyleClass().add("pane-opaque");
+			this.getStyleClass().add("pane-opaque");
 
 
 			//this.setPadding(new Insets(0,0,0,0));
