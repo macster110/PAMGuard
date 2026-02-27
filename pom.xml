@@ -676,7 +676,7 @@
 		<dependency>
 			<groupId>net.synedra</groupId>
 			<artifactId>validatorfx</artifactId>
-			<version>0.4.2</version>
+			<version>0.6.3</version>
 		</dependency>
 
 		<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-compress -->

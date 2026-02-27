@@ -102,6 +102,10 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 	 */
 	private HidingPane hidingPaneLeft;
 
+	private PamVBox leftPaneWrapper;
+	private PamVBox settingsContentPane;
+	private PamBorderPane mainLayout;
+
 	/**
 	 * Pane which shows load progress. 
 	 */
@@ -224,8 +228,23 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		/**create settings pane. This allows access to primary PAMGUARD settings.**/
 		settingsPane=new PamSettingsMenuPane();
 		settingsPane.setPrefWidth(250);
-		hidingPaneLeft=new HidingPane(Side.LEFT, settingsPane, this, false);
+		
+		leftPaneWrapper = new PamVBox();
+		leftPaneWrapper.setPrefWidth(250);
+		settingsContentPane = settingsPane;
+		leftPaneWrapper.getChildren().add(settingsContentPane);
+		
+		hidingPaneLeft=new HidingPane(Side.LEFT, leftPaneWrapper, this, false);
 		hidingPaneLeft.showHidePane(false);
+		
+		mainLayout = layout;
+		
+		hidingPaneLeft.showingProperty().addListener((obs, wasShowing, isShowing) -> {
+			if (!isShowing) {
+				restoreLeftPane();
+			}
+		});
+		
 		
 		hidingPaneLeft.getStylesheets().addAll(pamGuiManagerFX.getPamSettingsCSS());
 
@@ -630,16 +649,14 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 			PamButton reProcess=new PamButton("Reprocess");
 			reProcess.setGraphic(PamGlyphDude.createPamIcon("mdi2p-play", PamGuiManagerFX.iconSize));
 			reProcess.setOnAction((action)->{
-				//Open reprocess dialog. 
-				
+				showReprocessPane();
 			});
 			
 			
 			PamButton exportButton = new PamButton("Export data");
 			exportButton.setGraphic(PamGlyphDude.createPamIcon("mdi2d-database-export", PamGuiManagerFX.iconSize));
 			exportButton.setOnAction((action)->{
-				//export dialog
-				
+				showExportPane();
 			});
 			
 			PamButton importButton = new PamButton("Import data");
@@ -798,7 +815,64 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		}
 		return buttons; 
 	}
-	
+
+	/**
+	 * Show the offline reprocessing pane in the left hiding pane and disable
+	 * the rest of the GUI until the user closes or finishes processing.
+	 */
+	private void showReprocessPane() {
+		offlineProcessing.fx.OfflineProcessPaneFX processPaneFX =
+				new offlineProcessing.fx.OfflineProcessPaneFX();
+		processPaneFX.setOnClose(() -> restoreLeftPane());
+		Node content = processPaneFX.createContentPane();
+		showLeftPaneContent(content);
+	}
+
+	/**
+	 * Show the data export pane in the left hiding pane and disable
+	 * the rest of the GUI until the user closes or finishes exporting.
+	 */
+	private void showExportPane() {
+		export.layoutFX.ExportPaneFX exportPaneFX =
+				new export.layoutFX.ExportPaneFX();
+		exportPaneFX.setOnClose(() -> restoreLeftPane());
+		Node content = exportPaneFX.createContentPane();
+		showLeftPaneContent(content);
+	}
+
+	/**
+	 * Swap the left hiding pane content with the given node, open the pane,
+	 * and disable the main tab area so the user must interact with the left
+	 * pane before returning to PAMGuard.
+	 *
+	 * @param content the content node to display.
+	 */
+	private void showLeftPaneContent(Node content) {
+		leftPaneWrapper.getChildren().clear();
+		leftPaneWrapper.getChildren().add(content);
+		leftPaneWrapper.setPrefWidth(450);
+		hidingPaneLeft.showHidePane(true);
+		mainTabPane.setDisable(true);
+		if (sharedToolbar != null) {
+			sharedToolbar.setDisable(true);
+		}
+	}
+
+	/**
+	 * Restore the left hiding pane to its original settings content and
+	 * re-enable the main GUI.
+	 */
+	private void restoreLeftPane() {
+		leftPaneWrapper.getChildren().clear();
+		leftPaneWrapper.getChildren().add(settingsContentPane);
+		leftPaneWrapper.setPrefWidth(250);
+		hidingPaneLeft.showHidePane(false);
+		mainTabPane.setDisable(false);
+		if (sharedToolbar != null) {
+			sharedToolbar.setDisable(false);
+		}
+	}
+
 	/**
 	 * Remove an internal pane if it is contained within any tabs within the PamGuiFX
 	 * @param removeNode - remove the pane if it contains this node. 
