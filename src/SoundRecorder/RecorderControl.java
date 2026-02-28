@@ -666,8 +666,10 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 	public String getModuleSummary(boolean clear) {
 		File path = new File(recorderSettings.outputFolder);
 		double freeSpaceMB = -1;
+		double fileSizeMB = -1;
 		try {
 			freeSpaceMB = (double) path.getFreeSpace() / 1048576.;
+			fileSizeMB = (double) recorderStorage.getFileSizeBytes()/1048576.;
 		}
 		catch (SecurityException e) {
 			freeSpaceMB = -9999;
@@ -684,13 +686,19 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 
 		String stateName = (recorderStatus == RECORDING) ? "recording" : "idle";
 
+		
 		double[] lastAmplitudes = recorderProcess.getLastAmplitudedB();
-
+		
+		
+		
+		
 		StringBuilder sb = new StringBuilder();
 		sb.append("<RecorderSummary>");
 		sb.append(String.format("<button>%s</button>", buttonName));
 		sb.append(String.format("<state>%s</state>", stateName));
 		sb.append(String.format("<freeSpaceMB>%.1f</freeSpaceMB>", freeSpaceMB));
+		sb.append(String.format("<fileSizeMB>%.1f</fileSizeMB>", fileSizeMB));
+
 		sb.append("<channelAmplitudesdB>");
 		if (lastAmplitudes != null) {
 			for (int i = 0; i < lastAmplitudes.length; i++) {
