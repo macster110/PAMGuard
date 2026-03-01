@@ -689,9 +689,6 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 		
 		double[] lastAmplitudes = recorderProcess.getLastAmplitudedB();
 		
-		
-		
-		
 		StringBuilder sb = new StringBuilder();
 		sb.append("<RecorderSummary>");
 		sb.append(String.format("<button>%s</button>", buttonName));
