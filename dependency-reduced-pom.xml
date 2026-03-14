@@ -4,7 +4,7 @@
   <groupId>org.pamguard</groupId>
   <artifactId>Pamguard</artifactId>
   <name>Pamguard</name>
-  <version>2.02.18</version>
+  <version>2.02.18a</version>
   <description>Pamguard using Maven to control dependencies</description>
   <url>www.pamguard.org</url>
   <organization>
@@ -123,10 +123,12 @@
                   <string>-Xmx8192m</string>
                 </JVMArguments>
                 <NSAppSleepDisabled>true</NSAppSleepDisabled>
-                <NSMicrophoneUsageDescription>"PAMGuard requires access to the microphone and sound cards for real time operation"</NSMicrophoneUsageDescription>
+                <NSMicrophoneUsageDescription>"PAMGuard requires
+									access to the microphone and sound cards for
+									real time operation"</NSMicrophoneUsageDescription>
               </plist>
               <dmg>
-                <generate>true</generate>
+                <generate>false</generate>
                 <additionalResources>
                   <additionalResource>
                     <directory>${project.basedir}/target/bundle/</directory>
@@ -143,37 +145,11 @@
                 <location>/Library/Java/JavaVirtualMachines/amazon-corretto-21.jdk</location>
               </jdk>
               <codesign>
-                <enable>false</enable>
-                <identity>Apple Distribution: Jamie Macaulay (7365S9DZ34)</identity>
+                <enable>true</enable>
+                <identity>Apple Distribution: Jamie Macaulay
+									(7365S9DZ34)</identity>
               </codesign>
             </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <version>3.5.0</version>
-            <executions>
-              <execution>
-                <id>sign-app</id>
-                <phase>deploy</phase>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-                <configuration>
-                  <executable>bash</executable>
-                  <arguments>
-                    <argument>-c</argument>
-                    <argument>echo ${project.basedir}/target/${project.build.finalName}.dmg
-											xattr -cr ${project.basedir}/target/PAMGuard.app
-											codesign --force --sign "3rd Party Mac Developer Application: Jamie Macaulay" ${project.basedir}/target/PAMGuard.app
-											cp -r ${project.basedir}/target/PAMGuard.app ${project.basedir}/target/bundle/PAMGuard.app
-											cd ${project.basedir}/target/bundle
-											hdiutil create -srcfolder ${project.basedir}/target/bundle -volname "PAMGuard" -fs HFS+ -o "${project.build.finalName}-signed.dmg"
-											rm -r ${project.basedir}/target/bundle/PAMGuard.app</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-            </executions>
           </plugin>
         </plugins>
       </build>
@@ -254,6 +230,9 @@
               </execution>
             </executions>
             <configuration>
+              <transformers>
+                <transformer />
+              </transformers>
               <filters>
                 <filter>
                   <artifact>*:*</artifact>
@@ -323,8 +302,40 @@
       <id>central</id>
       <url>https://repo1.maven.org/maven2</url>
     </repository>
+    <repository>
+      <releases />
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>osgeo</id>
+      <name>OSGeo Release Repository</name>
+      <url>https://repo.osgeo.org/repository/release/</url>
+    </repository>
+    <repository>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots />
+      <id>osgeo-snapshot</id>
+      <name>OSGeo Snapshot Repository</name>
+      <url>https://repo.osgeo.org/repository/snapshot/</url>
+    </repository>
   </repositories>
   <dependencies>
+    <dependency>
+      <groupId>org.geotools</groupId>
+      <artifactId>gt-bom</artifactId>
+      <version>34.0</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit</groupId>
+      <artifactId>junit-bom</artifactId>
+      <version>5.11.0</version>
+      <type>pom</type>
+      <scope>import</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -359,14 +370,17 @@
     </dependencies>
   </dependencyManagement>
   <properties>
+    <maven.compiler.release>11</maven.compiler.release>
+    <geotools.version>34.0</geotools.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <powermock.version>1.6.6</powermock.version>
+    <javafx.version>21</javafx.version>
+    <jaxb.xjc.version>2.4.0-b180830.0438</jaxb.xjc.version>
     <maven.compiler.source>11</maven.compiler.source>
     <mockito.version>1.10.19</mockito.version>
     <jaxb.api.version>2.4.0-b180830.0359</jaxb.api.version>
     <maven.compiler.target>11</maven.compiler.target>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <powermock.version>1.6.6</powermock.version>
-    <javafx.version>21</javafx.version>
     <jaxb.runtime.version>2.4.0-b180830.0438</jaxb.runtime.version>
-    <jaxb.xjc.version>2.4.0-b180830.0438</jaxb.xjc.version>
+    <maven.deploy.skip>true</maven.deploy.skip>
   </properties>
 </project>
