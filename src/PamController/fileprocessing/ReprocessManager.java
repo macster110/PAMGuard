@@ -9,16 +9,17 @@ import javax.swing.SwingWorker;
 import PamController.DataInputStore;
 import PamController.DataOutputStore;
 import PamController.InputStoreInfo;
-import PamController.OfflineDataStore;
 import PamController.PamControlledUnit;
 import PamController.PamController;
 import PamController.PamGUIManager;
 import PamController.RawInputControlledUnit;
-import PamUtils.PamCalendar;
 import PamUtils.worker.PamWorkDialog;
 import PamUtils.worker.PamWorkMonitor;
 import PamUtils.worker.PamWorkProgressMessage;
 import PamView.dialog.warn.WarnOnce;
+import generalDatabase.DBControlUnit;
+import pamViewFX.pamTask.PamTaskUpdate;
+import pamViewFX.pamTask.SimplePamTaskUpdate;
 import pamguard.GlobalArguments;
 
 /**
@@ -42,10 +43,16 @@ public class ReprocessManager {
 	public void startCheckingThread(Frame mainFrame, ReprocessManagerMonitor mon) {
 		CheckWorker checkWorker = new CheckWorker(mainFrame, mon);
 		checkWorker.execute();	
+		
 		//TODO - JavaFX GUI crashes here
-		synchronized (synch) {
-			workDialog = new PamWorkDialog(mainFrame, 1, "Checking input files and existing output data");
-			workDialog.setVisible(true);
+		if (PamGUIManager.getGUIType() == PamGUIManager.FX) {
+			//do nothing - progress messages will be sent to PamController via the monitor interface.
+		}
+		else {
+			synchronized (synch) {
+				workDialog = new PamWorkDialog(mainFrame, 1, "Checking input files and existing output data");
+				workDialog.setVisible(true);
+			}
 		}
 	}
 	
@@ -104,6 +111,7 @@ public class ReprocessManager {
 					if (workDialog != null) {
 						workDialog.update(message);
 					}
+					
 				}
 			}
 		}
@@ -116,7 +124,15 @@ public class ReprocessManager {
 
 		@Override
 		public void update(PamWorkProgressMessage message) {
-			this.publish(message);
+			if (PamGUIManager.getGUIType() == PamGUIManager.FX) {
+				// in FX mode we just send the message to PamController which will deal with it.
+				PamController.getInstance().notifyTaskProgress(
+						new SimplePamTaskUpdate(message));
+			}
+			else {
+				//publish normally for SwingWorker
+				this.publish(message);
+			}
 		}
 		
 	}
@@ -171,6 +187,12 @@ public class ReprocessManager {
 		
 		boolean deleteOK = deleteOldData(choiceSummary, choice);
 		
+		// Commit the database - this is important to make sure that any deletions are saved before we start reprocessing.
+		DBControlUnit dbControl = DBControlUnit.findDatabaseControl();
+		if (dbControl != null) {
+			dbControl.commitChanges();
+		}
+		
 		return true;
 		
 	}
@@ -219,6 +241,7 @@ public class ReprocessManager {
 			DataOutputStore offlineStore = (DataOutputStore) aPCU;
 			ok &= offlineStore.deleteDataFrom(deleteFrom);
 		}
+		
 		return ok;
 	}
 
@@ -378,11 +401,17 @@ public class ReprocessManager {
 			System.out.println("In Nogui mode you should set a choice as to how to handle existing storage overwrites. Using default of overwriting everything");
 			return ReprocessStoreChoice.OVERWRITEALL;			
 		}
-		
-		// otherwise we'll need to show a dialog to let the user decide what to do 
-		ReprocessStoreChoice choice = ReprocessChoiceDialog.showDialog(PamController.getMainFrame(), choices);
-		
-		return choice;
+		else if (PamGUIManager.getGUIType() == PamGUIManager.FX) {
+			// otherwise we'll need to show a dialog to let the user decide what to do 
+			ReprocessStoreChoice choice = ReprocessChoiceDialogFX.showDialog(PamController.getMainStage(), choices);
+			return choice;
+		}
+		else {
+			// otherwise we'll need to show a dialog to let the user decide what to do 
+			ReprocessStoreChoice choice = ReprocessChoiceDialog.showDialog(PamController.getMainFrame(), choices);
+			
+			return choice;
+		}
 	}
 
 	/**

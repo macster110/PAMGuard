@@ -43,8 +43,8 @@ import PamController.command.TerminalController;
 import PamController.command.WatchdogComms;
 import PamController.fileprocessing.ReprocessManager;
 import PamController.fileprocessing.ReprocessManagerMonitor;
-import PamController.fileprocessing.ReprocessStoreChoice;
 import PamController.masterReference.MasterReferencePoint;
+import PamController.pamWizard.PamWizardManager;
 import PamController.settings.BatchViewSettingsImport;
 import PamController.settings.output.xml.XMLWriterDialog;
 import PamController.soundMedium.GlobalMediumManager;
@@ -54,7 +54,6 @@ import PamModel.PamModel;
 import PamModel.PamModelSettings;
 import PamModel.PamModuleInfo;
 import PamModel.SMRUEnable;
-import PamModel.PamModel.PluginClassloader;
 import PamUtils.PamCalendar;
 import PamUtils.time.GlobalTimeManager;
 import PamView.GeneralProjector;
@@ -216,6 +215,11 @@ public class PamController implements PamControllerInterface, PamSettings {
 	 * through.
 	 */
 	private GlobalMediumManager globalMediumManager;
+	
+	/**
+	 * Manager for PamWizard functionality
+	 */
+	private PamWizardManager pamWizardManager;
 
 	/**
 	 * A reference to the module currently being loaded. Used by the
@@ -270,6 +274,7 @@ public class PamController implements PamControllerInterface, PamSettings {
 
 		globalTimeManager = new GlobalTimeManager(this);
 		globalMediumManager = new GlobalMediumManager(this);
+		pamWizardManager = new PamWizardManager(this);
 
 		setPamStatus(PAM_IDLE);
 
@@ -297,7 +302,6 @@ public class PamController implements PamControllerInterface, PamSettings {
 		// diagnosticTimer = new Timer(1000, new DiagnosticTimer());
 		// diagnosticTimer.start();
 	}
-
 
 	/**
 	 * Get the location of the install folder. Note that this will be system dependent.
@@ -374,6 +378,9 @@ public class PamController implements PamControllerInterface, PamSettings {
 	 * modules will have received INITIALISATION_COMPLETE and should be good to run
 	 */
 	private void creationComplete() {
+		
+		MarkRelationships.getInstance().subscribeAllMarkers();
+		
 		if (GlobalArguments.getParam(PamController.AUTOSTART) != null) {
 			if (getRunMode() == RUN_NORMAL) {
 				startLater(); // may as well give AWT time to loop it's queue once more
@@ -2025,24 +2032,15 @@ public class PamController implements PamControllerInterface, PamSettings {
 	 * Updates the entire datamap.
 	 */
 	public void updateDataMap() {
-		System.out.println("updateDataMap:");
 
 		if (DBControlUnit.findDatabaseControl() == null)
 			return;
 
-		System.out.println("updateDataMap: 1");
-
 		ArrayList<PamDataBlock> datablocks = getDataBlocks();
-
-		System.out.println("updateDataMap: 2");
-
+		
 		DBControlUnit.findDatabaseControl().updateDataMap(datablocks);
 
-		System.out.println("updateDataMap: 3");
-
 		BinaryStore.findBinaryStoreControl().getDatagramManager().updateDatagrams();
-
-		System.out.println("updateDataMap: 4");
 
 		notifyModelChanged(PamControllerInterface.EXTERNAL_DATA_IMPORTED);
 	}
@@ -3138,6 +3136,15 @@ public class PamController implements PamControllerInterface, PamSettings {
 	 */
 	public WatchdogComms getWatchdogComms() {
 		return watchdogComms;
+	}
+	
+	
+	/**
+	 * Get the PAMWizard manager - manages creating configurations
+	 * @return the pamWizardManager
+	 */
+	public PamWizardManager getPamWizardManager() {
+		return pamWizardManager;
 	}
 
 	/**

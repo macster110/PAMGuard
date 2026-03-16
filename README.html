@@ -382,9 +382,12 @@ PAMGuardBeta_ViewerMode.exe):</p>
 
 <p class=MsoNormal>&nbsp;</p>
 
+<p class=MsoNormal><b><span style='font-size:12.0pt;font-family:"Cambria",serif'><a
+href="#_Version_2.02.19_Later">Version 2.02.19 Later in 2026</a></span></b></p>
+
 <p class=MsoNormal style='line-height:115%'><em><b><span style='font-size:12.0pt;
 line-height:115%;font-family:"Cambria",serif;font-style:normal'><a
-href="#_Version_2.02.18_????">Version 2.02.18 ???? 2025&nbsp;</a></span></b></em></p>
+href="#_Version_2.02.18_????">Version 2.02.18 February 2026&nbsp;</a></span></b></em></p>
 
 <p class=MsoNormal style='line-height:115%'><em><b><u><span style='font-size:
 12.0pt;line-height:115%;font-family:"Cambria",serif;font-style:normal'><a
@@ -446,9 +449,22 @@ name="_Latest_Version_2.02.08"></a><a name="_Version_2.02.09_June"></a><a
 name="_Version_2.02.10_January"></a><a name="_Version_2.02.11_April"></a><a
 name="_Version_2.02.14_October"></a><a name="_2.02.15_December_2014"></a><a
 name="_Version_2.02.16_February"></a><a name="_Version_2.02.17_?????"></a><a
-name="_Version_2.02.18_????"></a>Version 2.02.18 ????</h1>
+name="_Version_2.02.18_????"></a><a name="_Version_2.02.19_Later"></a>Version
+2.02.19 Later in 2-26</h1>
 
-<p class=MsoNormal>Update to Java version 25</p>
+<p class=MsoNormal><b>New Features</b></p>
+
+<p class=MsoNormal>GeoTIFF Map Layer. Can now use a geo referenced image File
+as a base layer on the PAMGuard Map. These can be created using many suitable
+GIS packages. See Help for details. </p>
+
+<p class=MsoNormal>Version Logging. PAMGuard version information and versions
+of all loaded plugin modules is written to the database table
+Version_Information every time PAMGuard starts. </p>
+
+<p class=MsoNormal><b>Bug Fixes</b></p>
+
+<h1>Version 2.02.18 February 2026</h1>
 
 <p class=MsoNormal><b>New Features</b></p>
 
@@ -473,7 +489,49 @@ Store</a> option to update all binary files to the latest version. This can be
 useful if you want to open old binary files with the latest versions of the <a
 href="https://www.pamguard.org/matlabandr.html">Matlab, R, and Python libraries</a>.</p>
 
+<p class=MsoNormal>Tethys output for One band Filtered noise measurements</p>
+
+<p class=MsoNormal>Support for DeepAcoustics AI models</p>
+
+<p class=MsoNormal>SoundTrap wav files now have millis time and PAMGuard starts
+at the start time of each file, not the sample clock</p>
+
+<p class=MsoNormal>DMG on macOS can now access computer's microphone but mac
+security requires user to accept a prompt</p>
+
 <p class=MsoNormal><b>Bug Fixes / minor enhancements </b></p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/292">Issue
+292</a>: Export of click events was not including all clicks within each event.
+Now resolved.</p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/286">Issue
+286</a>: Soundtrap SUD time. Issue fixed, though you should generally NEVER set
+a time zone offset for SUD files. See <a
+href="https://www.pamguard.org/olhelp/detectors/clickDetectorHelp/docs/SoundTrapClickDetector.html">online
+help</a>.</p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/285">Issue
+285</a>: Fixed bugs in DelphinID, which was not working. </p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/280">Issue
+280</a>: Fix long standing bug in click detector BT display where last click
+was not showing</p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/pull/283">Issue
+238</a>: Updates SUD file reader to correctly zero-pad files with missing
+chunks. </p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/279">Issue
+279</a>: Problems with user specified date formats. Improved help file and
+issue warning if a 12 hour time format is specified. </p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/273">Issue
+273</a>: Fixed (or improved) night mode display for logger forms. </p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/272">Issue
+272</a>: Bearing localiser was truncating the clicks if set to only measure
+bearings using first n samples. </p>
 
 <p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/270">Issue
 270</a>: Added options on click BT display pop up menu to manually classify
@@ -487,6 +545,14 @@ recording data. Now fixed. </p>
 265</a>: Clock setting from GPS. This has not worked for a number of years due
 to Windows security settings. A work around has now been found and documented
 in the help files.</p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/pull/261">Issue
+261</a>: Restore choseable symbols for swing spectrogram displays of DL
+detection data</p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/260">Issue
+260</a>: Issue popup warning in sound acquisition when no sound files are
+present. </p>
 
 <p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/258">Issue
 258</a>: Improved error reporting from database and binary store modules</p>
@@ -520,6 +586,12 @@ changes are used in bearing localisers. </p>
 247</a>: Make correct interpretation of invalid speed and heading values (given
 as 102.3knots and 360.0 degrees in the data) </p>
 
+<p class=MsoNormal>Fixed some dialogs in localiser that were not showing
+properly on macOS.</p>
+
+<p class=MsoNormal>Updated to latest X3 library which fixes zero-pad bugs when
+processing SoundTrap data</p>
+
 <h1>Version 2.02.17 June 2025</h1>
 
 <p class=MsoNormal><b>New Features</b></p>
@@ -548,8 +620,8 @@ files from SCRIPPS HARP recorders. &nbsp;</p>
 <p class=MsoNormal><b>Bug fixes</b></p>
 
 <p class=MsoNormal>Issue 207. Marked clicks in click detector not rematching
-when data reloaded. This was occurring when multiple clicks had the same
-millisecond time and has now been rectified. </p>
+when data reloaded. This was occurring when multiple clicks had the same millisecond
+time and has now been rectified. </p>
 
 <p class=MsoNormal>Tethys deployments table. Deployments table in Tethys was
 showing multiple lines for duty cycled data. Duty cycled data will now display
@@ -590,8 +662,8 @@ annotations, species codes can be taken from the logger form. </p>
 <p class=MsoNormal>Made export of data (Calibrations, Deployments, Detections,
 and Localisations) available as Offline tasks. This is not useful when running
 Tethys on a single dataset, since all tasks can be easily performed using
-�Export� buttons on the main Tethys interface. However, this change means that
-these export tasks become available to the <a
+Export buttons on the main Tethys interface. However, this change means
+that these export tasks become available to the <a
 href="https://www.pamguard.org/plugins/batchprocessor.html">batch processor</a>
 (Version 2.0 or above) which can be used to export data from multiple similar
 datasets without having to personally go into each one individually. See Tethys
@@ -686,9 +758,9 @@ whistles with branches to not draw.</p>
 
 <h2>New Features</h2>
 
-<p class=MsoNormal>Rocca update: Ability to specify whether strong whistle/encounter
-threshold is applied as an absolute value, or as the difference between the
-highest and second-highest votes.</p>
+<p class=MsoNormal>Rocca update: Ability to specify whether strong
+whistle/encounter threshold is applied as an absolute value, or as the
+difference between the highest and second-highest votes.</p>
 
 <p class=MsoNormal>Tethys: Export of Group3D Localiser data</p>
 
@@ -740,12 +812,12 @@ continually reset them. </p>
 project information to store with your data. See menu item Settings/Project
 information.</p>
 
-<p class=MsoNormal>Effort' management system. New map options allow colouring
-of track line by effort' from various other modules. This is currently the
-acquisition system (so the track will change colour when PAMGuard is running),
-the binary store system (likely the same as the acquisition) or data from
-Logger forms. This system will be extended to other modules in the near future.
-</p>
+<p class=MsoNormal>ÂEffort' management system. New map options allow
+colouring of track line by Âeffort' from various other modules. This is
+currently the acquisition system (so the track will change colour when PAMGuard
+is running), the binary store system (likely the same as the acquisition) or
+data from Logger forms. This system will be extended to other modules in the
+near future. </p>
 
 <p class=MsoNormal>Added a new exporter which allows users to export data to
 .mat (MATLAB, Python), .RData (open in R) or .wav files (open in Sonic
@@ -783,8 +855,8 @@ database. </p>
 long enough to make clips. In some circumstances data were being discarded too
 early so clips could not be created. </p>
 
-<p class=MsoNormal>Acquisition &quot;Skip initial seconds&quot; feature, designed
-to remove high sample levels e.g. from calibration tones at start of a
+<p class=MsoNormal>Acquisition &quot;Skip initial seconds&quot; feature,
+designed to remove high sample levels e.g. from calibration tones at start of a
 soundtrap recording was not working with the click detector. This is fixed but
 replacing all data with 0's and still sending data. Note that this may lead to
 artificially low noise measures at the start of a file. </p>
@@ -808,9 +880,9 @@ exact times, rather than a couple of seconds after the hour. </p>
 <h2><span lang=EN-US>New Features</span></h2>
 
 <p class=MsoNormal><b><span lang=EN-US>Importing modules</span></b><span
-lang=EN-US> from other configurations: New options from file menu allowing import
-of specific modules, or module settings from other configurations. E.g. if you
-had three similar configurations and had set one of them up with a new
+lang=EN-US> from other configurations: New options from file menu allowing
+import of specific modules, or module settings from other configurations. E.g.
+if you had three similar configurations and had set one of them up with a new
 detector, or got the click classifier settings set up just right in one of
 those configurations, you can import the additional modules or the click
 detector settings easily into the other configurations. </span></p>
@@ -932,14 +1004,14 @@ the first two characters of the string name may be. </span></p>
 <h2><span lang=EN-US>Bug Fixes</span></h2>
 
 <p class=MsoNormal><span lang=EN-US>Use of localization sensor and orientation
-data for static hydrophones had a bug whereby it would continually forget'
+data for static hydrophones had a bug whereby it would continually Âforget'
 angle offsets applied to static hydrophones in viewer mode. This is now fixed. </span></p>
 
 <p class=MsoNormal><span lang=EN-US>Click tool bar: Correctly shows event
 selection options even if no species classification options are in place. </span></p>
 
 <p class=MsoNormal><span lang=EN-US>Fixed Landmarks: Earlier versions were
-losing' these every time PAMGuard started or new data were loaded in viewer
+Âlosing' these every time PAMGuard started or new data were loaded in viewer
 mode. Now fixed. </span></p>
 
 <p class=MsoNormal><span lang=EN-US>ROCCA: Fixed (another) memory leak which
@@ -962,9 +1034,9 @@ you'd expect sound from higher frequency baleen whales, such as humpbacks, to
 vocalise at. &nbsp;&nbsp;</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Hiding tool tips. A menu item to
-permanently turn off all tool tips, or tap the Esc' key to turn them off for
-6 seconds if they are getting in the way, particularly when trying to interact
-with displays using the mouse. </span></p>
+permanently turn off all tool tips, or tap the ÂEsc' key to turn them off
+for 6 seconds if they are getting in the way, particularly when trying to
+interact with displays using the mouse. </span></p>
 
 <h1><span lang=EN-US>Version 2.02.06 November 2022</span></h1>
 
@@ -1033,8 +1105,8 @@ description of the algorithm, screen grabs and examples.</span></p>
 <p class=MsoNormal><span lang=EN-US>Help documentation for Matched Click
 Classifier</span></p>
 
-<p class=MsoNormal><span lang=EN-US>Database logging of offline tasks (such as
-click re-classification, bearing calculation, etc.)</span></p>
+<p class=MsoNormal><span lang=EN-US>Database logging of offline tasks (such as click
+re-classification, bearing calculation, etc.)</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Data selector for Whistle Classifier module</span></p>
 
@@ -1047,7 +1119,7 @@ audio files. </span></p>
 <h2><span lang=EN-US>Bug Fixes</span></h2>
 
 <p class=MsoNormal><span lang=EN-US>Soundtrap DWV import. Will now generate
-binary files even if DWV file doesn't exist (which is correct behavior in
+binary files even if DWV file doesnÂ't exist (which is correct behavior in
 quiet conditions when no clicks were detected). </span></p>
 
 <p class=MsoNormal><span lang=EN-US>Spectrogram. Changes to stop occasional
@@ -1079,11 +1151,11 @@ circumstances. This has been fixed</p>
 <p class=MsoNormal>#11 Matched Click Classifier: fixed bug which caused crash
 running in real time. Added template names based on file names. </p>
 
-<p class=MsoNormal>#13 Merging files when offline processing file folders: Had an
-error introduced in last release which caused it to fail to recognise gaps
+<p class=MsoNormal>#13 Merging files when offline processing file folders: Had
+an error introduced in last release which caused it to fail to recognise gaps
 between files, meaning that some output data (i.e. after a gap) would have an
-incorrect time stamp. This did not affect data if the merge contiguous files'
-option was not selected. </p>
+incorrect time stamp. This did not affect data if the Âmerge contiguous
+files' option was not selected. </p>
 
 <p class=MsoNormal>#14 Logger forms data were not plotting correctly. This was
 due to the required data selection functions not being fully implemented. This
@@ -1116,10 +1188,11 @@ over display area.</span></p>
 <h1><a name="_Latest_Version_2.02.01"></a><span lang=EN-US>Version 2.02.01
 October 2021</span></h1>
 
-<p class=MsoNormal><b>If you are upgrading from a PAMGuard core release (1.15.xx),
-PAMGuard Version 2 contains major updates. You should read and understand the
-notes listed for <a href="#_Latest_Beta_Version_2.00.10">Beta Version 2.00.10</a>
-before proceeding with installation and use of this version.</b></p>
+<p class=MsoNormal><b>If you are upgrading from a PAMGuard core release
+(1.15.xx), PAMGuard Version 2 contains major updates. You should read and
+understand the notes listed for <a href="#_Latest_Beta_Version_2.00.10">Beta
+Version 2.00.10</a> before proceeding with installation and use of this
+version.</b></p>
 
 <p class=MsoNormal>This version of PAMGuard has been bundled with Java 16
 (OpenJDK release), so you will not need to install a java runtime engine
@@ -1214,8 +1287,8 @@ wav file </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>5. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
-lang=EN-US> </span>Implemented a Backup Manager for backing up multiple types of
-data to multiple locations] </p>
+lang=EN-US> </span>Implemented a Backup Manager for backing up multiple types
+of data to multiple locations] </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>6. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
@@ -1278,10 +1351,10 @@ included in a future release. </p>
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>17. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
 lang=EN-US> </span>An implementation of the Generalized Power Law Detector,
-developed by Tyler Helble ([Helble et al., A generalized power-law detection
-algorithm for humpback whale vocalizations', The Journal of the Acoustical
-Society of America, vol. 131, no. 4, pp. 2682-2699, 2012) is now available. For
-details, see the online help </p>
+developed by Tyler Helble ([Helble et al., ÂA generalized power-law
+detection algorithm for humpback whale vocalizations', The Journal of the
+Acoustical Society of America, vol. 131, no. 4, pp. 2682-2699, 2012) is now
+available. For details, see the online help </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>18. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
@@ -1386,8 +1459,9 @@ lang=EN-US> </span>Implemented new Effort Monitoring System to track
 on/off-effort information </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>4. </span><span
-lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
-Added ability to receive NMEA over UDP multicast in addition to UDP broadcast </p>
+lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
+lang=EN-US> </span>Added ability to receive NMEA over UDP multicast in addition
+to UDP broadcast </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>5. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
@@ -2033,8 +2107,8 @@ better visibility at night.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>7. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
-lang=EN-US> </span>Added print screen button to capture/save all PAMGuard
-screens to file and log the information to the database.</p>
+lang=EN-US> </span>Added print screen button to capture/save all PAMGuard screens
+to file and log the information to the database.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>8. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
@@ -2575,7 +2649,7 @@ UID's are also added to PAMGuard database tables. </span></p>
 viewer they will automatically be converted. For safety, the original binary
 files will not be overwritten and the new data will be placed in a new folder
 on your computer with the same path as the old data, but suffixed with
-_WithUID', e.g. if your binary data were previously stored in the folder
+Â_WithUID', e.g. if your binary data were previously stored in the folder
 C:\MySurvey\binarydata the new data will be written to
 C:\MySurvey\binarydata_WithUID. </span></p>
 
@@ -2759,9 +2833,10 @@ PAMGuard website here, but developers are encouraged to host and maintain their
 own modules.</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Modules of interest to the general PAM
-community will remain as part of the core PAMGuard installation. However, specialized
-modules which are useful to only a small number of users have been removed and
-are available as a separate download. The following modules have been removed:</span></p>
+community will remain as part of the core PAMGuard installation. However,
+specialized modules which are useful to only a small number of users have been
+removed and are available as a separate download. The following modules have
+been removed:</span></p>
 
 <p class=MsoListParagraph style='margin-left:43.5pt;text-indent:-25.5pt'>1.<span
 style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2877,8 +2952,8 @@ appear when you right click on the display. </p>
 
 <p class=MsoListParagraph style='margin-left:40.5pt;text-indent:-22.5pt'>7.<span
 style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span>Bug 297. Airgun display was not correctly showing itself at fixed locations,
-but always following the vessel track. This is now fixed. </p>
+</span>Bug 297. Airgun display was not correctly showing itself at fixed
+locations, but always following the vessel track. This is now fixed. </p>
 
 <p class=MsoListParagraph style='margin-left:40.5pt;text-indent:-22.5pt'>8.<span
 style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2930,9 +3005,9 @@ main click detector display. </span></p>
 
 <p class=MsoNormal><b><span lang=EN-US>Target Motion Analysis</span></b></p>
 
-<p class=MsoNormal><span lang=EN-US>A major piece of work has been undertaken to
-improve the Target Motion tracking with PAMGuard. Details are available in the
-online help. Users of the Click Detector will notice the following changes:</span></p>
+<p class=MsoNormal><span lang=EN-US>A major piece of work has been undertaken
+to improve the Target Motion tracking with PAMGuard. Details are available in
+the online help. Users of the Click Detector will notice the following changes:</span></p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>1.</span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2980,9 +3055,9 @@ the future. </span></p>
 
 <p class=MsoNormal><i>Logger Form Design</i></p>
 
-<p class=MsoNormal>A GUI driven system for designing Logger forms has been
-released. Currently, this feature has no online help, but is reasonably
-intuitive compared to the old method of typing directly into the database. </p>
+<p class=MsoNormal>A GUI driven system for designing Logger forms has been released.
+Currently, this feature has no online help, but is reasonably intuitive
+compared to the old method of typing directly into the database. </p>
 
 <p class=MsoNormal><i><span lang=EN-US>Improved Number handling</span></i></p>
 
@@ -3001,9 +3076,9 @@ noticed by users. </span></p>
 
 <p class=MsoNormal><i><span lang=EN-US>Click Detector RainbowClick file output</span></i></p>
 
-<p class=MsoNormal><span lang=EN-US>This feature has been removed since it has been
-obsolete for several years. Users should use the PAMGuard binary storage system
-for Click Detector data. </span></p>
+<p class=MsoNormal><span lang=EN-US>This feature has been removed since it has
+been obsolete for several years. Users should use the PAMGuard binary storage
+system for Click Detector data. </span></p>
 
 <h1><a name="_Latest_Version_1.15.04"></a><span lang=EN-US>Version 1.15.04 July
 2016</span></h1>
@@ -3740,9 +3815,8 @@ shaped Finite Impulse Response filters (see online help for details). </p>
 
 <p class=MsoNormal><i>Radar Display</i></p>
 
-<p class=MsoNormal>Can now show bearings relative to true North OR the vessel
-heading. Also has the option of only showing certain types of click and
-whistle.</p>
+<p class=MsoNormal>Can now show bearings relative to true North OR the vessel heading.
+Also has the option of only showing certain types of click and whistle.</p>
 
 <p class=MsoNormal><b>Bug Fixes</b></p>
 
@@ -3806,9 +3880,9 @@ whistle.</p>
 
 <p class=MsoNormal><b>New Modules</b></p>
 
-<p class=MsoNormal style='margin-left:36.0pt'>Clip Generator: Saves and
-displays short waveform clips around detections. Can work with any detector (or
-indeed any other data stream within PAMGuard). &nbsp;</p>
+<p class=MsoNormal style='margin-left:36.0pt'>Clip Generator: Saves and displays
+short waveform clips around detections. Can work with any detector (or indeed
+any other data stream within PAMGuard). &nbsp;</p>
 
 <p class=MsoNormal style='margin-left:36.0pt'>Local time display: displays the
 computers local time on the main display panel. </p>
@@ -3939,9 +4013,9 @@ have implemented database storage for output of these modules. </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span style='font-family:
 Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span>Radar Display: A bug which stopped the radar display from correctly displaying
-bearings to whistles from arrays containing more than two hydrophone elements
-has been fixed. </p>
+</span>Radar Display: A bug which stopped the radar display from correctly
+displaying bearings to whistles from arrays containing more than two hydrophone
+elements has been fixed. </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span style='font-family:
 Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -4480,8 +4554,8 @@ results in an approximate 30% speed improvement for that one module. </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span style='font-family:
 Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span>Sound playback when monitoring using a sound card (previously only possible
-with ASIO sound cards) but see warning in help file about sound card
+</span>Sound playback when monitoring using a sound card (previously only
+possible with ASIO sound cards) but see warning in help file about sound card
 synchronisation.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span style='font-family:
@@ -4792,8 +4866,8 @@ start-up takes slightly longer than previously. </p>
 
 <p class=MsoNormal><b>Outstanding bugs</b></p>
 
-<p class=MsoNormal>The patch panel is known to crash if output channel numbers from
-the patch panel a higher than the highest input channel number of the data
+<p class=MsoNormal>The patch panel is known to crash if output channel numbers
+from the patch panel a higher than the highest input channel number of the data
 acquisition.&nbsp; </p>
 
 <p class=MsoNormal><b>Bug fixes</b></p>
@@ -5165,8 +5239,7 @@ Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif
 
 <h2>0.5b&nbsp;&nbsp;&nbsp; 31 August 2007 </h2>
 
-<p class=MsoNormal>Requires Java 6 Update 2
-(http://java.com/en/download/manual.jsp)</p>
+<p class=MsoNormal>Requires Java 6 Update 2 (http://java.com/en/download/manual.jsp)</p>
 
 <p class=MsoNormal>Major new features include:</p>
 
