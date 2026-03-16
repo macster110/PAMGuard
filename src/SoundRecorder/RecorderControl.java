@@ -159,7 +159,7 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 		
 		String globPrefix = GlobalArguments.getParam(RecorderControl.GlobalWavPrefixArg);
 		if (globPrefix != null) {
-			if (globPrefix.length()<6) {
+			if (globPrefix.length()<6000) { // why was this restricted to 6 ? 
 				recorderSettings.fileInitials = globPrefix; // remember it. 
 			}
 			else {
