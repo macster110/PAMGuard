@@ -450,7 +450,7 @@ name="_Version_2.02.10_January"></a><a name="_Version_2.02.11_April"></a><a
 name="_Version_2.02.14_October"></a><a name="_2.02.15_December_2014"></a><a
 name="_Version_2.02.16_February"></a><a name="_Version_2.02.17_?????"></a><a
 name="_Version_2.02.18_????"></a><a name="_Version_2.02.19_Later"></a>Version
-2.02.19 Later in 2-26</h1>
+2.02.19 Later in 2026</h1>
 
 <p class=MsoNormal><b>New Features</b></p>
 
@@ -463,6 +463,10 @@ of all loaded plugin modules is written to the database table
 Version_Information every time PAMGuard starts. </p>
 
 <p class=MsoNormal><b>Bug Fixes</b></p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/296">Issue
+292</a>: Stop printing unnecessary wav file format warnings when they do no
+harm. </p>
 
 <h1>Version 2.02.18 February 2026</h1>
 
@@ -620,8 +624,8 @@ files from SCRIPPS HARP recorders. &nbsp;</p>
 <p class=MsoNormal><b>Bug fixes</b></p>
 
 <p class=MsoNormal>Issue 207. Marked clicks in click detector not rematching
-when data reloaded. This was occurring when multiple clicks had the same millisecond
-time and has now been rectified. </p>
+when data reloaded. This was occurring when multiple clicks had the same
+millisecond time and has now been rectified. </p>
 
 <p class=MsoNormal>Tethys deployments table. Deployments table in Tethys was
 showing multiple lines for duty cycled data. Duty cycled data will now display
@@ -699,10 +703,10 @@ the spectrogram display. </p>
 automatically getting the correct file end, making the exported files
 impossible to use. This is fixed and files will get the correct .paf end.</p>
 
-<p class=MsoNormal>Issue 167. File counter not resetting when restarting
-PAMGuard if it was paused during processing of folders of offline files. This
-has been updated to that a popup menu on the start button will allow you to
-continue from where you left off, or restart from the beginning. </p>
+<p class=MsoNormal>Issue 167. File counter not resetting when restarting PAMGuard
+if it was paused during processing of folders of offline files. This has been
+updated to that a popup menu on the start button will allow you to continue
+from where you left off, or restart from the beginning. </p>
 
 <p class=MsoNormal>Issue 165. When re-opening folder selection dialog for
 processing folders of offline files, the folder name would be added a second
@@ -910,9 +914,9 @@ correctly saving updated bearings to the database. Now fixed. </span></p>
 
 <p class=MsoNormal><b><span lang=EN-US>ROCCA Classifier fixes</span></b></p>
 
-<p class=MsoNormal><span lang=EN-US>Allow Rocca to run without classifiers:
-Fixed bug that threw an error if no classifier files were &nbsp;specified in
-Rocca Params dialog</span></p>
+<p class=MsoNormal><span lang=EN-US>Allow Rocca to run without classifiers: Fixed
+bug that threw an error if no classifier files were &nbsp;specified in Rocca
+Params dialog</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Fix memory issue with
 RoccaContourDataBlocks not being released for garbage collection</span></p>
@@ -989,9 +993,9 @@ processing of offline files, if output data already exist (binary data of
 within database tables) you will be asked if you want to overwrite the data,
 cancel, or try to continue from where to left off. </span></p>
 
-<p class=MsoNormal><span lang=EN-US>Updated SoundTrap sud file interface so
-that PAMGuard now extracts and stores the Click Detector settings from the sud
-files and stores them within the PAMGuard configuration. This does not affect
+<p class=MsoNormal><span lang=EN-US>Updated SoundTrap sud file interface so that
+PAMGuard now extracts and stores the Click Detector settings from the sud files
+and stores them within the PAMGuard configuration. This does not affect
 processing, but is important for record keeping. </span></p>
 
 <p class=MsoNormal><span lang=EN-US>GPS options to use any valid RMC or GGA
@@ -1075,8 +1079,8 @@ low DPI screens. </span></p>
 <p class=MsoNormal><span lang=EN-US>Complete rewrite of the classification
 system to have nested classifiers which can be enabled or disabled. </span></p>
 
-<p class=MsoNormal><span lang=EN-US>Changes to classification GUI to
-accommodate the new classification system.</span></p>
+<p class=MsoNormal><span lang=EN-US>Changes to classification GUI to accommodate
+the new classification system.</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Addition of data selectors to the minimum
 number of clicks accepted by the classifier. This allows the click-by-click
@@ -1093,8 +1097,8 @@ classifier was being trimmed. </span></p>
 
 <p class=MsoNormal><b><span lang=EN-US>Documentation</span></b></p>
 
-<p class=MsoNormal><span lang=EN-US>Comprehensive help file including
-description of the algorithm, screen grabs and examples.</span></p>
+<p class=MsoNormal><span lang=EN-US>Comprehensive help file including description
+of the algorithm, screen grabs and examples.</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Bug fixes</span></p>
 
@@ -1105,8 +1109,8 @@ description of the algorithm, screen grabs and examples.</span></p>
 <p class=MsoNormal><span lang=EN-US>Help documentation for Matched Click
 Classifier</span></p>
 
-<p class=MsoNormal><span lang=EN-US>Database logging of offline tasks (such as click
-re-classification, bearing calculation, etc.)</span></p>
+<p class=MsoNormal><span lang=EN-US>Database logging of offline tasks (such as
+click re-classification, bearing calculation, etc.)</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Data selector for Whistle Classifier module</span></p>
 
@@ -1835,9 +1839,9 @@ Detector display. </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>1. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
-lang=EN-US> </span>This version of PAMGuard has been upgraded to make it
-compatible with Java 12. psfx files generated in previous beta releases should
-be compatible with this version, and vice-versa.</p>
+lang=EN-US> </span>This version of PAMGuard has been upgraded to make it compatible
+with Java 12. psfx files generated in previous beta releases should be
+compatible with this version, and vice-versa.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>2. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
@@ -2107,8 +2111,8 @@ better visibility at night.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>7. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
-lang=EN-US> </span>Added print screen button to capture/save all PAMGuard screens
-to file and log the information to the database.</p>
+lang=EN-US> </span>Added print screen button to capture/save all PAMGuard
+screens to file and log the information to the database.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>8. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
@@ -2209,10 +2213,10 @@ settings even when user tries to cancel or discard changes</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>6. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span>Bug 387. Map was stopping displaying data based on the start time of
-data units. Have changed this to last updated time so that click events will
-display if they have been recently modified. Otherwise, long events get lost
-from the display.</p>
+</span>Bug 387. Map was stopping displaying data based on the start time of data
+units. Have changed this to last updated time so that click events will display
+if they have been recently modified. Otherwise, long events get lost from the
+display.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>7. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -2260,9 +2264,9 @@ see new options in main menu.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>2. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
-lang=EN-US> </span>Added Matched Template Click Classifier. Classifies clicks
-based on an ideal template to match and a template to reject. An example of
-this is to classify beaked whale clicks in an environment with dolphin clicks.</p>
+lang=EN-US> </span>Added Matched Template Click Classifier. Classifies clicks based
+on an ideal template to match and a template to reject. An example of this is
+to classify beaked whale clicks in an environment with dolphin clicks.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>3. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
@@ -2857,9 +2861,9 @@ dependencies)</span></p>
 
 <p class=MsoNormal><b><span lang=EN-US>Other Changes</span></b></p>
 
-<p class=MsoNormal><span lang=EN-US>The installer has been updated to handle
-both 64 bit and 32 bit installations. PAMGuard psf files are now registered in
-the Windows Registry, so double-clicking on a psf file should run PAMGuard in
+<p class=MsoNormal><span lang=EN-US>The installer has been updated to handle both
+64 bit and 32 bit installations. PAMGuard psf files are now registered in the
+Windows Registry, so double-clicking on a psf file should run PAMGuard in
 normal mode (as opposed to Viewer or Mixed modes). Note that the Windows
 Registry can only hold a single executable reference for psf files; therefore,
 for users with multiple installations of PAMGuard, double-clicking on a psf
@@ -3025,9 +3029,9 @@ detector has been tidied up so that there are a) All Click, b) Tracked Clicks
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>3.</span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 </span><span lang=EN-US>When tracking online, all the click marking information
-is written to the same database tables as are used for offline target motion
-analysis. This means than when reviewing data offline, the tracks created in
-real time are now available for review and further analysis. </span></p>
+is written to the same database tables as are used for offline target motion analysis.
+This means than when reviewing data offline, the tracks created in real time
+are now available for review and further analysis. </span></p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>4.</span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -3055,9 +3059,9 @@ the future. </span></p>
 
 <p class=MsoNormal><i>Logger Form Design</i></p>
 
-<p class=MsoNormal>A GUI driven system for designing Logger forms has been released.
-Currently, this feature has no online help, but is reasonably intuitive
-compared to the old method of typing directly into the database. </p>
+<p class=MsoNormal>A GUI driven system for designing Logger forms has been
+released. Currently, this feature has no online help, but is reasonably
+intuitive compared to the old method of typing directly into the database. </p>
 
 <p class=MsoNormal><i><span lang=EN-US>Improved Number handling</span></i></p>
 
@@ -3124,14 +3128,14 @@ dialog.</p>
 
 <p class=MsoListParagraph style='margin-left:38.25pt;text-indent:-20.25pt'>6.<span
 style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span>Bug 278. Have future proofed against potential binary file format
-changes in future releases. New PAMGuard releases will always be able to open
-older binary files, however, with previous PAMGuard releases if a newer file
-format was opened, then PAMGuard was unable to check that the file format was
-newer and would attempt to read the files and might even corrupt them. Now it
-will recognise that it cannot open the files, display appropriate error
-messages and not attempt to read the files. NOTE that at this time there are no
-planned file format changes and that this is purely a future proofing exercise.</p>
+</span>Bug 278. Have future proofed against potential binary file format changes
+in future releases. New PAMGuard releases will always be able to open older
+binary files, however, with previous PAMGuard releases if a newer file format
+was opened, then PAMGuard was unable to check that the file format was newer
+and would attempt to read the files and might even corrupt them. Now it will
+recognise that it cannot open the files, display appropriate error messages and
+not attempt to read the files. NOTE that at this time there are no planned file
+format changes and that this is purely a future proofing exercise.</p>
 
 <p class=MsoListParagraph style='margin-left:38.25pt;text-indent:-20.25pt'>7.<span
 style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -3791,8 +3795,8 @@ File/BinaryStore/Datagram options menu. </p>
 <p class=MsoNormal><i>Viewer Configuration</i></p>
 
 <p class=MsoNormal>The Viewer configuration is now saved into a separate
-database table from 'normal' settings so that Viewer can run at same time as
-normal operation, but with slightly different display settings. </p>
+database table from 'normal' settings so that Viewer can run at same time as normal
+operation, but with slightly different display settings. </p>
 
 <p class=MsoNormal><i>Spectrogram Display</i></p>
 
@@ -3815,8 +3819,9 @@ shaped Finite Impulse Response filters (see online help for details). </p>
 
 <p class=MsoNormal><i>Radar Display</i></p>
 
-<p class=MsoNormal>Can now show bearings relative to true North OR the vessel heading.
-Also has the option of only showing certain types of click and whistle.</p>
+<p class=MsoNormal>Can now show bearings relative to true North OR the vessel
+heading. Also has the option of only showing certain types of click and
+whistle.</p>
 
 <p class=MsoNormal><b>Bug Fixes</b></p>
 
@@ -3880,9 +3885,9 @@ Also has the option of only showing certain types of click and whistle.</p>
 
 <p class=MsoNormal><b>New Modules</b></p>
 
-<p class=MsoNormal style='margin-left:36.0pt'>Clip Generator: Saves and displays
-short waveform clips around detections. Can work with any detector (or indeed
-any other data stream within PAMGuard). &nbsp;</p>
+<p class=MsoNormal style='margin-left:36.0pt'>Clip Generator: Saves and
+displays short waveform clips around detections. Can work with any detector (or
+indeed any other data stream within PAMGuard). &nbsp;</p>
 
 <p class=MsoNormal style='margin-left:36.0pt'>Local time display: displays the
 computers local time on the main display panel. </p>
@@ -4411,9 +4416,9 @@ more displays are set up for offline data viewing in future releases. </p>
 
 <p class=MsoNormal>Viewer data map</p>
 
-<p class=MsoNormal>When using the PAMGuard viewer an additional panel will be
-displayed showing an overview of data quantity (per hour) from the various
-database tables connected to PAMGuard. </p>
+<p class=MsoNormal>When using the PAMGuard viewer an additional panel will be displayed
+showing an overview of data quantity (per hour) from the various database
+tables connected to PAMGuard. </p>
 
 <p class=MsoNormal>Spectrogram Display overlays</p>
 
@@ -4507,8 +4512,8 @@ Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span style='font-family:
 Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span>Synchronisation of FFT functions. Prevents threads accessing the same
-FFT module simultaneously which was occasionally causing crashes of the click
+</span>Synchronisation of FFT functions. Prevents threads accessing the same FFT
+module simultaneously which was occasionally causing crashes of the click
 detector if multiple hydrophone groups were being used. </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span style='font-family:
@@ -4981,9 +4986,9 @@ localiser (affects stability of click train localiser and whistle localiser in <
 
 <h2>1.2.0 Beta December 2008</h2>
 
-<p class=MsoNormal>This release contains many bug fixes from the PAMGuard
-industry field trial which took place in the Gulf of Mexico on the RV New
-Venture in November 2008.</p>
+<p class=MsoNormal>This release contains many bug fixes from the PAMGuard industry
+field trial which took place in the Gulf of Mexico on the RV New Venture in
+November 2008.</p>
 
 <p class=MsoNormal><b>Bug Fixes</b></p>
 
@@ -5109,11 +5114,11 @@ Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif
 
 <p class=MsoNormal><b>Multithreading</b></p>
 
-<p class=MsoNormal>PAMGuard now processes data in each module in a different
-processing thread. This allows PAMGuard to use both processor cores on dual or
-multi core processor machines. However, multithreading may still cause
-instability in some modules. An option is therefore accessible from the main
-Detection menu to enable and disable multithreading. </p>
+<p class=MsoNormal>PAMGuard now processes data in each module in a different processing
+thread. This allows PAMGuard to use both processor cores on dual or multi core
+processor machines. However, multithreading may still cause instability in some
+modules. An option is therefore accessible from the main Detection menu to
+enable and disable multithreading. </p>
 
 <p class=MsoNormal><b>New Modules</b></p>
 
@@ -5239,7 +5244,8 @@ Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif
 
 <h2>0.5b&nbsp;&nbsp;&nbsp; 31 August 2007 </h2>
 
-<p class=MsoNormal>Requires Java 6 Update 2 (http://java.com/en/download/manual.jsp)</p>
+<p class=MsoNormal>Requires Java 6 Update 2
+(http://java.com/en/download/manual.jsp)</p>
 
 <p class=MsoNormal>Major new features include:</p>
 
