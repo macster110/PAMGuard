@@ -63,6 +63,7 @@ import PamView.FullScreen;
 import PamView.ScreenSize;
 import PamView.dialog.warn.WarnOnce;
 import PamguardMVC.debug.Debug;
+import SoundRecorder.RecorderControl;
 import binaryFileStorage.BinaryStore;
 import dataPlotsFX.JamieDev;
 import generalDatabase.DBControl;
@@ -321,6 +322,12 @@ public class Pamguard {
 					String wavFolder = args[iArg++];
 					GlobalArguments.setParam(FolderInputSystem.GlobalWavFolderArg, wavFolder);
 					System.out.println("Setting input wav file folder to " + wavFolder);
+				}
+				else if (anArg.equalsIgnoreCase(RecorderControl.GlobalWavPrefixArg)) {
+					// source folder for wav files (or other supported sound files)
+					String wavPrefix = args[iArg++];
+					GlobalArguments.setParam(RecorderControl.GlobalWavPrefixArg, wavPrefix);
+					System.out.println("Setting recording prefix to " + wavPrefix);
 				}
 				else if (anArg.equalsIgnoreCase(PamController.AUTOSTART)) {
 					// auto start processing. 

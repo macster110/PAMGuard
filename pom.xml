@@ -618,19 +618,6 @@
 				<enabled>true</enabled>
 			</releases>
 		</repository>
-		<!-- Repos for geotools (do I need both ? >-->
-		<repository>
-			<id>osgeo-snapshot</id>
-			<name>OSGeo Snapshot Repository</name>
-			<url>https://repo.osgeo.org/repository/snapshot/</url>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-		</repository>
-
 	</repositories>
 
 
@@ -758,46 +745,21 @@
 			<scope>compile</scope>
 		</dependency>
 
-		<!--   GeoTools to unpack GeoTIFF files 
-		<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-geotiff</artifactId>
-			<version>29.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-main</artifactId>
-			<version>29.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-referencing</artifactId>
-			<version>29.0</version>
-		</dependency>-->
 		<dependency>
 			<groupId>org.geotools</groupId>
 			<artifactId>gt-bom</artifactId>
 			<version>${geotools.version}</version>
 			<type>pom</type>
-			<scope>import</scope>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit</groupId>
 			<artifactId>junit-bom</artifactId>
 			<version>5.11.0</version>
 			<type>pom</type>
-			<scope>import</scope>
+			<scope>compile</scope>
 		</dependency>
-		<!--<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-shapefile</artifactId>
-			<version>${geotools.version}</version>
-		</dependency> -->
-		<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-swing</artifactId>
-			<version>${geotools.version}</version>
-		</dependency>
+		<!-- Geotools libraries needed to get reference positions from geotiff files. -->
 		<dependency>
 			<groupId>org.geotools</groupId>
 			<artifactId>gt-epsg-hsql</artifactId>
@@ -808,11 +770,11 @@
 			<artifactId>gt-geotiff</artifactId>
 			<version>${geotools.version}</version>
 		</dependency>
-		<!-- <dependency>
+		 <dependency>
 			<groupId>org.geotools</groupId>
 			<artifactId>gt-image</artifactId>
 			<version>${geotools.version}</version>
-		</dependency>-->
+		</dependency>
 
 		<!-- Swing theme for MacOS -->
 		<dependency>
