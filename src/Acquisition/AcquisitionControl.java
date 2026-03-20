@@ -86,6 +86,7 @@ import hfDaqCard.SmruDaqSystem;
 //import mcc.mccacquisition.MCCDaqSystem;
 import mcc.mccacquisition.MCCDaqSystem;
 import nidaqdev.NIDAQProcess;
+import nidaqdev.networkdaq.NINetworkDaq;
 import pamScrollSystem.ViewLoadObserver;
 import simulatedAcquisition.SimProcess;
 
@@ -191,9 +192,9 @@ public class AcquisitionControl extends RawInputControlledUnit implements PamSet
 		registerDaqSystem(new SmruDaqSystem(this));
 		registerDaqSystem(new SimProcess(this));
 //		registerDaqSystem(new XArrayDaq(this));
+		registerDaqSystem(new NINetworkDaq(this));
 		if (SMRUEnable.isEnable()) {
 //			registerDaqSystem(new icListenSystem());
-//			registerDaqSystem(new NINetworkDaq(this));
 			registerDaqSystem(new MCCDaqSystem(this));
 //			registerDaqSystem(new RonaInputSystem(this));
 		}
