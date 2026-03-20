@@ -204,7 +204,7 @@
 									real time operation"</NSMicrophoneUsageDescription>
 							</plist>
 							<dmg>
-								<generate>true</generate>
+								<generate>false</generate>
 								<additionalResources>
 									<additionalResource>
 										<directory>
@@ -226,7 +226,8 @@
 							</jdk>
 							<codesign>
 								<enable>true</enable>
-								<identity>Apple Distribution: Jamie Macaulay (7365S9DZ34)</identity>
+								<identity>Apple Distribution: Jamie Macaulay
+									(7365S9DZ34)</identity>
 							</codesign>
 						</configuration>
 						<executions>
@@ -240,11 +241,13 @@
 					</plugin>
 
 
-					
 					<!--There is an issue with coide signing in the macosappbundler-maven-plugin. Details of the issue are here.
 					https://developer.apple.com/library/archive/qa/qa1940/_index.html  
 					To get round this run a script afterwards which signs the .app and create an alternative dmg file which is signed  -->
-					<plugin>
+					<!-- App sepecific passowrd aqnu-fcyf-itol-dsgq -->
+
+
+					<!--<plugin>
 						<groupId>org.codehaus.mojo</groupId>
 						<artifactId>exec-maven-plugin</artifactId>
 						<version>3.5.0</version>
@@ -256,24 +259,14 @@
 									<goal>exec</goal>
 								</goals>
 								<configuration>
-									<executable>bash</executable>
-									<arguments>
-										<argument>-c</argument>
-										<argument>
-											echo ${project.basedir}/target/${project.build.finalName}.dmg
-											xattr -cr ${project.basedir}/target/PAMGuard.app
-											codesign --force --sign "3rd Party Mac Developer Application: Jamie Macaulay" ${project.basedir}/target/PAMGuard.app
-											cp -r ${project.basedir}/target/PAMGuard.app ${project.basedir}/target/bundle/PAMGuard.app
-											cd ${project.basedir}/target/bundle
-											hdiutil create -srcfolder ${project.basedir}/target/bundle -volname "PAMGuard" -fs HFS+ -o "${project.build.finalName}-signed.dmg"
-											rm -r ${project.basedir}/target/bundle/PAMGuard.app
-										</argument>
-									</arguments>
-								</configuration>
+					                <executable>bash</executable>
+					                <arguments>
+					                    <argument>${project.basedir}/build/macos/build_and_sign.sh</argument>
+					                </arguments>
+					            </configuration>
 							</execution>
 						</executions>
-
-					</plugin>
+					</plugin>-->
 
 				</plugins>
 			</build>
@@ -345,6 +338,10 @@
 						<artifactId>maven-shade-plugin</artifactId>
 						<version>3.6.0</version>
 						<configuration>
+							<transformers>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+							</transformers>
 							<filters>
 								<!-- Moved these filters up to here from where
 								they were int
@@ -389,7 +386,8 @@
 												file -->
 											</manifestEntries>
 										</transformer>
-										<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+										<transformer
+											implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
 									</transformers>
 								</configuration>
 							</execution>
@@ -620,19 +618,6 @@
 				<enabled>true</enabled>
 			</releases>
 		</repository>
-		<!-- Repos for geotools (do I need both ? >-->
-		<repository>
-			<id>osgeo-snapshot</id>
-			<name>OSGeo Snapshot Repository</name>
-			<url>https://repo.osgeo.org/repository/snapshot/</url>
-			<snapshots>
-				<enabled>true</enabled>
-			</snapshots>
-			<releases>
-				<enabled>false</enabled>
-			</releases>
-		</repository>
-
 	</repositories>
 
 
@@ -760,46 +745,21 @@
 			<scope>compile</scope>
 		</dependency>
 
-		<!--   GeoTools to unpack GeoTIFF files 
-		<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-geotiff</artifactId>
-			<version>29.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-main</artifactId>
-			<version>29.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-referencing</artifactId>
-			<version>29.0</version>
-		</dependency>-->
 		<dependency>
 			<groupId>org.geotools</groupId>
 			<artifactId>gt-bom</artifactId>
 			<version>${geotools.version}</version>
 			<type>pom</type>
-			<scope>import</scope>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.junit</groupId>
 			<artifactId>junit-bom</artifactId>
 			<version>5.11.0</version>
 			<type>pom</type>
-			<scope>import</scope>
+			<scope>compile</scope>
 		</dependency>
-		<!--<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-shapefile</artifactId>
-			<version>${geotools.version}</version>
-		</dependency> -->
-		<dependency>
-			<groupId>org.geotools</groupId>
-			<artifactId>gt-swing</artifactId>
-			<version>${geotools.version}</version>
-		</dependency>
+		<!-- Geotools libraries needed to get reference positions from geotiff files. -->
 		<dependency>
 			<groupId>org.geotools</groupId>
 			<artifactId>gt-epsg-hsql</artifactId>
@@ -810,11 +770,11 @@
 			<artifactId>gt-geotiff</artifactId>
 			<version>${geotools.version}</version>
 		</dependency>
-		<!-- <dependency>
+		 <dependency>
 			<groupId>org.geotools</groupId>
 			<artifactId>gt-image</artifactId>
 			<version>${geotools.version}</version>
-		</dependency>-->
+		</dependency>
 
 		<!-- Swing theme for MacOS -->
 		<dependency>
@@ -828,7 +788,7 @@
 		<dependency>
 			<groupId>net.synedra</groupId>
 			<artifactId>validatorfx</artifactId>
-			<version>0.6.3</version>
+			<version>0.4.2</version>
 		</dependency>
 
 		<!--
@@ -910,20 +870,19 @@
 			</exclusions>
 		</dependency>
 
-		<!-- html to markdown conversion https://github.com/furstenheim/copy-down --> 
-	    <dependency>
-	        <groupId>io.github.furstenheim</groupId>
-	        <artifactId>copy_down</artifactId>
-	        <version>1.1</version>
-	    </dependency>
-
+		<!-- html to markdown conversion
+		https://github.com/furstenheim/copy-down -->
+		<dependency>
+			<groupId>io.github.furstenheim</groupId>
+			<artifactId>copy_down</artifactId>
+			<version>1.1</version>
+		</dependency>
 
 		<!--
 		https://search.maven.org/artifact/org.kordamp.ikonli/ikonli-javafx/12.2.0/jar -->
 		<!-- Icon symbol pack to replace FontAwesome.  This is the core library,
 		and the
 	     actual symbol packs need to be added separately (see below) -->
-	    <!-- Note: version 12.4.0 causes issues on symbols on mac so stick with 12.3.1 -->
 		<dependency>
 			<groupId>org.kordamp.ikonli</groupId>
 			<artifactId>ikonli-javafx</artifactId>
