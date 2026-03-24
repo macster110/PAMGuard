@@ -311,15 +311,6 @@
       <name>OSGeo Release Repository</name>
       <url>https://repo.osgeo.org/repository/release/</url>
     </repository>
-    <repository>
-      <releases>
-        <enabled>false</enabled>
-      </releases>
-      <snapshots />
-      <id>osgeo-snapshot</id>
-      <name>OSGeo Snapshot Repository</name>
-      <url>https://repo.osgeo.org/repository/snapshot/</url>
-    </repository>
   </repositories>
   <dependencies>
     <dependency>
@@ -327,14 +318,14 @@
       <artifactId>gt-bom</artifactId>
       <version>34.0</version>
       <type>pom</type>
-      <scope>import</scope>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.junit</groupId>
       <artifactId>junit-bom</artifactId>
       <version>5.11.0</version>
       <type>pom</type>
-      <scope>import</scope>
+      <scope>compile</scope>
     </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
