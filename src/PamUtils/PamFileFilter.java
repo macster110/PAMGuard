@@ -85,6 +85,7 @@ public class PamFileFilter extends javax.swing.filechooser.FileFilter implements
 
 	public static String getExtension(File f) {
 		String ext = null;
+		
 		String s = f.getName();
 		int i = s.lastIndexOf('.');
 		if (i > 0 && i < s.length() - 1) {
@@ -111,7 +112,7 @@ public class PamFileFilter extends javax.swing.filechooser.FileFilter implements
 		}
 		String fEnd = getExtension(f);
 		if (fEnd != null && fEnd.equals(end)) return f;
-		if (fEnd != null && fEnd.length() > 1 && forceEnd == false) return f;
+		if (fEnd != null && fEnd.length() > 1 && !forceEnd) return f;
 		// either there is no end, or it's the wrong type.
 		String newName = f.getAbsolutePath();
 		if (fEnd != null) { // remove it !

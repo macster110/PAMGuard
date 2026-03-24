@@ -126,7 +126,7 @@ public class SqliteSystem extends DBSystem implements PamSettings {
 		// if the file doesn't exit, consider creating it.
 		if (newFile.exists() == false) {
 			boolean ask = GlobalArguments.getParam(DBControl.GlobalDatabaseNameArg) == null;
-			newFile = createNewDatabase(databaseName, null, ask);
+			newFile = createNewDatabase(databaseName, dbControl.getGuiFrame(), ask);
 			if (newFile == null) {
 				System.out.println("Unable to create "+newFile);
 				return;
@@ -270,7 +270,9 @@ public class SqliteSystem extends DBSystem implements PamSettings {
 			return null;
 		}
 		//			System.out.println("-------------------------------     OpenedSQLite database " + dbName + " handle " + con);
-		return new PamConnection(this, con, sqlTypes);
+		PamConnection connection = new PamConnection(this, con, sqlTypes);
+		connection.setDatabaseName(dbName);
+		return connection;
 	}
 
 	@Override

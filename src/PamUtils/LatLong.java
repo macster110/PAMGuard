@@ -14,6 +14,7 @@ import java.text.NumberFormat;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 import PamguardMVC.PamConstants;
 import net.sf.geographiclib.Geodesic;
@@ -730,7 +731,7 @@ public class LatLong implements Serializable, Cloneable, Transferable, PamCoordi
 
 //		DataFlavor[] a = clipboard.getContents(null).getTransferDataFlavors();
 		boolean ans = clipboard.getContents(null).isDataFlavorSupported(LatLong.getDataFlavor());
-		if (ans == false) {
+		if (!ans) {
 			return null;
 		}
 		
@@ -833,7 +834,7 @@ public class LatLong implements Serializable, Cloneable, Transferable, PamCoordi
 	 */
 	@Override
 	public PamParameterSet getParameterSet() {
-	PamParameterSet ps = PamParameterSet.autoGenerate(this);
+	PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 	try {
 		Field field = this.getClass().getDeclaredField("height");
 		ps.put(new PrivatePamParameterData(this, field) {

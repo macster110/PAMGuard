@@ -27,12 +27,14 @@ import java.io.File;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.net.URL;
+
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 
 /**
@@ -203,13 +205,14 @@ public class ClickAlarm implements Comparable<ClickAlarm>, Serializable, Cloneab
         return name;
     }
 
-    public int compareTo(ClickAlarm alarm) {
+    @Override
+	public int compareTo(ClickAlarm alarm) {
         return name.compareTo(alarm.getName());
     }
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("fileIsLoaded");
 			ps.put(new PrivatePamParameterData(this, field) {

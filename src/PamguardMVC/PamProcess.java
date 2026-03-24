@@ -36,18 +36,18 @@ import java.awt.event.ActionListener;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
-import javax.swing.Timer;
 
-import networkTransfer.receive.BuoyStatusDataUnit;
+import javax.swing.Timer;
 
 import PamController.PamControlledUnit;
 import PamController.PamController;
 import PamController.PamControllerInterface;
 import PamController.status.ProcessCheck;
 import PamModel.PamModel;
-import PamModel.PamProfiler;
 import PamUtils.PamCalendar;
 import PamguardMVC.dataOffline.OfflineDataLoadInfo;
+import PamguardMVC.datakeeper.DataKeeper;
+import networkTransfer.receive.BuoyStatusDataUnit;
 
 /**
  * @author Doug Gillespie
@@ -105,7 +105,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	/**
 	 * The sample rate of the process. 
 	 */
-	protected float sampleRate;
+	private float sampleRate;
 
 	// private PamDataUnit lastUsedUnit;
 	protected String processName;
@@ -121,11 +121,13 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	 */
 	boolean isExternalProcess = true; 
 
-	PamProfiler.CPUUsageSnapshot startCPUSnapShot, endCPUSnapShot;
+//	PamProfiler.CPUUsageSnapshot startCPUSnapShot, endCPUSnapShot;
 	
 	private long cpuUsage;
 	private long lastCPUCheckTime = System.currentTimeMillis();
 	private double cpuPercent;
+	private double totalCPU, peakCPU;
+	private int nCPU;
 	
 	/**
 	 * Flag for the process to say whether or not it's primary data connection
@@ -140,6 +142,11 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	 * Last received data unit - used for working out timing offsets. 
 	 */
 	private PamDataUnit lastAcousticDataunit;
+
+	/*
+	 * diagnostic count of all data processed
+	 */
+	private int nDataProcessed;
 	// some flags and variables needed to deal with conversion from
 	// milliseconds to samples and back
 //	private boolean acousticDataSource = false;
@@ -296,6 +303,10 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 		 * one. Otherwise Pamguard tends to get stuck in a loop of model change
 		 * notifications and setting of data blocks. 
 		 */
+		boolean instant =  (this instanceof PamInstantProcess);
+		if (instant) {
+			reThread = false;
+		}
 		if (parentDataBlock == newParentDataBlock) {
 			return;
 		}
@@ -305,7 +316,12 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 		}
 		parentDataBlock = newParentDataBlock;
 		if (parentDataBlock != null) {
-			parentDataBlock.addObserver(this, PamModel.getPamModel().isMultiThread() & reThread);
+			if (instant) {
+				parentDataBlock.addInstantObserver(this);
+			}
+			else {
+				parentDataBlock.addObserver(this, PamModel.getPamModel().isMultiThread() & reThread);
+			}
 //			acousticDataSource = AcousticDataUnit.class.isAssignableFrom(parentDataBlock.getUnitClass());
 //			parentProcess = parentDataBlock.getParentProcess();
 			PamProcess pp = parentDataBlock.getParentProcess();
@@ -357,6 +373,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 		return processName;
 	}
 
+	@Override
 	public String getObserverName() {
 		return "Process: " + getProcessName();
 	}
@@ -366,8 +383,12 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	 * 
 	 * @see PamguardMVC.PamObserver#SetSampleRate(float, boolean)
 	 */
+	@Override
 	public void setSampleRate(float sampleRate, boolean notify) {
 		// notify all output data blocks that there is a new sample rate
+//		if (Math.round(sampleRate) == 9600) {
+//			System.out.printf("Sample rate in %s set to 9600\n", getProcessName());
+//		}
 		this.sampleRate = sampleRate;
 		if (notify && outputDataBlocks != null) {
 			for (int i = 0; i < outputDataBlocks.size(); i++) {
@@ -457,6 +478,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 		return (long) (millis * sampleRate / 1000);
 	}
 
+	@Override
 	public void noteNewSettings() {
 		for (int i = 0; i < outputDataBlocks.size(); i++) {
 			outputDataBlocks.get(i).noteNewSettings();
@@ -625,7 +647,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	 *            Reference to a PamDataBlock
 	 */
 	public void addOutputDataBlock(PamDataBlock outputDataBlock) {
-		if (outputDataBlocks.contains(outputDataBlock) == false){
+		if (!outputDataBlocks.contains(outputDataBlock)){
 			outputDataBlocks.add(outputDataBlock);
 			PamController.getInstance().notifyModelChanged(PamControllerInterface.ADD_DATABLOCK);
 		}
@@ -670,6 +692,19 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 		return processName;
 	}
 
+	/**
+	 * Should all output data from this process be cleared at startup ? 
+	 * Default behaviour is to follow the global value in DataKeeper for real time. 
+	 * For file analysis, we need to avoid going back in time, so clear anyway !
+	 * @return
+	 */
+	public boolean isClearAtStart() {
+		if (PamCalendar.isSoundFile()) {
+			return true;
+		}
+		boolean cas = DataKeeper.getInstance().isClearAtStart();
+		return cas;
+	}
 
 	/**
 	 * Clears all data from all output data blocks of this process.
@@ -677,8 +712,21 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	 * start of operations. Can be overridden in some classes
 	 * which don't want to delete existing data or they can set the 
 	 * clearAtStart flag in any data block. 
+	 * <br> will check the isClearAtStart flag to see if we really should clear data at start up
 	 */
 	public void clearOldData() {
+		boolean cas = isClearAtStart();
+		if (cas) {
+			doClearOldData();
+		}
+	}
+	
+	/**
+	 * Clears all data from all output data blocks of this process.
+	 * <br>Does not ask or check, so can bypass the behaviour of 
+	 * clearOldData(), which will check on the datakeeper option to clearatstart. 
+	 */
+	public void doClearOldData() {
 		for (int i = 0; i < outputDataBlocks.size(); i++) {
 			if (outputDataBlocks.get(i).isClearAtStart()) {
 				outputDataBlocks.get(i).clearAll();
@@ -742,6 +790,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 		}
 //		long cpuStart = SystemTiming.getProcessCPUTime();
 		long threadId = Thread.currentThread().getId();
+		nDataProcessed++;
 		long cpuStart = tmxb.getThreadCpuTime(threadId);
 			newData(o, arg);
 			if (processCheck != null) {
@@ -753,6 +802,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	}
 	
 	Timer t = new Timer(1000, new ActionListener() {
+		@Override
 		public void actionPerformed(ActionEvent evt) {
 			long now = System.currentTimeMillis();
 			if (lastCPUCheckTime == now) return;
@@ -762,12 +812,18 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 			 * get percent. Total is -9+3+2 = /!0^4 !  
 			 */
 			cpuPercent = (double) cpuUsage / (now - lastCPUCheckTime) / 10000.;
+			// these next two allow us to take an average cpu. 
+			totalCPU += cpuPercent;
+			nCPU++;
+			// and hte max cpu (may always go to 100 at end ?)
+			peakCPU = Math.max(cpuPercent, peakCPU);
+			
 			lastCPUCheckTime = now;
 			cpuUsage = 0;
 		}
 	});
 
-	private int lastSourceNotificationType;
+	private volatile int lastSourceNotificationType;
 
 	private Object lastSourceNotificationObject;
 	
@@ -775,6 +831,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 		
 	}
 	
+	@Override
 	public void updateData(PamObservable o, PamDataUnit arg) {
 		
 	}
@@ -822,6 +879,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	 * Called when a PamDataBlock observed by this PamProcess is
 	 * removed. 
 	 */
+	@Override
 	public void removeObservable(PamObservable observable) {
 		// TODO Auto-generated method stub
 		// called when the source data block has been removed. 
@@ -898,7 +956,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 //		if (getParentDataBlock() == null) {
 //			return PamDataBlock.REQUEST_NO_DATA;
 //		}
-		return getOfflineData(new OfflineDataLoadInfo(this, endUser, startMillis, endMillis, loadKeepLayers-1, true));
+		return getOfflineData(new OfflineDataLoadInfo(this, endUser, startMillis, endMillis, loadKeepLayers, true));
 	}
 	
 	
@@ -927,7 +985,7 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 		int errors = 0;
 		int nDB = getNumOutputDataBlocks();
 		for (int i = 0; i < nDB; i++) {
-			if (getOutputDataBlock(i).waitForThreadedObservers(maxWait) == false) {
+			if (!getOutputDataBlock(i).waitForThreadedObservers(maxWait)) {
 				errors++;
 			}
 		}
@@ -1063,6 +1121,29 @@ abstract public class PamProcess implements PamObserver, ProcessAnnotator {
 	 */
 	public Object getLastSourceNotificationObject() {
 		return lastSourceNotificationObject;
+	}
+
+	/**
+	 * Say the status of any buffers, particularly in output buffers of 
+	 * data blocks, but can add bespoke info for other internal buffers
+	 * for some processes. 
+	 * @param message
+	 * @param sayEmpties include info even if a buffer is empty. 
+	 */
+	public void dumpBufferStatus(String message, boolean sayEmpties) {
+		if (sayEmpties || nDataProcessed > 0) {
+			System.out.printf("Process %s: ran %d datas, peak CPU %3.1f%%, mean CPU %3.1f%%\n", this.getProcessName(), nDataProcessed, peakCPU, totalCPU/nCPU);
+		}
+		ArrayList<PamDataBlock> outputs = getOutputDataBlocks();
+		try {
+			for (PamDataBlock output : outputs) {
+				output.dumpBufferStatus(message, sayEmpties);
+			}
+		}
+		catch (Exception e) {
+			System.err.println("Error dumping buffer data from process " + getProcessName());
+			e.printStackTrace();
+		}
 	}
 
 }

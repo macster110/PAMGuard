@@ -6,6 +6,7 @@ import java.lang.reflect.Field;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 
 public class AlarmParameters implements Serializable, Cloneable, ManagedParameters {
@@ -46,7 +47,7 @@ public class AlarmParameters implements Serializable, Cloneable, ManagedParamete
 			if (np.triggerCounts == null || np.triggerCounts.length != COUNT_LEVELS) {
 				np.triggerCounts = new double[COUNT_LEVELS];
 			}
-			if (np.hadHold == false) {
+			if (!np.hadHold) {
 				np.setHoldSeconds(3600);
 				np.hadHold = true;
 			}
@@ -103,7 +104,7 @@ public class AlarmParameters implements Serializable, Cloneable, ManagedParamete
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DISPLAY);
 		try {
 			Field field = this.getClass().getDeclaredField("hadHold");
 			ps.put(new PrivatePamParameterData(this, field) {

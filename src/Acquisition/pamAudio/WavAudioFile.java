@@ -12,8 +12,14 @@ import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 import org.codehaus.plexus.util.FileUtils;
+import org.pamguard.x3.sud.SudAudioInputStream;
+
 import Acquisition.offlineFuncs.AquisitionLoadPoint;
 import PamDetection.RawDataUnit;
+import PamUtils.worker.filelist.WavFileType;
+import PamUtils.worker.filelist.WavLoadListener;
+import PamUtils.PamCalendar;
+import PamguardMVC.PamConstants;
 //import PamUtils.CPUMonitor;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.dataOffline.OfflineDataLoadInfo;
@@ -47,6 +53,8 @@ public class WavAudioFile implements PamAudioFileLoader {
 	 * Get the file extensions associated with loading these data. 
 	 */
 	protected ArrayList<String> fileExtensions; 
+	
+	private double[] channelBackground = new double[PamConstants.MAX_CHANNELS];
 
 	public WavAudioFile() {
 		fileExtensions = new ArrayList<String>(Arrays.asList(new String[]{".wav", ".aif", ".aiff"})); 
@@ -64,11 +72,16 @@ public class WavAudioFile implements PamAudioFileLoader {
 
 	@Override
 	public boolean loadAudioData(OfflineFileServer offlineFileServer, PamDataBlock dataBlock, OfflineDataLoadInfo offlineDataLoadInfo, ViewLoadObserver loadObserver) {
+		
+		//System.out.println("WavAudioFile: Load Wav Data: " + offlineDataLoadInfo.getCurrentObserver().getObserverName());
 
 		//		Debug.out.println("OfflineFileServer: Load Wav Data: " + offlineDataLoadInfo.getCurrentObserver().getObserverName() );
 		OfflineDataMap<FileDataMapPoint> dataMap = offlineFileServer.getDataMap();
 		Iterator<FileDataMapPoint> mapIt = dataMap.getListIterator();
 		FileDataMapPoint mapPoint = offlineFileServer.findFirstMapPoint(mapIt, offlineDataLoadInfo.getStartMillis(), offlineDataLoadInfo.getEndMillis());
+				
+				
+		//System.out.println("WavAudioFile: mapPoint: " +  mapPoint.getSoundFile().getName() + "   " + PamCalendar.formatDateTime2(mapPoint.getStartTime()) + "  " +  PamCalendar.formatDateTime2(mapPoint.getEndTime())); 
 
 		if (openSoundFile(mapPoint.getSoundFile()) == false) {
 			System.out.println("Could not open sound file " + mapPoint.getSoundFile().getAbsolutePath());
@@ -89,6 +102,9 @@ public class WavAudioFile implements PamAudioFileLoader {
 		int nChannels = audioFormat.getChannels();
 		int blockSamples = Math.max((int) audioFormat.getSampleRate() / 10, 1000);
 		int frameSize = audioFormat.getFrameSize();
+		
+		//System.out.println("loadAudioData.frameSize: " + frameSize);
+		
 		if (frameSize < 0) {
 			frameSize = audioFormat.getChannels()*audioFormat.getSampleSizeInBits()/8;
 		}
@@ -105,15 +121,28 @@ public class WavAudioFile implements PamAudioFileLoader {
 
 		RawDataUnit newDataUnit;
 		long skipped = 0; 
+		long samplePosition = 0;
+		long maxReadBytes = (long) Integer.MAX_VALUE * 2L; 
+		long maxSamples = maxReadBytes / audioFormat.getFrameSize();
 		if (currentTime < offlineDataLoadInfo.getStartMillis()) {
 			// need to fast forward in current file. 
-			long skipBytes = (long) (((offlineDataLoadInfo.getStartMillis()-currentTime)*audioFormat.getSampleRate()*audioFormat.getFrameSize())/1000.);
+			samplePosition = (long) (((offlineDataLoadInfo.getStartMillis()-currentTime)*audioFormat.getSampleRate())/1000.);
+			long skipBytes = samplePosition*audioFormat.getFrameSize();
+			if (mapPoint.getSoundFile() instanceof WavFileType) {
+				WavFileType wavFile = (WavFileType) mapPoint.getSoundFile();
+				// for HARP data, may need to skip the start of the file. 
+				// and also limit how far we can read without going into the next section. 
+				//this doesn't add to the samples count. 
+				skipBytes += wavFile.getSamplesOffset() * audioFormat.getFrameSize();
+				maxSamples = wavFile.getMaxSamples();
+				maxReadBytes = maxSamples * audioFormat.getFrameSize();
+			}
 			try {
 
-				//System.out.println("Skipped " + skipped+  " " + skipBytes + " " + audioInputStream.available());
 //				CPUMonitor cpuMonitor = new CPUMonitor();
 //				cpuMonitor.start();
 				skipped = audioInputStream.skip(skipBytes);
+				
 //				cpuMonitor.stop();
 //				System.out.println(cpuMonitor.getSummary("Sound skip: " + skipBytes + " bytes "));
 				//System.out.println("Offline " + (offlineDataLoadInfo.getStartMillis()-currentTime) + " ms : frame size: " + audioFormat.getFrameSize());
@@ -130,17 +159,24 @@ public class WavAudioFile implements PamAudioFileLoader {
 			currentTime = offlineDataLoadInfo.getStartMillis();
 		}
 		ms = currentTime;
+		int readSamples = inputBuffer.length;
 		while (ms < offlineDataLoadInfo.getEndMillis() && currentTime < offlineDataLoadInfo.getEndMillis()) {
+			
 			if (offlineDataLoadInfo.cancel) {
 				//add the position we got to 
 				offlineDataLoadInfo.setLastLoadInfo(new AquisitionLoadPoint(ms, bytesRead)); 
-
-
 				break;
 			}
 			try {
-				if (inputBuffer.length<audioInputStream.available()) {
-					bytesRead = audioInputStream.read(inputBuffer);
+				// check how far we can read into this file. 
+				long maxRead = (maxSamples - samplePosition)*audioFormat.getFrameSize(); // stupid large unless it's HARP data
+				maxRead = Math.min(maxRead, inputBuffer.length);
+				maxRead = Math.min(maxRead, audioInputStream.available());
+//				if (inputBuffer.length<audioInputStream.available()) {
+//					bytesRead = audioInputStream.read(inputBuffer);
+//				}
+				if (maxRead > 0) {
+					bytesRead = audioInputStream.read(inputBuffer, 0, (int) maxRead);
 				}
 				else {
 					bytesRead = 0; //force new file to load. 
@@ -149,12 +185,13 @@ public class WavAudioFile implements PamAudioFileLoader {
 				e.printStackTrace();
 			}			
 			if (bytesRead <= 0) {
-				skipped = 0 ; //reset ot zero because were not skipping anyu bytes here. 
+				skipped = 0 ; //reset to zero because were not skipping any bytes here. 
 				/*
 				 *  that's the end of that file, so get the next one if there
 				 *  is one, if not then break.
 				 */
 				if (mapIt.hasNext() == false) {
+					//System.out.println("WavAudioFile: no map next: " + mapPoint.getSoundFile().getName());
 					break;
 				}
 				mapPoint = mapIt.next();
@@ -167,20 +204,39 @@ public class WavAudioFile implements PamAudioFileLoader {
 				prevFileEnd = mapPoint.getEndTime();
 				if (!fileGap) { // don't carry on if there is a file gap
 					if (openSoundFile(mapPoint.getSoundFile()) == false) {
+						//System.out.println("WavAudioFile: file gap" );
 						break;
+					}
+					samplePosition = 0;
+					long skipBytes = 0;
+					if (mapPoint.getSoundFile() instanceof WavFileType) {
+						WavFileType wavFile = (WavFileType) mapPoint.getSoundFile();
+						// for HARP data, may need to skip the start of the file. 
+						// and also limit how far we can read without going into the next section. 
+						//this doesn't add to the samples count. 
+						skipBytes += wavFile.getSamplesOffset() * audioFormat.getFrameSize();
+						maxSamples = wavFile.getMaxSamples();
+						maxReadBytes = maxSamples * audioFormat.getFrameSize();
 					}
 					// try again to read data. 
 					try {
+						if (skipBytes>0) {
+							audioInputStream.skip(skipBytes);
+						}
 						bytesRead = audioInputStream.read(inputBuffer);
 					} catch (IOException e) {
 						e.printStackTrace();
 					}		
 					if (bytesRead <= 0) {
+						//System.out.println("WavAudioFile: no bytes read" );
 						break;
 					}
 				}
 			}
+			
+			
 			newSamples = bytesRead / frameSize;
+			samplePosition += newSamples;
 			doubleData = new double[nChannels][newSamples];
 			int convertedSamples = byteConverter.bytesToDouble(inputBuffer, doubleData, bytesRead);
 			ms = offlineFileServer.getOfflineRawDataStore().getParentProcess().absSamplesToMilliseconds(totalSamples);
@@ -190,6 +246,9 @@ public class WavAudioFile implements PamAudioFileLoader {
 
 				newDataUnit = new RawDataUnit(ms, 1 << ichan, totalSamples, newSamples);
 				newDataUnit.setFileSamples(totalSamples + skipped / frameSize); //set the number samples into the wav file. 
+				
+				removeDCComponent(doubleData[ichan], ichan, audioFormat);
+				
 				newDataUnit.setRawData(doubleData[ichan], true);
 
 				//System.out.println("New wav data: " + PamCalendar.formatDateTime(newDataUnit.getTimeMilliseconds()));
@@ -211,6 +270,26 @@ public class WavAudioFile implements PamAudioFileLoader {
 	}
 
 
+	private void removeDCComponent(double[] ds, int channel, AudioFormat audioFormat) {
+		/*
+		 *  do a simple background subtraction with about a 1s time constant. 
+		 *  If the background is currently zero initialise it to the mean data value.  
+		 */
+		double alpha = 1./audioFormat.getSampleRate();
+		double alpha_1 = 1.-alpha;
+		double bg = channelBackground[channel];
+		if (bg == 0.) {
+			for (int i = 0; i < ds.length; i++) {
+				bg += ds[i];
+			}
+			bg /= ds.length;
+		}
+		for (int i = 0; i < ds.length; i++) {
+			ds[i] -= bg;
+			bg = bg*alpha_1 + ds[i]*alpha;
+		}
+	}
+
 	/**
 	 * Open a sound file. 
 	 * @param soundFile
@@ -218,7 +297,7 @@ public class WavAudioFile implements PamAudioFileLoader {
 	 */
 	private boolean openSoundFile(File soundFile) {
 
-		audioInputStream = getAudioStream(soundFile);
+		audioInputStream = getAudioStream(soundFile, null);
 		if (audioInputStream == null) return false;
 		audioFormat = audioInputStream.getFormat();
 
@@ -227,16 +306,25 @@ public class WavAudioFile implements PamAudioFileLoader {
 
 
 	@Override
-	public AudioInputStream getAudioStream(File soundFile) {
-		if (soundFile.exists() == false) return null;
+	public AudioInputStream getAudioStream(File soundFile,  WavLoadListener loadListener) {
+		if (soundFile.exists() == false || soundFile.length()<44) return null;
 		if (soundFile != null && isSoundFile(soundFile)) {
 			try {
 				return WavFileInputStream.openInputStream(soundFile);
 			}
 			catch (UnsupportedAudioFileException | IOException e) {
-				e.printStackTrace(); 
+//				e.printStackTrace(); 
 				// don't do anything and it will try the built in Audiosystem
-				System.err.println("Could not open wav file: trying default audio stream: " + soundFile.getName()); 
+				System.err.println("Could not open wav file: trying default audio stream: " + soundFile.getName() + "  " + soundFile.length());
+				System.err.println(e.getMessage());
+			
+				/* 
+				 * If it's a  wav file, we need to give up at this point and return null, however
+				 * other types may need to go the the default audio system.
+				 */
+				if (soundFile.getName().toLowerCase().endsWith(".wav")) {
+					return null;
+				}
 			}
 		}
 		try {
@@ -250,9 +338,30 @@ public class WavAudioFile implements PamAudioFileLoader {
 	}
 
 
-	public boolean isSoundFile(File soundFile) {
+	public static boolean isSoundFile(File soundFile) {
 		String extension = FileUtils.getExtension(soundFile.getName()); 
-		return (extension.equals(".wav"));
+		//2023-03-12 - for some reason this was .wav
+		return (extension.equals("wav"));
+	}
+	
+	
+//	public static void main(String args[]) {
+//		
+//		File wavFile = new File("E:\\SoundNet\\1chan_analysis\\pamguard\\67150826\\mf_wav\\20180529\\PAM_20180529_055114_000.wav");
+//		try {
+//			WavFileInputStream.openInputStream(wavFile);
+//			System.out.println("Wav file opened successfully: " + isSoundFile(wavFile));
+//			
+//		} catch (UnsupportedAudioFileException | IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+//	}
+
+	@Override
+	public PamAudioSettingsPane getSettingsPane() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 

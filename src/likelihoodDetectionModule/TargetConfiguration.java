@@ -5,6 +5,7 @@ import java.util.ArrayList;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import likelihoodDetectionModule.normalizer.NormalizerProcess.NormalizerAlgorithm;
 
 /**
@@ -37,7 +38,7 @@ public class TargetConfiguration implements Serializable, ManagedParameters {
 		
 		/** The configuration is in Error. */
 		Error
-	};
+	}
 
 	/** The state. */
 	private State state = State.Active;
@@ -453,7 +454,7 @@ public class TargetConfiguration implements Serializable, ManagedParameters {
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 

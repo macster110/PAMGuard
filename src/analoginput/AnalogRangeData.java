@@ -4,12 +4,13 @@ import java.io.Serializable;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 
 public class AnalogRangeData implements Serializable, Cloneable, Comparable<AnalogRangeData>, ManagedParameters {
 
 	public static final long serialVersionUID = 1L;
 
-	public enum AnalogType {VOLTS, AMPS}; 
+	public enum AnalogType {VOLTS, AMPS} 
 	
 	private double[] range;
 	
@@ -87,7 +88,7 @@ public class AnalogRangeData implements Serializable, Cloneable, Comparable<Anal
 
 	@Override
 	public boolean equals(Object obj) {
-		if (obj instanceof AnalogRangeData == false) {
+		if (!(obj instanceof AnalogRangeData)) {
 			return false;
 		}
 		AnalogRangeData oth = (AnalogRangeData) obj;
@@ -119,7 +120,7 @@ public class AnalogRangeData implements Serializable, Cloneable, Comparable<Anal
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 

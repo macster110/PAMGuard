@@ -1,0 +1,363 @@
+package Acquisition.sud;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.UnsupportedAudioFileException;
+import javax.swing.SwingUtilities;
+
+import org.pamguard.x3.sud.ChunkHeader;
+import org.pamguard.x3.sud.SudAudioInputStream;
+import org.pamguard.x3.sud.SudFileMap;
+import org.pamguard.x3.sud.SudMapListener;
+
+import Acquisition.pamAudio.PamAudioSettingsPane;
+import Acquisition.pamAudio.WavAudioFile;
+import PamController.PamControlledUnitSettings;
+import PamController.PamController;
+import PamController.PamGUIManager;
+import PamController.PamSettingManager;
+import PamController.PamSettings;
+import PamUtils.worker.PamWorkProgressMessage;
+import PamUtils.worker.PamWorkWrapper;
+import PamUtils.worker.PamWorker;
+import PamUtils.worker.filelist.WavLoadListener;
+
+/**
+ * Opens a .sud audio file.
+ * <p>
+ * Sud files contain X3 compressed audio data. The sud file reader opens files,
+ * creating a map of the file and saving the map as a.sudx file so it can be
+ * read more rapidly when the file is next accessed.
+ * <p>
+ * The SudioAudioInput stream fully implements AudioInputStream and so sud files
+ * can be accessed using much of the same code as .wav files.
+ *
+ * @author Jamie Macaulay
+ *
+ */
+public class SudAudioFile extends WavAudioFile implements PamSettings {
+
+	private Object conditionSync = new Object();
+
+	private volatile PamWorker<AudioInputStream> worker;
+
+	private volatile SudMapWorker sudMapWorker;
+
+	/**
+	 * Settings pane to allow users to set some additional options.  
+	 */
+	private SudAudioSettingsPane sudAudioSettingsPane;
+
+	/**
+	 * Parameters for the sud file. TODO Note: PamAudioManager is always a single
+	 * instance referenced globally from PAMGuard. Having parameters is therefore
+	 * slightly problematic because they will apply across SoundAcquisition modules.
+	 * So in the case that someone is using two or more Sound Acquisition modules
+	 * then selecting zero and non -zero pad would be impossible
+	 */
+	private PamSudParams sudParams = new PamSudParams(); 
+
+	public SudAudioFile() {
+		super();
+		fileExtensions = new ArrayList<String>(Arrays.asList(new String[] { ".sud" }));
+		PamSettingManager.getInstance().registerSettings(this);
+	}
+
+	@Override
+	public String getName() {
+		return "SUD";
+	}
+
+	@Override
+	public AudioInputStream getAudioStream(File soundFile,  WavLoadListener loadListener) {
+
+		synchronized (conditionSync) {
+
+			// System.out.println("Get SUD getAudioStream : " + soundFile.getName());
+
+			if (soundFile.exists() == false) {
+				System.err.println("The sud file does not exist: " + soundFile);
+				return null;
+			}
+			if (soundFile != null) {
+
+				if (isValidSudMapFile(soundFile)) {
+					//				System.out.println("----NO NEED TO MAP SUD FILE-----"  + soundFile);
+					try {
+//						System.out.println("Opening SUD file without mapping: " + soundFile.getName() + " ZERODPAD: " + sudParams.zeroPad);
+						return new SudAudioFileReader(sudParams.zeroPad).getAudioInputStream(soundFile);
+					} catch (UnsupportedAudioFileException | IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+				else {
+					
+					AudioInputStream stream = null;
+					if (PamGUIManager.isFX()) {
+						
+						/**
+						 * When using JavaFX we update via a listener. This is better form than a blocking dialog and eventually the 
+						 * Swing version should be replaced with this.
+						 */
+						
+						try {
+							stream = new SudAudioFileReader(sudParams.zeroPad).getAudioInputStream(soundFile, (chunkHeader,  count)->{
+								//System.out.println("Sud Map Progress: " + count + " " + loadListener);		
+								
+								//transfer sud map listener updates to the more generic wav load listener
+								String message = null;
+								if (count % 500 == 0) {
+									message = new String("Mapping " + String.format("%07d", count) + " sud file chunks for " + soundFile.getName());
+								}
+								if (count == -1) {
+									message = new String("Mapped sud file " + soundFile.getName());
+								}
+							  if (loadListener!=null) {
+								  loadListener.updateWavLoad(message, count);
+							  }
+							});
+						} catch (UnsupportedAudioFileException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+					else {
+						//TODO - messy code with GUI stuff that should not be in this class. 
+						/**
+						 * We need to map the sud file. But we don't want this to just freeze the current
+						 * GUI thread. Therefore add a listener to the mapping process and show a
+						 * blocking dialog to indicate that something is happening. The mapping is put
+						 * on a separate thread and blocks stuff from happening until the mapping
+						 * process has completed. This isn't neat
+						 */
+						if (sudMapWorker == null || !sudMapWorker.getSudFile().equals(soundFile)) {
+
+							sudMapWorker = new SudMapWorker(soundFile);
+							worker = new PamWorker<AudioInputStream>(sudMapWorker,
+									PamController.getInstance().getMainFrame(), 1,
+									"Mapping sud file: " + soundFile.getName());
+
+							SwingUtilities.invokeLater(() -> {
+								
+								//prevent the dialog from stealing focus from the main PAMGUI or indeed other programs
+								//because the dialog appears so often the focus stealing can be very annoying
+								worker.getPamWorkDialog().setAutoRequestFocus(false);
+								
+//								worker.getPamWorkDialog().setLocation(worker.getPamWorkDialog().getX(), 
+//										worker.getPamWorkDialog().getY() + 200);
+//								worker.getPamWorkDialog().validate();
+								//System.out.println("Sud Audio Stream STARTED: " + soundFile.getName());
+								worker.start();
+							});
+							// this should block AWT thread but won't block if called on another thread..
+
+						}
+
+						// this is only ever called if this function is called on another thread other
+						// than the event dispatch thread.
+						while (sudMapWorker == null || !sudMapWorker.isDone()) {
+							// do nothing
+							//						System.out.println("Waiting for the SUD file map: " + soundFile.getName() + " worker: " + worker);
+							try {
+								//						Thread.sleep(100);
+								Thread.sleep(100);
+							} catch (InterruptedException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+						}
+
+						 stream = sudMapWorker.getSudAudioStream();
+
+					}
+
+					//				sudMapWorker= null;
+					//				worker = null;
+
+					//				System.out.println("----RETURN SUD FILE ON OTHER THREAD-----" + stream);
+
+					return stream;
+
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Checks if the .sudx file exists and has the correct serialVersionUID to be opened as a SudFileMap.
+	 */
+	private boolean isValidSudMapFile(File soundFile) {
+		File sudxFile = new File(soundFile.getAbsolutePath() + "x");
+		if (!sudxFile.exists()) {
+			return false;
+		}
+		try {
+			SudFileMap sudFileMap = SudAudioInputStream.loadSudMap(sudxFile);
+			if (sudFileMap != null) {
+				// System.out.println("Valid Sud Map File: " + sudxFile.getName());
+				return true;
+			} else {
+				// System.out.println("Invalid Sud Map File: " + sudxFile.getName());
+			}
+		} catch (Exception e) {
+			return false;
+		}
+		return false;
+	}
+
+	public class SudMapProgress implements SudMapListener {
+
+		PamWorker<AudioInputStream> sudMapWorker;
+
+		public SudMapProgress(PamWorker<AudioInputStream> sudMapWorker) {
+			this.sudMapWorker = sudMapWorker;
+		}
+
+		@Override
+		public void chunkProcessed(ChunkHeader chunkHeader, int count) {
+			// System.out.println("Sud Map Progress: " + count);
+			if (count % 500 == 0) {
+				// don't update too often or everything just freezes
+				sudMapWorker.update(new PamWorkProgressMessage(-1, ("Mapped " + count + " sud file chunks")));
+			}
+			if (count == -1) {
+				sudMapWorker.update(new PamWorkProgressMessage(-1, ("Mapping sud file finished")));
+			}
+		}
+
+	}
+
+	/**
+	 * Opens an sud file on a different thread and adds a listener for a mapping.
+	 * This allows a callback to show map progress.
+	 * 
+	 * @author Jamie Macaulay
+	 *
+	 */
+	public class SudMapWorker implements PamWorkWrapper<AudioInputStream> {
+
+		private File soundFile;
+
+		private SudMapProgress sudMapListener;
+
+		private volatile boolean done = false;
+
+		private AudioInputStream result;
+
+		public SudMapWorker(File soundFile) {
+			this.soundFile = soundFile;
+		}
+
+		public File getSudFile() {
+			return soundFile;
+		}
+
+		public AudioInputStream getSudAudioStream() {
+			return result;
+		}
+
+		@Override
+		public AudioInputStream runBackgroundTask(PamWorker<AudioInputStream> pamWorker) {
+			AudioInputStream stream;
+			try {
+				//				System.out.println("START OPEN SUD FILE:");
+
+				this.sudMapListener = new SudMapProgress(pamWorker);
+				stream = new SudAudioFileReader(sudParams.zeroPad).getAudioInputStream(soundFile, sudMapListener);
+
+				//				System.out.println("END SUD FILE:");
+
+				// for some reason - task finished may not be called on other
+				// thread so put this here.
+				this.result = stream;
+				this.done = true;
+
+				return stream;
+			} catch (UnsupportedAudioFileException e) {
+				System.err.println("UnsupportedAudioFileException: Could not open sud file: not a supported file "
+						+ soundFile.getName());
+				System.err.println(e.getMessage());
+				//				 e.printStackTrace();
+			} catch (IOException e) {
+				System.err.println("Could not open sud file: IO Exception: " + soundFile.getName());
+				//				e.printStackTrace();
+			}
+
+			//important that these are here otherwise the blocking dialog does not know the process has completed (even if there has been an errot)
+			//and will block the GUI
+			this.done = true;
+			this.result = null;
+			return null;
+		}
+
+		@Override
+		public void taskFinished(AudioInputStream result) {
+			//			System.out.println("TASK FINSIHED:");
+			this.result = result;
+			this.done = true;
+		}
+
+		public boolean isDone() {
+			return done;
+		}
+
+	}
+
+	@Override
+	public PamAudioSettingsPane getSettingsPane() {
+		if (sudAudioSettingsPane==null) {
+			sudAudioSettingsPane = new SudAudioSettingsPane(this); 
+		}
+		return sudAudioSettingsPane;
+	}
+
+	@Override
+	public String getUnitName() {
+		return "PamAudioManager";
+	}
+
+	@Override
+	public String getUnitType() {
+		return "sud_files";
+	}
+
+	@Override
+	public Serializable getSettingsReference() {
+		return sudParams;
+	}
+
+	@Override
+	public long getSettingsVersion() {
+		return PamSudParams.serialVersionUID;
+	}
+
+
+	@Override
+	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
+		try {
+			sudParams = ((PamSudParams) pamControlledUnitSettings.getSettings()).clone();
+
+			return true;
+		}
+		catch (ClassCastException e) {
+			e.printStackTrace();
+		}
+		return false;
+	}
+
+	public PamSudParams getSudParams() {
+		return this.sudParams;
+	}
+
+}

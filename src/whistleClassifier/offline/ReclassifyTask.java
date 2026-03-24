@@ -16,7 +16,7 @@ public class ReclassifyTask extends OfflineTask<AbstractWhistleDataUnit>{
 	long dataEndTime;
 
 	public ReclassifyTask(WhistleClassifierControl whistleClassifierControl) {
-		super(whistleClassifierControl.getWhistleClassifierProcess().getParentDataBlock());
+		super(whistleClassifierControl, whistleClassifierControl.getWhistleClassifierProcess().getParentDataBlock());
 		this.whistleClassifierControl = whistleClassifierControl;
 		whistleClassifierProcess = whistleClassifierControl.getWhistleClassifierProcess();
 		setParentDataBlock(whistleClassifierProcess.getParentDataBlock());
@@ -59,6 +59,7 @@ public class ReclassifyTask extends OfflineTask<AbstractWhistleDataUnit>{
 			// may want to do a classification anyway, even if data are insufficient. 
 			if (whistleClassifierControl.getWhistleClassificationParameters().alwaysClassify) {
 				whistleClassifierProcess.runClassification(dataEndTime);
+				whistleClassifierProcess.clearFragmentStore(dataEndTime);
 			}
 			
 		}
@@ -89,6 +90,11 @@ public class ReclassifyTask extends OfflineTask<AbstractWhistleDataUnit>{
 	@Override
 	public void prepareTask() {
 		whistleClassifierProcess.resetClassifier();
+	}
+
+	@Override
+	public boolean canRun() {
+		return true;
 	}
 
 }

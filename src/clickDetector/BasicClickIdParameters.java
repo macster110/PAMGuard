@@ -26,6 +26,7 @@ import java.util.ArrayList;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 
 
 
@@ -69,7 +70,7 @@ public class BasicClickIdParameters implements Serializable, Cloneable, ManagedP
 						used = true;
 						break;
 					}
-					if (used == false) {
+					if (!used) {
 						return id;
 					}
 				}
@@ -83,7 +84,7 @@ public class BasicClickIdParameters implements Serializable, Cloneable, ManagedP
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 

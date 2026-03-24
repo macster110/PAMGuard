@@ -7,15 +7,16 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
 
-import clickDetector.ClickClassifiers.ClickTypeProvider;
 import PamController.PamController;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 import binaryFileStorage.BinaryHeader;
 import binaryFileStorage.BinaryObjectData;
 import binaryFileStorage.ModuleFooter;
 import binaryFileStorage.ModuleHeader;
+import clickDetector.ClickClassifiers.ClickTypeProvider;
 
 public class ClickBinaryModuleFooter extends ModuleFooter implements ManagedParameters {
 	
@@ -128,7 +129,7 @@ public class ClickBinaryModuleFooter extends ModuleFooter implements ManagedPara
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("clickDetectorName");
 			ps.put(new PrivatePamParameterData(this, field) {

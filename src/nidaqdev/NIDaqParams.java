@@ -9,7 +9,6 @@ import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
 import PamModel.parametermanager.PrivatePamParameterData;
 import PamguardMVC.PamConstants;
-import hfDaqCard.SmruDaqSystem;
 
 public class NIDaqParams extends SoundCardParameters implements Serializable, Cloneable, ManagedParameters {
 	
@@ -83,6 +82,9 @@ public class NIDaqParams extends SoundCardParameters implements Serializable, Cl
 		}
 
 		PamParameterSet ps = super.getParameterSet();
+		if (ps == null) {
+			return null;
+		}
 		try {
 			Field field = this.getClass().getDeclaredField("aiRange");
 			ps.put(new PrivatePamParameterData(this, field) {

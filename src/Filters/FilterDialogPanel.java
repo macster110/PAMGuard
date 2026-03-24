@@ -5,6 +5,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
@@ -13,11 +14,13 @@ import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.font.LineMetrics;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -29,34 +32,40 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.AbstractTableModel;
 
+import org.apache.pdfbox.pdmodel.documentinterchange.taggedpdf.PDArtifactMarkedContent;
+
+import com.opencsv.CSVReader;
+import com.opencsv.exceptions.CsvException;
+
 import Layout.PamAxis;
 import PamUtils.PamFileChooser;
 import PamUtils.PamFileFilter;
+import PamUtils.PamUtils;
 import PamView.PamColors;
 import PamView.PamColors.PamColor;
 import PamView.dialog.PamDialog;
 import PamView.dialog.PamGridBagContraints;
 import PamView.panel.PamPanel;
-import com.opencsv.CSVReader;
-import com.opencsv.exceptions.CsvException;
-
 import fftManager.Complex;
 
 /**
- * Create a more generic dialog panel for the PAMGurd 
- * filters which can be incorporated into larger pnales
+ * Create a more generic dialog panel for the PAMGuard 
+ * filters which can be incorporated into larger panels
  * if desired. 
  * @author Doug Gillespie
  *
@@ -67,10 +76,7 @@ public class FilterDialogPanel implements ActionListener {
 
 	private float sampleRate;
 
-	private String[] filterNames = { "None", "IIR Butterworth", "IIR Chebyshev", 
-			"FIR Filter (Window Method)", "Arbitrary FIR Filter"};
-
-	private JComboBox filterTypes;
+	private JComboBox<FilterType> filterTypes;
 
 	private JRadioButton highPass;
 
@@ -188,8 +194,9 @@ public class FilterDialogPanel implements ActionListener {
 		repaintAll();
 	}
 
+	@Override
 	public void actionPerformed(ActionEvent e) {
-		if (isSetup == false) {
+		if (!isSetup) {
 			return;
 		}
 		if (e.getSource() == filterTypes) {
@@ -212,33 +219,39 @@ public class FilterDialogPanel implements ActionListener {
 	}
 
 	private void enableControls() {
-		int filterType = filterTypes.getSelectedIndex();
-		boolean haveFilter = filterType > 0;
+		FilterType filterType = (FilterType) filterTypes.getSelectedItem();
+		if (filterType == null) {
+			filterType = FilterType.NONE;
+		}
+		boolean haveFilter = filterType != null;
 		lowPass.setEnabled(haveFilter);
 		highPass.setEnabled(haveFilter);
 		bandPass.setEnabled(haveFilter);
 		bandStop.setEnabled(haveFilter);
 		highCut.setEnabled(!lowPass.isSelected() & haveFilter);
 		lowCut.setEnabled(!highPass.isSelected() & haveFilter);
-		order.setEnabled(haveFilter);
-		passbandRipple.setEnabled(haveFilter & filterType >=2);
+		order.setEnabled(filterType.hasOrder());
+		passbandRipple.setEnabled(filterType.hasRipple());
 		logScale.setEnabled(haveFilter);
 		linScale.setEnabled(haveFilter);
 		plotButton.setEnabled(haveFilter);
 		switch (filterType) {
-		case 2:
+		case CHEBYCHEV:
 			rippleLabel.setText("Pass band ripple ");
 			break;
-		case 3:
-		case 4:
+		case FIRARBITRARY:
+		case FIRWINDOW:
 			rippleLabel.setText("Gamma  ");
 			break;
+			default:
+				rippleLabel.setText(" ");
 		}
-		boolean isArb = filterType == 4;
-		normalPanel.setVisible(isArb == false);
+		boolean isArb = filterType == FilterType.FIRARBITRARY;
+		normalPanel.setVisible(!isArb);
 		arbPanel.setVisible(isArb);
 	}
 
+	
 
 	void repaintAll() {
 		bodeGraph.repaint();
@@ -257,7 +270,7 @@ public class FilterDialogPanel implements ActionListener {
 
 		SettingsPanel() {
 
-			filterTypes = new JComboBox(filterNames);
+			filterTypes = new JComboBox(FilterType.values());
 			highPass = new JRadioButton("High Pass");
 			bandPass = new JRadioButton("Band Pass");
 			bandStop = new JRadioButton("Band Stop");
@@ -321,14 +334,14 @@ public class FilterDialogPanel implements ActionListener {
 			c.gridwidth = 1;
 			c.gridy++;
 			c.gridx = xc;
-			normalPanel.add(new JLabel(" High Pass", JLabel.RIGHT), c);
+			normalPanel.add(new JLabel(" High Pass", SwingConstants.RIGHT), c);
 			c.gridx++;
 			normalPanel.add(highCut, c);
 			c.gridx++;
 			normalPanel.add(new JLabel(" Hz"), c);
 			c.gridy++;
 			c.gridx = xc;
-			normalPanel.add(new JLabel(" Low Pass", JLabel.RIGHT), c);
+			normalPanel.add(new JLabel(" Low Pass", SwingConstants.RIGHT), c);
 			c.gridx++;
 			normalPanel.add(lowCut, c);
 			c.gridx++;
@@ -458,26 +471,33 @@ public class FilterDialogPanel implements ActionListener {
 		if (filterParams == null) {
 			filterParams = new FilterParams();
 		}
-		switch (filterParams.filterType) {
-		case NONE:
-			filterTypes.setSelectedIndex(0);
-			break;
-		case BUTTERWORTH:
-			filterTypes.setSelectedIndex(1);
-			break;
-		case CHEBYCHEV:
-			filterTypes.setSelectedIndex(2);
-			break;
-		case FIRWINDOW:
-			if (filterNames.length > 3) {
-				filterTypes.setSelectedIndex(3);
-			}
-			break;
-		case FIRARBITRARY:
-			if (filterNames.length > 4) {
-				filterTypes.setSelectedIndex(4);
-			}
+		if (filterParams.filterType != null) {
+			filterTypes.setSelectedItem(filterParams.filterType);
 		}
+//		switch (filterParams.filterType) {
+//		case NONE:
+//			filterTypes.setSelectedIndex(0);
+//			break;
+//		case BUTTERWORTH:
+//			filterTypes.setSelectedIndex(1);
+//			break;
+//		case CHEBYCHEV:
+//			filterTypes.setSelectedIndex(2);
+//			break;
+//		case FIRWINDOW:
+//			if (filterNames.length > 3) {
+//				filterTypes.setSelectedIndex(3);
+//			}
+//			break;
+//		case FIRARBITRARY:
+//			if (filterNames.length > 4) {
+//				filterTypes.setSelectedIndex(4);
+//			}
+//		case FFT:
+//			if (filterNames.length > 5) {
+//				filterTypes.setSelectedIndex(5);
+//			}
+//		}
 		switch (filterParams.filterBand) {
 		case HIGHPASS:
 			highPass.setSelected(true);
@@ -570,16 +590,24 @@ public class FilterDialogPanel implements ActionListener {
 
 
 	void setRippleParam() {
-		int filtType = filterTypes.getSelectedIndex();
-		switch(filtType) {
-		case 2:
-			passbandRipple.setText(String.format("%3.1f", filterParams.passBandRipple));
-			break;
-		case 3:
-		case 4:
-			passbandRipple.setText(String.format("%3.1f", filterParams.chebyGamma));
-			break;
+		FilterType filtType = (FilterType) filterTypes.getSelectedItem();
+		if (filtType != null) {
+			if (filtType.hasRipple()) {
+				passbandRipple.setText(String.format("%3.1f", filterParams.passBandRipple));
+			}
+//			if (filtType.hasOrder()) {
+//				filter
+//			}
 		}
+//		switch(filtType) {
+//		case 2:
+//			passbandRipple.setText(String.format("%3.1f", filterParams.passBandRipple));
+//			break;
+//		case 3:
+//		case 4:
+//			passbandRipple.setText(String.format("%3.1f", filterParams.chebyGamma));
+//			break;
+//		}
 	}
 
 	public void cancelButtonPressed() {
@@ -592,16 +620,20 @@ public class FilterDialogPanel implements ActionListener {
 
 	public boolean getParams() {
 		try {
-			if (filterTypes.getSelectedIndex() == 0)
-				filterParams.filterType = FilterType.NONE;
-			else if (filterTypes.getSelectedIndex() == 1)
-				filterParams.filterType = FilterType.BUTTERWORTH;
-			else if (filterTypes.getSelectedIndex() == 2)
-				filterParams.filterType = FilterType.CHEBYCHEV;
-			else if (filterTypes.getSelectedIndex() == 3)
-				filterParams.filterType = FilterType.FIRWINDOW;
-			else if (filterTypes.getSelectedIndex() == 4)
-				filterParams.filterType = FilterType.FIRARBITRARY;
+//			if (filterTypes.getSelectedIndex() == 0)
+//				filterParams.filterType = FilterType.NONE;
+//			else if (filterTypes.getSelectedIndex() == 1)
+//				filterParams.filterType = FilterType.BUTTERWORTH;
+//			else if (filterTypes.getSelectedIndex() == 2)
+//				filterParams.filterType = FilterType.CHEBYCHEV;
+//			else if (filterTypes.getSelectedIndex() == 3)
+//				filterParams.filterType = FilterType.FIRWINDOW;
+//			else if (filterTypes.getSelectedIndex() == 4)
+//				filterParams.filterType = FilterType.FIRARBITRARY;
+//			else if (filterTypes.getSelectedIndex() == 5) {
+//				filterParams.filterType = FilterType.FFT;
+//			}
+			filterParams.filterType = (FilterType) filterTypes.getSelectedItem();
 
 			if (highPass.isSelected())
 				filterParams.filterBand = FilterBand.HIGHPASS;
@@ -694,6 +726,57 @@ public class FilterDialogPanel implements ActionListener {
 			//				PamColors.getInstance().registerComponent(this,
 			//						PamColors.PamColor.PlOTWINDOW);
 			setPreferredSize(new Dimension(100,200));
+			addMouseListener(new PZMouse());
+			setToolTipText("Right click to change IIR Filter plot type");
+		}
+		
+		private class PZMouse extends MouseAdapter {
+
+			@Override
+			public void mousePressed(MouseEvent e) {
+				if (e.isPopupTrigger()) {
+					showPopupMenu(e);
+				}
+			}
+
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				if (e.isPopupTrigger()) {
+					showPopupMenu(e);
+				}
+			}
+			
+		}
+		
+		private void showPopupMenu(MouseEvent e) {
+
+			if (filterMethod == null) {
+				return;
+			}
+			if (FIRFilterMethod.class.isAssignableFrom(filterMethod.getClass())) {
+				return;
+			}
+			JPopupMenu popMenu = new JPopupMenu();
+			JCheckBoxMenuItem menuItem;
+			menuItem = new JCheckBoxMenuItem("Show Pole-Zero plot", FilterParams.pzPlotStyle == FilterParams.PZPLOT_PZ);
+			menuItem.addActionListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					FilterParams.pzPlotStyle = FilterParams.PZPLOT_PZ;
+					repaint();
+				}
+			});
+			popMenu.add(menuItem);
+			menuItem = new JCheckBoxMenuItem("Show Impulse Response", FilterParams.pzPlotStyle == FilterParams.PZPLOT_IMPULSE);
+			menuItem.addActionListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					FilterParams.pzPlotStyle = FilterParams.PZPLOT_IMPULSE;
+					repaint();
+				}
+			});
+			popMenu.add(menuItem);
+			popMenu.show(e.getComponent(), e.getX(), e.getY());
 		}
 
 		@Override
@@ -702,13 +785,28 @@ public class FilterDialogPanel implements ActionListener {
 			if (filterMethod == null) {
 				return;
 			}
-			if (IIRFilterMethod.class.isAssignableFrom(filterMethod.getClass()) == true) {
-				paintPoleZeros(g);
+			Graphics2D g2d = (Graphics2D) g;
+			g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+			g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+			   
+			
+			if (IIRFilterMethod.class.isAssignableFrom(filterMethod.getClass())) {
+				if (FilterParams.pzPlotStyle == FilterParams.PZPLOT_IMPULSE) {
+					paintIIRImpulseResponse(g);
+				}
+				else {
+					paintPoleZeros(g);
+				}
 			}
-			else if (FIRFilterMethod.class.isAssignableFrom(filterMethod.getClass()) == true) {
+			else if (FIRFilterMethod.class.isAssignableFrom(filterMethod.getClass())) {
 				paintImpulseResponse(g);
 			}
 		}
+		/**
+		 * Paint the impulse response. For FIR filters, this is the only option and is
+		 * simply the taps of the filter function. 
+		 * @param g
+		 */
 		private void paintImpulseResponse(Graphics g) {
 			int margin = 20;
 			int cSize = 2;
@@ -726,7 +824,7 @@ public class FilterDialogPanel implements ActionListener {
 			}
 			double yScale = (r.getHeight()-margin*2) / (2*maxTap);
 			double xScale = (r.getWidth()-margin*2) / (nTaps-1);
-			g.setColor(Color.BLUE);
+			g.setColor(Color.BLACK);
 			g.drawLine(margin, margin, margin, getHeight()-margin);
 			g.drawLine(margin, midy, getWidth()-margin, midy);
 			g.drawString(String.format("%3.2f", maxTap), margin+1, margin);
@@ -738,6 +836,10 @@ public class FilterDialogPanel implements ActionListener {
 				g.drawLine(x, midy, x, y);
 				g.drawOval(x-cSize, y-cSize, cSize*2+1, cSize*2+1);
 			}
+
+			g.setColor(Color.BLACK);
+			String txt = "Impulse response";
+			cornerText(g, txt);
 
 		}
 
@@ -773,6 +875,128 @@ public class FilterDialogPanel implements ActionListener {
 			for (int i = 0; i < iirFilterMethod.poleZeroCount(); i++) {
 				drawZero(g, zeros[i], center, radius);
 			}
+			g.setColor(Color.BLACK);
+			String txt = "Pole-Zero";
+			cornerText(g, txt);
+		}
+
+		/**
+		 * Paint the impulse response for IIR filters: We can calculate an
+		 * impulse response over a short time period by putting a 1 into the filter 
+		 * function followed by a load of zeros. Probably want about 5 times the number of
+		 * filter taps ? 
+		 * @param g
+		 */
+		private void paintIIRImpulseResponse(Graphics g) {
+			IIRFilterMethod iirFilterMethod = (IIRFilterMethod) filterMethod;
+			if (filterMethod == null) {
+				return;
+			}
+			//  try to do an upsampled filter method to make the plot clearer
+			int upsFactor = 10;
+			FilterParams upFP = iirFilterMethod.filterParams.clone();
+			IIRFilterMethod upsMethod = (IIRFilterMethod) FilterMethod.createFilterMethod(sampleRate*upsFactor, upFP);
+			int upsPoints = upsMethod.filterParams.filterOrder*10*upsFactor;
+			double[] upsInput = new double[upsPoints];
+			double[] upsOutput = new double[upsPoints];
+			Filter upsFilter = upsMethod.createFilter(0);
+			for (int i = 0; i < upsFactor; i++) {
+				upsInput[i] = 1;
+			}
+//			upsInput[0] = upsFactor;
+			upsFilter.runFilter(upsInput, upsOutput);
+			
+			int nPoints = iirFilterMethod.filterParams.filterOrder * 10;
+			Filter filter = iirFilterMethod.createFilter(0);
+			filter.prepareFilter();
+			double[] input = new double[nPoints];
+			double[] output = new double[nPoints];
+			input[0] = 1;
+			filter.runFilter(input, output);
+			double maxOut = 0;
+			for (int i = 0; i < output.length; i++) {
+				maxOut = Math.max(maxOut, Math.abs(output[i]));
+			}
+			double[] scaleMaxes = {1, .5, .2, .1};
+			double scaleMax = 1.0;
+			for (int i = 1; i < scaleMaxes.length; i++) {
+				if (maxOut > scaleMaxes[i]) {
+					break;
+				}
+				scaleMax = scaleMaxes[i];
+			}
+			
+			// can now plot that. 
+			// what's the lenght of the plot in seconds ? 
+			double tSecs = (nPoints-1)/sampleRate;
+			double tScale = 1;
+			String tUnit = "s";
+			if (tSecs < .1) {
+				tScale = 1000;
+				tUnit = "ms";
+			}
+			if (tSecs < 1e-4) {
+				tScale = 1e6;
+				tUnit = "\u00B5s";
+			}
+
+			Graphics2D g2d = (Graphics2D) g;
+
+			g2d.setColor(PamColors.getInstance().getColor(PamColor.AXIS));
+			FontMetrics fm = g2d.getFontMetrics();
+			int charWidth = fm.charWidth('2');
+
+			Insets insets = getInsets();
+			Rectangle r = getBounds();
+			int marginL = charWidth*4+6;
+			int marginT = Math.max(fm.getAscent(), fm.getDescent());
+			int marginR = charWidth*2+3;
+			int x0 = marginL;
+			int y0 = getHeight()/2;
+			int y1 = getWidth()-marginR;
+			double yScale = getHeight()/2-marginT;
+			g.setColor(Color.BLACK);
+			g.drawLine(x0, getHeight()-marginT, x0, marginT);
+			PamAxis yAxis = new PamAxis(x0, getHeight()-marginT, x0, marginT, -1, 1, PamAxis.ABOVE_LEFT, "", PamAxis.LABEL_NEAR_CENTRE, "%3.1f");
+			yAxis.drawAxis(g);
+			g.drawLine(x0, y0, y1, y0);
+			PamAxis xAxis = new PamAxis(x0, y0, y1, y0, 0, tSecs*tScale, PamAxis.BELOW_RIGHT, tUnit, PamAxis.LABEL_NEAR_MAX, "%3.1f");
+			xAxis.drawAxis(g);
+			int lastX = -1;
+			int lastY = 0;
+			/**
+			 * Draw an upsampled copy of the impulse response which gives a smoother curve
+			 */
+			g.setColor(Color.GRAY);
+			for (int i = 0; i < upsInput.length; i++) {
+				int x = (int) xAxis.getPosition((i-upsFactor)/sampleRate/upsFactor*tScale) + marginL;
+				int y = (int) yAxis.getPosition(upsOutput[i]) + marginT;
+				if (i >= upsFactor) {
+					g2d.drawLine(lastX, lastY, x, y);
+				}
+				lastX = x;
+				lastY = y;
+			}
+			// draw the impulse response at the filter frequency we're working at.
+			g.setColor(Color.RED);
+			for (int i = 0; i < input.length; i++) {
+				int x = (int) xAxis.getPosition(i/sampleRate*tScale) + marginL;
+				int y = (int) yAxis.getPosition(output[i]) + marginT;
+				if (i > 0) {
+					g2d.drawLine(lastX, lastY, x, y);
+				}
+				lastX = x;
+				lastY = y;
+			}
+			g.setColor(Color.BLACK);
+			String txt = "Impulse response";
+			cornerText(g, txt);
+		}
+		
+		void cornerText(Graphics g, String txt) {
+			FontMetrics fm = g.getFontMetrics();
+			int w = fm.stringWidth(txt);
+			g.drawString(txt, getWidth()-w-fm.getMaxAdvance(), fm.getAscent()*3/2);
 		}
 
 		void drawPole(Graphics g, Complex p, Point center, int radius) {
@@ -1044,7 +1268,7 @@ public class FilterDialogPanel implements ActionListener {
 		}
 
 		/**
-		 * Plots ansi standard 1/3 octave curves based around th emid frequency 
+		 * Plots ansi standard 1/3 octave curves based around the mid frequency 
 		 * of a bandpass filter. 
 		 * @param g
 		 */
@@ -1129,6 +1353,7 @@ public class FilterDialogPanel implements ActionListener {
 
 	public void setSampleRate(float sampleRate) {
 		this.sampleRate = sampleRate;
+		repaintAll();
 	}
 
 	public FilterParams getFilterParams() {

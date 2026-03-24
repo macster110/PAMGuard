@@ -1,7 +1,7 @@
 package Acquisition;
 
 /**
- * Class to remove DC offset from audio data. 
+ * Class to remove DC offset from audio data.
  * @author Douglas Gillespie
  *
  */
@@ -12,15 +12,34 @@ public class DCFilter {
 	private int nChannels;
 	private double[] background;
 	private double alpha;
+	private int[] channelCallCount;
 
 	public DCFilter(double sampleRate, double timeConstant, int nChannels) {
 		this.sampleRate = sampleRate;
 		this.timeConstant = timeConstant;
 		this.nChannels = nChannels;
 		background = new double[nChannels];
-		alpha = 1-1./(sampleRate*timeConstant);
+		setTimeContant(sampleRate, timeConstant);
+		channelCallCount = new int[nChannels];
 	}
 	
+	/**
+	 * Set the time constant
+	 * @param timeConstant 
+	 * @param timeConstant2
+	 * @param timeConstant 
+	 */
+	public void setTimeContant(double sampleRate, double timeConstant) {
+		this.sampleRate = sampleRate;
+		this.timeConstant = timeConstant;
+		alpha = 1-1./(sampleRate*timeConstant);
+	}
+
+	/**
+	 * Filter data in place. 
+	 * @param channel
+	 * @param data
+	 */
 	public void filterData(int channel, double[] data) {
 		double x;
 		double b = background[channel];
@@ -33,5 +52,30 @@ public class DCFilter {
 //			data[i] = x;
 		}
 		background[channel] = b;
+		channelCallCount[channel] ++;
+	}
+	
+	public int getChannelCallCount(int channel) {
+		return channelCallCount[channel];
+	}
+
+	public double getSampleRate() {
+		return sampleRate;
+	}
+
+	public double getTimeConstant() {
+		return timeConstant;
+	}
+
+	public int getnChannels() {
+		return nChannels;
+	}
+
+	public double[] getBackground() {
+		return background;
+	}
+
+	public double getAlpha() {
+		return alpha;
 	}
 }

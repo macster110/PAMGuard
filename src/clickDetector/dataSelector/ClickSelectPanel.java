@@ -4,6 +4,7 @@ import generalDatabase.lookupTables.LookUpTables;
 import generalDatabase.lookupTables.LookupList;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -13,11 +14,13 @@ import java.awt.event.ActionListener;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 
 import PamController.PamController;
@@ -30,6 +33,8 @@ import PamView.dialog.PamDialog;
 import PamView.dialog.PamDialogPanel;
 import PamView.dialog.PamGridBagContraints;
 import PamView.panel.PamAlignmentPanel;
+import PamView.panel.SeparatorBorder;
+import PamView.panel.WestAlignedPanel;
 
 public class ClickSelectPanel implements PamDialogPanel {
 	
@@ -40,6 +45,9 @@ public class ClickSelectPanel implements PamDialogPanel {
 	private ClickDataSelector clickDataSelector;
 	private JPanel mainPanel;
 	private boolean isViewer;
+	private JComboBox<String> andOrBox;
+	
+	public static final String mainTip = "You should select options in both the Click Type and the Event Type panels";
 
 	public ClickSelectPanel(ClickDataSelector clickDataSelector, boolean allowScores, boolean useEventTypes) {
 		this.clickDataSelector = clickDataSelector;
@@ -66,10 +74,12 @@ public class ClickSelectPanel implements PamDialogPanel {
 	public void setParams() {
 		eventTypePanel.setParams();
 		speciesPanel.setParams();
+		andOrBox.setSelectedIndex(clickDataSelector.getParams().isClicksANDEvents() ? 0 : 1);
 	}
 
 	@Override
 	public boolean getParams() {
+		clickDataSelector.getParams().setClicksANDEvents(andOrBox.getSelectedIndex() == 0);
 		return (speciesPanel.getParams() & eventTypePanel.getParams());
 	}
 	
@@ -79,7 +89,9 @@ public class ClickSelectPanel implements PamDialogPanel {
 		private LookupList lutList;
 		
 		public EventTypePanel() {
-			setBorder(new TitledBorder("Event Type Selection"));
+			setBorder(new SeparatorBorder("Event Type Selection"));
+
+			setToolTipText(mainTip);
 		}
 		
 		void setParams() {
@@ -102,16 +114,24 @@ public class ClickSelectPanel implements PamDialogPanel {
 			boxPanel.add(onlineAuto = new JCheckBox("Automatically detected click trains"), c);
 			onlineAuto.setSelected(clickAlarmParameters.onlineAutoEvents);
 			
+			useUnassigned.setToolTipText("Clicks that are NOT part of a manual or automatic click train");
+			onlineManual.setToolTipText("Clicks that are part of a manually marked click train");
+			onlineAuto.setToolTipText("Clicks that are part of an automatically detected click train");
+			
 			
 			lutList = LookUpTables.getLookUpTables().getLookupList(ClicksOffline.ClickTypeLookupName);
 			if (lutList == null) {
 				return;
 			}
+			c.gridy++;
+			boxPanel.add(new JLabel("OR the following click train types ...", JLabel.LEFT), c);
 			useType = new JCheckBox[lutList.getList().size()];
 			for (int i = 0; i < useType.length; i++) {
 				c.gridy++;
 				boxPanel.add(useType[i] = new JCheckBox(lutList.getList().get(i).getText()), c);
 				useType[i].setSelected(clickAlarmParameters.isUseEventType(lutList.getList().get(i).getCode()));
+				String tip = String.format("Clicks that are part of a click train labelled as %s", lutList.getList().get(i).getText());
+				useType[i].setToolTipText(tip);
 			}
 		}
 		
@@ -149,19 +169,27 @@ public class ClickSelectPanel implements PamDialogPanel {
 //		JRadioButton andEvents, orEvents;
 //		JRadioButton anyEvents, onlyEvents;
 		private JCheckBox useEchoes;
+		private JTextField minAmplitude;
 		private JCheckBox scoreByAmplitude;
 		private JTextField minICI;
 		
 		SpeciesPanel () {
 			super();
-			setLayout(new BorderLayout());
+//			setLayout(new BorderLayout());
+			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 			northPanel = new JPanel();
 			northPanel.setLayout(new GridBagLayout());
 			GridBagConstraints c = new PamGridBagContraints();
-			northPanel.setBorder(new TitledBorder("Echoes"));
-			c.gridwidth = 3;
+			c.gridwidth = 1;
 			c.anchor = GridBagConstraints.WEST;
-			northPanel.add(useEchoes = new JCheckBox("Use Echoes"), c);
+			northPanel.add(new JLabel("Minimum amplitude ", JLabel.RIGHT), c);
+			c.gridx++;
+			northPanel.add(minAmplitude = new JTextField(4), c);
+			c.gridx++;
+			northPanel.add(new JLabel(" dB"));
+			c.gridx = 0;
+			c.gridy++;
+			northPanel.add(new PamAlignmentPanel(useEchoes = new JCheckBox("Use Echoes"), BorderLayout.WEST), c);
 			c.gridwidth = 1;
 			c.gridy++;
 			c.gridx = 0;
@@ -172,31 +200,51 @@ public class ClickSelectPanel implements PamDialogPanel {
 //			minICI.setToolTipText("Minimum ICI in milliseconds");
 //			c.gridx++;
 //			northPanel.add(new JLabel(" ms", JLabel.LEFT), c);
-			c.gridwidth = 3;
-			c.gridy++;
-			c.gridx = 0;
-			northPanel.add(scoreByAmplitude = new JCheckBox("Score by amplitude"), c);
-			scoreByAmplitude.setVisible(allowScores);
-			scoreByAmplitude.addActionListener(new AllSpeciesListener());
-			add(BorderLayout.NORTH, northPanel);
+			scoreByAmplitude = new JCheckBox("Score by amplitude");
+			if (allowScores) {
+				c.gridwidth = 3;
+				c.gridy++;
+				c.gridx = 0;
+				northPanel.add(scoreByAmplitude, c);
+				scoreByAmplitude.setVisible(allowScores);
+				scoreByAmplitude.addActionListener(new AllSpeciesListener());
+			}
+			WestAlignedPanel walpn;
+			this.add(walpn = new WestAlignedPanel(northPanel));
+			walpn.setBorder(new SeparatorBorder("Click Selection"));
 			
 			JPanel centralOuterPanel = new JPanel(new BorderLayout());
 			centralPanel.setLayout(new GridBagLayout());
-			centralOuterPanel.setBorder(new TitledBorder("Click Type Selection"));
+			centralOuterPanel.setBorder(new SeparatorBorder("Click Types"));
 			
-			add(BorderLayout.CENTER, centralOuterPanel);
+			this.add(centralOuterPanel);
 			JScrollPane scrollPane = new DialogScrollPane(new PamAlignmentPanel(centralPanel, BorderLayout.WEST), 10);
 			centralOuterPanel.add(BorderLayout.CENTER, scrollPane);
 			
 			centralEastPanel.setLayout(new GridBagLayout());
 			c = new PamGridBagContraints();
-			centralEastPanel.add(selectAll = new JButton("Select All"), c);
-			c.gridx++;
-			centralEastPanel.add(clearAll = new JButton("Clear All"), c);
+			c.ipady = 0;
+			c.insets.bottom = c.insets.top = c.insets.left = c.insets.right = 0;
+			centralEastPanel.add(selectAll = new JButton("All"), c);
+			c.gridy++;
+			centralEastPanel.add(clearAll = new JButton("None"), c);
+			selectAll.setBorder(new EmptyBorder(3,3,2,3));
+			clearAll.setBorder(new EmptyBorder(3,3,2,3));
 			selectAll.addActionListener(new AutoSelect(true));
 			clearAll.addActionListener(new AutoSelect(false));
-			centralOuterPanel.add(BorderLayout.SOUTH, new PamAlignmentPanel(centralEastPanel, BorderLayout.WEST));
+			centralOuterPanel.add(BorderLayout.EAST, new PamAlignmentPanel(centralEastPanel, BorderLayout.NORTH));
 			
+			centralOuterPanel.setToolTipText(mainTip);
+			
+			this.add(andOrBox = new JComboBox<>());
+			andOrBox.setToolTipText("Select how to logically combine the click and event selections");
+			andOrBox.addItem("AND");
+			andOrBox.addItem("OR");
+			JPanel emptyPanel = new JPanel();
+			emptyPanel.setPreferredSize(new Dimension(10, 5));
+			this.add(emptyPanel);
+			
+			setToolTipText(mainTip);
 		}
 		
 		void setParams() {
@@ -236,6 +284,7 @@ public class ClickSelectPanel implements PamDialogPanel {
 				}
 			}
 			useEchoes.setSelected(clickAlarmParameters.useEchoes);
+			minAmplitude.setText(String.format("%3.1f", clickAlarmParameters.minimumAmplitude));
 			minICI.setText(String.format("%d", clickAlarmParameters.minICIMillis));
 			scoreByAmplitude.setSelected(clickAlarmParameters.scoreByAmplitude);
 			allWeight.setText(String.format("%3.1f", clickAlarmParameters.getSpeciesWeight(0)));
@@ -261,6 +310,12 @@ public class ClickSelectPanel implements PamDialogPanel {
 
 			ClickAlarmParameters clickAlarmParameters = clickDataSelector.getClickAlarmParameters().clone();
 			clickAlarmParameters.useEchoes = useEchoes.isSelected();
+			try {
+				clickAlarmParameters.minimumAmplitude = Double.valueOf(minAmplitude.getText());
+			}
+			catch (NumberFormatException e) {
+				return PamDialog.showWarning(null, "Minimum amplitude", "Invalid minimum amplitude value");
+			}
 			try {
 				clickAlarmParameters.minICIMillis = Integer.valueOf(minICI.getText());
 			}

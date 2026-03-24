@@ -5,6 +5,7 @@ import java.io.Serializable;
 import PamController.PamController;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.scene.paint.Color;
@@ -23,6 +24,11 @@ public class PlotParams2D implements Serializable, Cloneable, ManagedParameters 
 	 * The maximum limits of the amplitude slider bar. 
 	 */
 	public double[] maxAmplitudeLimits={30,180}; 
+	
+	/**
+	 * Limits of amplitude range- this is a double property which can be bound to colour sliders.
+	 */
+	private transient DoubleProperty[] amplitudeLimits= {new SimpleDoubleProperty(amplitudeLimitsSerial[0]), new SimpleDoubleProperty(amplitudeLimitsSerial[1])};
 	
 
 	/**
@@ -61,11 +67,6 @@ public class PlotParams2D implements Serializable, Cloneable, ManagedParameters 
 		return amplitudeLimits;
 	}
 
-	/**
-	 * Limits of amplitude range- this is a double property which can be bound to colour sliders.
-	 */
-	private transient DoubleProperty[] amplitudeLimits= {new SimpleDoubleProperty(amplitudeLimitsSerial[0]), new SimpleDoubleProperty(amplitudeLimitsSerial[1])};
-	
 	public PlotParams2D() {
 		super();
 		//make sure the amplitude limits are set to the correct air/water to begin with. 
@@ -156,7 +157,7 @@ public class PlotParams2D implements Serializable, Cloneable, ManagedParameters 
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DISPLAY);
 		return ps;
 	}
 

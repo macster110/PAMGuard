@@ -1,12 +1,5 @@
 package generalDatabase;
 
-import generalDatabase.ColumnMetaData.METACOLNAMES;
-import generalDatabase.clauses.FixedClause;
-import generalDatabase.clauses.FromClause;
-import generalDatabase.clauses.PAMSelectClause;
-import generalDatabase.pamCursor.PamCursor;
-import generalDatabase.ucanAccess.UCanAccessSystem;
-
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.BufferedReader;
@@ -15,17 +8,15 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -33,18 +24,13 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 
-import warnings.PamWarning;
-import warnings.WarningSystem;
-import whistlesAndMoans.ConnectedRegionDataBlock;
-import loggerForms.FormDescription;
-import loggerForms.FormsControl;
-import loggerForms.ItemInformation;
-import loggerForms.UDFTableDefinition;
-import loggerForms.formdesign.FormEditor;
 import PamController.PamControlledUnit;
 import PamController.PamController;
 import PamController.PamFolders;
+import PamController.PamguardVersionInfo;
 import PamController.fileprocessing.StoreStatus;
+import PamModel.CommonPluginInterface;
+import PamModel.PamModel;
 import PamUtils.PamCalendar;
 import PamUtils.PamFileChooser;
 import PamView.dialog.warn.WarnOnce;
@@ -53,6 +39,18 @@ import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
 import PamguardMVC.PamProcess;
 import PamguardMVC.debug.Debug;
+import generalDatabase.ColumnMetaData.METACOLNAMES;
+import generalDatabase.clauses.FromClause;
+import generalDatabase.clauses.PAMSelectClause;
+import generalDatabase.pamCursor.PamCursor;
+import generalDatabase.ucanAccess.UCanAccessSystem;
+import generalDatabase.version.VersionDataBlock;
+import generalDatabase.version.VersionDataUnit;
+import generalDatabase.version.VersionLogging;
+import loggerForms.FormDescription;
+import loggerForms.FormsControl;
+import warnings.PamWarning;
+import warnings.WarningSystem;
 
 public class DBProcess extends PamProcess {
 
@@ -82,6 +80,10 @@ public class DBProcess extends PamProcess {
 
 	private DBCommitter dbCommitter;
 
+	private VersionDataBlock versionDataBlock;
+
+	private VersionLogging versionLogging;
+
 	public DBProcess(DBControl databaseControll) {
 		super(databaseControll, null);
 		this.databaseControll = databaseControll;
@@ -102,7 +104,11 @@ public class DBProcess extends PamProcess {
 		dbSpecials.add(logSettings = new LogSettings(databaseControll, "Pamguard Settings", false));
 		dbSpecials.add(logLastSettings = new LogSettings(databaseControll, "Pamguard Settings Last", true));
 		dbSpecials.add(logViewerSettings = new LogSettings(databaseControll, "Pamguard Settings Viewer", true));
+		
+		dbSpecials.add(new LogXMLSettings(databaseControll));
 
+		versionDataBlock = new VersionDataBlock(this);
+		versionDataBlock.SetLogging(versionLogging = new VersionLogging(versionDataBlock));
 	}
 
 	@Override
@@ -113,15 +119,24 @@ public class DBProcess extends PamProcess {
 		}
 	}
 
-	protected boolean saveStartSettings() {
+	protected boolean saveStartSettings(long timeNow) {
 		PamConnection con = databaseControll.getConnection();
 		if (con != null) {
+			/**
+			 * This first one is the 'old' pre 2022 method which saves a serialised lump of all
+			 * the settings in the database. It ain't broke, so not fixing it. 
+			 */
 			for (int i = 0; i < dbSpecials.size(); i++) {
 				dbSpecials.get(i).pamStart(con);
 			}
 			return true;
 		}
 		return false;
+	}
+
+	protected boolean saveEndSettings(long timeNow) {
+		
+		return true;
 	}
 
 	@Override
@@ -212,7 +227,7 @@ public class DBProcess extends PamProcess {
 		}
 
 		dataBlocks = PamController.getInstance().getDataBlocks();
-		PamTableDefinition tableDefinition;
+		EmptyTableDefinition tableDefinition;
 		SQLLogging logging;
 
 		// for each datablock, check that the process can log (ignoring GPS process)
@@ -288,7 +303,7 @@ public class DBProcess extends PamProcess {
 					FormDescription theForm = loggerModule.getFormDescription(j);
 
 					// if the table doesn't exist, create it
-					if (tableExists(theForm.getUdfTableDefinition()) == false) {
+					if (!tableExists(theForm.getUdfTableDefinition())) {
 						checkTable(theForm.getUdfTableDefinition());
 					}
 					// if this table already exists in the database, warn the user that it's about
@@ -322,7 +337,7 @@ public class DBProcess extends PamProcess {
 	 */
 	public boolean checkTable(SQLLogging sqlLogging) {
 		boolean ans = checkTable(sqlLogging.getTableDefinition());
-		if (sqlLogging.doExtraChecks(this, databaseControll.getConnection()) == false) {
+		if (!sqlLogging.doExtraChecks(this, databaseControll.getConnection())) {
 			return false;
 		}
 		if (sqlLogging instanceof SuperDetLogging) {
@@ -354,9 +369,9 @@ public class DBProcess extends PamProcess {
 		Debug.out.println("Checking table: " + tableDef.getTableName());
 //		}
 
-		if (tableExists(tableDef) == false) {
+		if (!tableExists(tableDef)) {
 			createTable(tableDef);
-			if (tableExists(tableDef) == false)
+			if (!tableExists(tableDef))
 				return false;
 		}
 
@@ -371,7 +386,7 @@ public class DBProcess extends PamProcess {
 //		getAllColumnMetaData(tableDef.tableName);
 
 		for (int i = 0; i < tableDef.getTableItemCount(); i++) {
-			if (checkColumn(tableDef, tableDef.getTableItem(i)) == false) {
+			if (!checkColumn(tableDef, tableDef.getTableItem(i))) {
 				columnErrors++;
 			}
 		}
@@ -500,7 +515,7 @@ public class DBProcess extends PamProcess {
 		 * If the DB is NOT MS Access, not need to do anything. while the error occurred
 		 * it would have been impossible to create any other type of database.
 		 */
-		if (databaseControll.databaseSystem.getSystemName().equals(MSAccessSystem.SYSTEMNAME) == false) {
+		if (!databaseControll.databaseSystem.getSystemName().equals(MSAccessSystem.SYSTEMNAME)) {
 			return;
 		}
 		boolean hasPCLocalTime = columnExists(tableDef, "PCLocalTime", Types.TIMESTAMP);
@@ -510,7 +525,7 @@ public class DBProcess extends PamProcess {
 		 * If it already has a PCLocalTime column, then we've probably been here before
 		 * and all is OK,
 		 */
-		if (hasLocalTime == true && hasPCLocalTime == false) {
+		if (hasLocalTime && !hasPCLocalTime) {
 			// we have a problem !
 			int ans = JOptionPane.showConfirmDialog(null, expMessage, "Database table " + tableDef.getTableName(),
 					JOptionPane.OK_CANCEL_OPTION);
@@ -632,14 +647,14 @@ public class DBProcess extends PamProcess {
 	 * @return true if column existed or was created.
 	 */
 	public boolean checkColumn(EmptyTableDefinition tableDef, PamTableItem tableItem) {
-		if (columnExists(tableDef, tableItem) == false) {
-			if (addColumn(tableDef, tableItem) == false)
+		if (!columnExists(tableDef, tableItem)) {
+			if (!addColumn(tableDef, tableItem))
 				return false;
 			populateNewColumn(tableDef, null, tableItem);
 		}
 		if (tableItem.isPrimaryKey()) {
 			boolean ispk = isPrimarykey(tableDef.getTableName(), tableItem.getName());
-			if (ispk == false) {
+			if (!ispk) {
 				String tit = "Database table " + tableDef.tableName;
 				String msg = String.format("<html>Column \"%s\" in the table \"%s\" should be a primary key, but this is not the case,"
 						+ "<br>Database behaviour may become very unpredictable unless this is fixed." +
@@ -678,7 +693,7 @@ public class DBProcess extends PamProcess {
 			copyStr = String.format("UPDATE %s SET %s = %s", tableDef.getTableName(), tableColToUpdate.getName(),
 					tableColWithValues.getName());
 		}
-		if (copyStr != null && runStmt(copyStr) == false) {
+		if (copyStr != null && !runStmt(copyStr)) {
 			System.out.println("Error trying to copy data between columns: " + copyStr);
 			return false;
 		}
@@ -855,7 +870,7 @@ public class DBProcess extends PamProcess {
 		String sqlCmd;
 		if (columnExists(tableName, tempColName, tableItem.getSqlType())) {
 			sqlCmd = String.format("ALTER TABLE %s DROP COLUMN %s", sqlTypes.formatTableName(tableName), tempColName);
-			if (runStmt(sqlCmd) == false) {
+			if (!runStmt(sqlCmd)) {
 				return false;
 			}
 		}
@@ -863,21 +878,21 @@ public class DBProcess extends PamProcess {
 		// create the temp column
 		sqlCmd = String.format("ALTER TABLE %s ADD COLUMN %s %s", sqlTypes.formatTableName(tableName), tempColName,
 				sqlTypes.typeToString(tableItem.getSqlType(), tableItem.getLength()));
-		if (runStmt(sqlCmd) == false) {
+		if (!runStmt(sqlCmd)) {
 			return false;
 		}
 
 		// copy over the data
 		sqlCmd = String.format("UPDATE %s SET %s = %s", sqlTypes.formatTableName(tableName), tempColName,
 				sqlTypes.formatColumnName(tableItem.getName()));
-		if (runStmt(sqlCmd) == false) {
+		if (!runStmt(sqlCmd)) {
 			return false;
 		}
 
 		// delete the original column
 		sqlCmd = String.format("ALTER TABLE %s DROP COLUMN %s", sqlTypes.formatTableName(tableName),
 				sqlTypes.formatColumnName(tableItem.getName()));
-		if (runStmt(sqlCmd) == false) {
+		if (!runStmt(sqlCmd)) {
 			return false;
 		}
 
@@ -885,7 +900,7 @@ public class DBProcess extends PamProcess {
 		sqlCmd = String.format("ALTER TABLE %s ADD COLUMN %s %s", sqlTypes.formatTableName(tableName),
 				sqlTypes.formatColumnName(tableItem.getName()),
 				sqlTypes.typeToString(tableItem.getSqlType(), tableItem.getLength()));
-		if (runStmt(sqlCmd) == false) {
+		if (!runStmt(sqlCmd)) {
 			return false;
 		}
 
@@ -893,13 +908,13 @@ public class DBProcess extends PamProcess {
 		sqlCmd = String.format("UPDATE %s SET %s = %s", sqlTypes.formatTableName(tableName), 
 				sqlTypes.formatColumnName(tableItem.getName()),
 				tempColName);
-		if (runStmt(sqlCmd) == false) {
+		if (!runStmt(sqlCmd)) {
 			return false;
 		}
 
 		// delete the original column
 		sqlCmd = String.format("ALTER TABLE %s DROP COLUMN %s", tableName, tempColName);
-		if (runStmt(sqlCmd) == false) {
+		if (!runStmt(sqlCmd)) {
 			return false;
 		}
 
@@ -1137,7 +1152,7 @@ public class DBProcess extends PamProcess {
 		if (tableItem.isPrimaryKey()) {
 			String primaryString = "ALTER TABLE " + tableDef.getTableName() + " ADD PRIMARY KEY ( "
 					+ sqlTypes.formatColumnName(tableItem.getName()) + " )";
-			;
+			
 
 			try {
 				stmt = databaseControll.getConnection().getConnection().createStatement();
@@ -1270,6 +1285,13 @@ public class DBProcess extends PamProcess {
 	}
 
 	public void updateProcessList() {
+		if (getPamControlledUnit().getPamConfiguration() != PamController.getInstance().getPamConfiguration()) {
+			/*
+			 * Normally the DB subsribes to everything, but if it's the external configuration we 
+			 * don't want it to since it won't have opened a database and shouldn't do anything. 
+			 */
+			return;
+		}
 		ArrayList<PamDataBlock> dataBlocks = PamController.getInstance().getDataBlocks();
 		PamDataBlock dataBlock;
 		for (int i = 0; i < dataBlocks.size(); i++) {
@@ -1354,6 +1376,9 @@ public class DBProcess extends PamProcess {
 		} else {
 			dbWriteErrors++;
 		}
+
+		dbCommitter.checkCommit(databaseControll.getConnection());
+		
 		return ok;
 	}
 
@@ -1373,6 +1398,7 @@ public class DBProcess extends PamProcess {
 
 	class TimerAction implements ActionListener {
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			databaseControll.setWriteCount(dbWriteOKs, dbWriteErrors);
 			dbWriteOKs = dbWriteErrors = 0;
@@ -1382,6 +1408,7 @@ public class DBProcess extends PamProcess {
 
 	class ViewTimerAction implements ActionListener {
 
+		@Override
 		public void actionPerformed(ActionEvent arg0) {
 			viewTimerAction();
 		}
@@ -1576,6 +1603,51 @@ public class DBProcess extends PamProcess {
 			ok &= logging.deleteData(clause);
 		}
 		return ok;
+	}
+
+	/** 
+	 * write version info for PAMGuard and all plugins to the database. 
+	 */
+	public void storeVersionInfo() {
+		String v = PamguardVersionInfo.version;
+		VersionDataUnit vdu;
+		long now = System.currentTimeMillis();
+		PamConnection con = databaseControll.getConnection();
+		if (con == null) {
+			return;
+		}
+		checkTable(versionLogging.getTableDefinition());
+		// PAMGuard
+		String runMode = PamController.getInstance().getRunModeName();
+		vdu = new VersionDataUnit(now, "PAMGuard", runMode, v);
+//		versionDataBlock.addPamData(vdu);
+		versionLogging.logData(con, vdu);
+		// can we get the users ? 
+//		Properties props = System.getProperties();
+		String user = System.getProperty("user.name");
+		String os = System.getProperty("os.name");
+		if (user != null || os != null) {
+			vdu = new VersionDataUnit(now, "User", user, os);
+//			versionDataBlock.addPamData(vdu);
+			versionLogging.logData(con, vdu);
+		}
+		//JAVA
+		v = System.getProperty("java.vm.version");
+		String name = System.getProperty("java.vm.name");
+		vdu = new VersionDataUnit(now, "Java", name, v);
+//		versionDataBlock.addPamData(vdu);
+		versionLogging.logData(con, vdu);
+		
+		// and all the plugins
+		List<CommonPluginInterface> plugins = PamModel.getPamModel().getPluginList();
+		for (CommonPluginInterface aPlug : plugins) {
+			vdu = new VersionDataUnit(now, aPlug.getDefaultName(), aPlug.getClass().getName(), aPlug.getVersion());
+//			versionDataBlock.addPamData(vdu);
+			versionLogging.logData(con, vdu);
+		}
+		
+		databaseControll.commitChanges();
+		
 	}
 
 }

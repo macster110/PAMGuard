@@ -9,15 +9,15 @@ import java.util.ArrayList;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 
 import PamController.PamConfiguration;
 import PamController.PamControlledUnit;
 import PamController.PamController;
-import PamController.PamControllerInterface;
 import PamView.MenuItemEnabler;
 import PamView.dialog.warn.WarnOnce;
 import dataModelFX.connectionNodes.ModuleIconFactory.ModuleIcon;
-import javafx.stage.Stage;
+import pamguard.GlobalArguments;
 
 /**
  * Holds information about available PAMGUARD modules.
@@ -34,6 +34,8 @@ public class PamModuleInfo implements PamDependent{
 	private String defaultName;
 	private Class moduleClass;
 	private String toolTipText;
+	private String helpPoint;
+	private int allowedModes = PamPluginInterface.ALLMODES;
 	
 	private static final Class[] constrParams1 = {PamConfiguration.class, String.class};
 	private static final Class[] constrParams2 = {String.class};
@@ -205,6 +207,7 @@ public class PamModuleInfo implements PamDependent{
 			this.moduleInfo = moduleInfo;
 		}
 		
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			// first check dependencies to see if everything required
 			// by this module actually exists
@@ -215,7 +218,13 @@ public class PamModuleInfo implements PamDependent{
 			// create a new PamControlledUnit and add it to PamGuard ...
 			PamController pamController = PamController.getInstance();
 		
-			pamController.addModule(parentFrame, moduleInfo);
+			SwingUtilities.invokeLater(new Runnable() {
+				
+				@Override
+				public void run() {
+					pamController.addModule(parentFrame, moduleInfo);
+				}
+			});
 		}
 		
 	}
@@ -234,6 +243,8 @@ public class PamModuleInfo implements PamDependent{
 //		Class[] paramList = new Class[1];
 //		paramList[0] = unitName.getClass();
 		boolean error = false;
+		long tic = System.currentTimeMillis();
+		long toc = tic;
 		try {
 			Constructor constructor = moduleClass.getConstructor(constrParams1);
 			newUnit = (PamControlledUnit) constructor.newInstance(pamConfiguration, unitName);
@@ -261,6 +272,11 @@ public class PamModuleInfo implements PamDependent{
 				Ex.printStackTrace();
 				return null;
 			}
+		}
+		toc = System.currentTimeMillis();
+		if (toc-tic > 1000) {
+			System.out.printf("Module %s-%s was slow to load, taking %3.1f seconds\n", newUnit.getUnitType(), 
+					newUnit.getUnitName(), (double)(toc-tic)/1000.);
 		}
 
 		setNInstances(nInstances + 1);
@@ -326,10 +342,17 @@ public class PamModuleInfo implements PamDependent{
 		for (int i = 0; i < moduleList.size(); i++) {
 			
 			mi = moduleList.get(i);
-			
-			if (mi.isHidden()) {
-				continue;
+
+			// don't skip anything in batch view, only allow skip if it isn't. 
+			if (GlobalArguments.getParam(GlobalArguments.BATCHVIEW) == null) {
+				if (mi.isHidden()) {
+					continue;
+				}
+				if (mi.availableInMode() == false) {
+					continue;
+				}
 			}
+			
 			
 			//System.out.println("PamModuleInfo getmodules menu " + moduleList.get(i).getDescription());
 			menuItem = new JMenuItem(mi.toString());
@@ -338,7 +361,7 @@ public class PamModuleInfo implements PamDependent{
 				menuItem.setToolTipText(mi.toolTipText);
 			}
 			
-			if (mi.canCreate() == false) {
+			if (!mi.canCreate()) {
 				//continue;
 				menuItem.setEnabled(false);
 			}
@@ -375,7 +398,7 @@ public class PamModuleInfo implements PamDependent{
 				continue;
 			}
 			if (mi != null) {
-				if (mi.canRemove() == false) continue;
+				if (!mi.canRemove()) continue;
 			}
 			menuItem = new JMenuItem(pamControlledUnit.getUnitName());
 			menuItem.addActionListener(new RemoveModuleMenuAction(pamControlledUnit));
@@ -404,6 +427,7 @@ public class PamModuleInfo implements PamDependent{
 			this.pamControlledUnit = pamControlledUnit;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			int ans = JOptionPane.showConfirmDialog(pamControlledUnit.getGuiFrame(),
 					"Do you really want to remove the module " 
@@ -496,6 +520,7 @@ public class PamModuleInfo implements PamDependent{
 	/* (non-Javadoc)
 	 * @see PamModel.PamDependent#addDependancy(PamModel.PamDependency)
 	 */
+	@Override
 	public void addDependency(PamDependency dependancy) {
 
 		pamDependency = dependancy;
@@ -505,6 +530,7 @@ public class PamModuleInfo implements PamDependent{
 	/* (non-Javadoc)
 	 * @see PamModel.PamDependent#getDependency()
 	 */
+	@Override
 	public PamDependency getDependency() {
 		
 		return pamDependency;
@@ -514,6 +540,7 @@ public class PamModuleInfo implements PamDependent{
 	/* (non-Javadoc)
 	 * @see PamModel.PamDependent#getDependentUserName()
 	 */
+	@Override
 	public String getDependentUserName() {
 		return this.description;
 	}
@@ -618,7 +645,51 @@ public class PamModuleInfo implements PamDependent{
 		return guiCombatibility.get(index);
 	}
 
+	/**
+	 * @return the helpPoint
+	 */
+	protected String getHelpPoint() {
+		return helpPoint;
+	}
 
+	/**
+	 * @param helpPoint the helpPoint to set
+	 */
+	protected void setHelpPoint(String helpPoint) {
+		this.helpPoint = helpPoint;
+	}
+
+	/**
+	 * @return the allowedModes
+	 */
+	public int getAllowedModes() {
+		return allowedModes;
+	}
+
+	/**
+	 * @param allowedModes the allowedModes to set
+	 */
+	public void setAllowedModes(int allowedModes) {
+		this.allowedModes = allowedModes;
+	}
+
+	/**
+	 * Is this module available in this mode ? 
+	 * @return true if available. 
+	 */
+	public boolean availableInMode() {
+		if (allowedModes == PamPluginInterface.ALLMODES) {
+			return true;
+		}
+		int mode = PamController.getInstance().getRunMode();
+		if (mode == PamController.RUN_PAMVIEW && (allowedModes & PamPluginInterface.NOTINVIEWER)!=0) {
+			return false;
+		}
+		if (mode == PamController.RUN_NORMAL && (allowedModes & PamPluginInterface.NOTINVIEWER)!=0) {
+			return false;
+		}
+		return true;
+	}
 
 	
 	

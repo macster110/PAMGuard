@@ -1,5 +1,19 @@
 package offlineProcessing;
 
+import java.awt.Component;
+import java.awt.Point;
+import java.util.ArrayList;
+import java.util.ListIterator;
+
+import PamController.PamConfiguration;
+import PamController.PamControlledUnit;
+import PamController.PamSettings;
+import PamController.PamViewParameters;
+import PamguardMVC.PamDataBlock;
+import PamguardMVC.PamDataUnit;
+import PamguardMVC.PamProcess;
+import PamguardMVC.superdet.SuperDetection;
+import dataMap.OfflineDataMapPoint;
 import generalDatabase.DBControlUnit;
 import generalDatabase.PamConnection;
 import generalDatabase.SQLLogging;
@@ -8,18 +22,6 @@ import generalDatabase.SuperDetLogging;
 import generalDatabase.clauses.FixedClause;
 import generalDatabase.clauses.FromClause;
 import generalDatabase.clauses.PAMSelectClause;
-
-import java.util.ArrayList;
-import java.util.ListIterator;
-
-import PamController.PamControlledUnit;
-import PamController.PamViewParameters;
-import dataMap.OfflineDataMapPoint;
-
-import PamguardMVC.PamDataBlock;
-import PamguardMVC.PamDataUnit;
-import PamguardMVC.PamProcess;
-import PamguardMVC.superdet.SuperDetection;
 
 /**
  * An offline task, such as click species id. 
@@ -47,6 +49,8 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 	 */
 	private PamDataBlock<T> parentDataBlock;
 
+	private PamControlledUnit parentControlledUnit;
+
 //	/**
 //	 * Default constructor. Should no longer be used, but kept in case there are subclasses
 //	 * of OfflineTask in other plugins. <br>
@@ -57,8 +61,11 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 //		super();
 //	}
 	/**
+	 * For compatibility with batch processor it's better to use the other
+	 * constructor public OfflineTask(PamControlledUnit pamControlledUnit, PamDataBlock<T> parentDataBlock)
 	 * @param parentDataBlock
 	 */
+	@Deprecated
 	public OfflineTask(PamDataBlock<T> parentDataBlock) {
 		super();
 		this.parentDataBlock = parentDataBlock;
@@ -74,9 +81,22 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 			System.out.printf("Offline task %s with datablock %s is not associated with a PAMGuard module\n", getName(), parentDataBlock==null ?  "null": parentDataBlock.getDataName());
 		}
 		else {
-			OfflineTaskManager.getManager().registerTask(this);
+//			parentControl.getPamConfiguration().
+//			OfflineTaskManager.getManager().registerTask(this);
 		}
 		
+	}
+	
+	/**
+	 * Preferred constructor for offline tasks that gets a valid ref to the appropriate 
+	 * PAMControlled unit. 
+	 * @param pamControlledUnit
+	 * @param parentDataBlock
+	 */
+	public OfflineTask(PamControlledUnit pamControlledUnit, PamDataBlock<T> parentDataBlock) {
+		super();
+		this.parentControlledUnit = pamControlledUnit;
+		this.parentDataBlock = parentDataBlock;
 	}
 	
 	/**
@@ -84,6 +104,9 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 	 * @return PAMControlled unit associated with a task. 
 	 */
 	public PamControlledUnit getTaskControlledUnit() {
+		if (parentControlledUnit != null) {
+			return parentControlledUnit;
+		}
 		if (parentDataBlock == null) {
 			return null;
 		}
@@ -91,7 +114,7 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 		if (parentProcess == null) {
 			return null;
 		}
-		return parentProcess.getPamControlledUnit();
+		return parentControlledUnit = parentProcess.getPamControlledUnit();
 	}
 
 	/**
@@ -123,6 +146,29 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 		}
 	}
 
+	/**
+	 * Get a uniquely identifying name for the task which consists of the 
+	 * pamControlledUnit type and name as well as the tasks shorter name from getName();
+	 * @return a long name which should be unique within a configuration. 
+	 */
+	public String getLongName() {
+		PamControlledUnit tcu = getTaskControlledUnit();
+		if (tcu == null) {
+			System.out.printf("Unregistered offline task class %s name %s \n", getClass().getName(), getName());
+			return String.format("%s:%s", getClass().getName(), getName());
+		}
+		String str = String.format("%s:%s:%s", tcu.getUnitType(), tcu.getUnitName(), getName());
+//		PamDataBlock groupDataBlock = offlineTaskGroup.getPrimaryDataBlock();
+//		String dataBlockName;
+//		if (groupDataBlock == null) {
+//			dataBlockName = "Unknown Primary Block";
+//		}
+//		else {
+//			dataBlockName = groupDataBlock.getLongDataName();
+//		}
+//		String str = String.format("%s:%s:%s:%s", tcu.getUnitType(), tcu.getUnitName(), getName());
+		return str;
+	}
 	/**
 	 * 
 	 * @return a name for the task, to be displayed in the dialog. 
@@ -160,17 +206,34 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 	}
 
 	/**
-	 * task has settings which can be called
+	 * task has settings which can be modified. If this is true, then 
+	 * callSettings(Component component) should do something such as open a dialog or show a menu, or something. 
 	 * @return true or false
 	 */
 	public boolean hasSettings() {
 		return false;
 	}
+	
+	/**
+	 * Call any task specific settings. This replaces the older
+	 * function callSettings() which is now deprecated. Passes a 
+	 * reference to an awt component so that it's location can be used to
+	 * open a popup dialog, etc, for more complex systems with many options. 
+	 * @param component button or whatever called the settings. 
+	 * @return
+	 */
+	public boolean callSettings(Component component, Point point) {
+		return callSettings();
+	}
 
 	/**
-	 * Call any task specific settings
+	 * Call any task specific settings<br>
+	 * use callSettings(Component component) instead wherever possible. 
+	 * @param point 
+	 * @param component 
 	 * @return true if settings may have changed. 
 	 */
+	@Deprecated
 	public boolean callSettings() {
 		return false;
 	}
@@ -184,6 +247,14 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 	public boolean canRun() {
 		boolean can = getDataBlock() != null; 
 		return can;
+	}
+	
+	/**
+	 * If a task can't run, try to return a string to say why not. 
+	 * @return text reason as to why task can't run (such as missing data). 
+	 */
+	public String whyNot() {
+		return null;
 	}
 
 	/**
@@ -216,6 +287,9 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 	 * @param dataBlockInfo required data block with pre and post load times. 
 	 */
 	public void addRequiredDataBlock(RequiredDataBlockInfo dataBlockInfo) {
+		if (dataBlockInfo == null || dataBlockInfo.getPamDataBlock() == null) {
+			return;
+		}
 		if (requiredDatablocks == null) {
 			requiredDatablocks = new ArrayList<RequiredDataBlockInfo>();
 		}
@@ -275,6 +349,9 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 	 * @param dataBlock affected data block. 
 	 */
 	public void addAffectedDataBlock(PamDataBlock dataBlock) {
+		if (dataBlock == null) {
+			return;
+		}
 		if (affectedDataBlocks == null) {
 			affectedDataBlocks = new ArrayList<PamDataBlock>();
 		}
@@ -310,7 +387,11 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 		if (affectedDataBlocks == null || affectedDataBlocks.size() == 0) {
 			return null;
 		}
-		String blocks = affectedDataBlocks.get(0).getDataName();
+		PamDataBlock block0 = affectedDataBlocks.get(0);
+		if (block0 == null) {
+			return null;
+		}
+		String blocks = block0.getDataName();
 		for (int i = 1; i < affectedDataBlocks.size(); i++) {
 			blocks += "; " + affectedDataBlocks.get(i).getDataName();
 		}
@@ -323,9 +404,9 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 	 * @return true to run. 
 	 */
 	public boolean isDoRun() {
-		if (canRun() == false) {
-			return false;
-		}
+//		if (!canRun()) {
+//			return false;
+//		}
 		return doRun;
 	}
 
@@ -398,8 +479,42 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 		}
 
 		for (PamDataBlock aBlock:affectedDataBlocks) {
+			if (isInputBlock(aBlock)) {
+				System.out.printf("Task %s: Don't delete data from \"%s\" since it input to this task", 
+					 this.getName(), aBlock.getLongDataName());
+				continue;
+			}
 			deleteOldData(aBlock, taskGroupParams);
 		}
+	}
+	
+	/**
+	 * See if the input to the task is the same as the output of 
+	 * the task. If this is the case, then FFS don't delete the input data. 
+	 * @return
+	 */
+	private boolean isInputBlock(PamDataBlock aDataBlock) {
+		if (parentDataBlock == aDataBlock) {
+			return true;
+		}
+		return false;
+	}
+	
+	/**
+	 * See if the data block is one of the required datablocks. 
+	 * @param aDataBlock
+	 * @return
+	 */
+	private boolean isRequiredBlock(PamDataBlock aDataBlock) {
+		if (requiredDatablocks != null) {
+			for (int i = 0; i < requiredDatablocks.size(); i++) {
+				RequiredDataBlockInfo blockInf = requiredDatablocks.get(i);
+				if (blockInf != null && blockInf.getPamDataBlock() == aDataBlock) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -472,5 +587,25 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 		}
 	}
 
+	/**
+	 * @return the parentControlledUnit
+	 */
+	public PamControlledUnit getParentControlledUnit() {
+		return parentControlledUnit;
+	}
+
+	/*
+	 * Get a list of all Settings users associated with this module. 
+	 */
+	public ArrayList<PamSettings> getSettingsProviders() {
+		if (parentControlledUnit instanceof PamSettings == false) {
+			return null;
+		}
+		PamConfiguration config = parentControlledUnit.getPamConfiguration();
+		if (config == null) {
+			return null;
+		}
+		return config.getSettingsOwners(parentControlledUnit.getUnitName());
+	}
 
 }

@@ -1,5 +1,7 @@
 package binaryFileStorage;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -7,7 +9,6 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InvalidClassException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
@@ -16,9 +17,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
 
-import dataMap.OfflineDataMap;
-import PamController.OfflineDataStore;
 import PamguardMVC.PamDataBlock;
+import dataMap.OfflineDataMap;
 
 public class DataMapSerialiser {
 
@@ -58,7 +58,7 @@ public class DataMapSerialiser {
 		ObjectInputStream oos = null;
 		try {
 			os = new FileInputStream(file);
-			oos = new ObjectInputStream(os);
+			oos = new ObjectInputStream(new BufferedInputStream(os));
 		} catch (FileNotFoundException e) {
 			System.out.println("Cached datamap file " + file.getAbsolutePath() + " not found.");
 			return false;
@@ -153,7 +153,7 @@ public class DataMapSerialiser {
 		while (it.hasPrevious()) {
 			aPoint = it.previous();
 			file = aPoint.getBinaryFile(binaryStore);
-			if (file == null || file.exists() == false) {
+			if (file == null || !file.exists()) {
 				it.remove();
 				nRemovals ++;
 			}
@@ -231,7 +231,7 @@ public class DataMapSerialiser {
 			return false;
 		}
 		try {
-			ObjectOutputStream oos = new ObjectOutputStream(os);
+			ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(os));
 			OfflineDataMap dm;
 			Object o;
 			for (int i = 0; i < streams.size(); i++) {

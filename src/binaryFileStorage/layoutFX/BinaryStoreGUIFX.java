@@ -5,7 +5,6 @@ import java.util.Optional;
 import PamController.SettingsPane;
 import binaryFileStorage.BinaryStore;
 import binaryFileStorage.BinaryStoreSettings;
-import javafx.stage.Stage;
 import pamViewFX.PamControlledGUIFX;
 import pamViewFX.fxNodes.pamDialogFX.PamSettingsDialogFX;
 
@@ -62,7 +61,7 @@ public class BinaryStoreGUIFX extends PamControlledGUIFX {
 			getSettingsPane().paneInitialized();
 			//fix to make sure the dialog appearsa in pre PG GUI FX insitialisation i.e. when selecting viewer database 
 			//on PG start up/. 
-			((Stage) dBsettingsDialog.getDialogPane().getScene().getWindow()).setAlwaysOnTop(true);;
+			//((Stage) dBsettingsDialog.getDialogPane().getScene().getWindow()).setAlwaysOnTop(true);;
 		});
 
 

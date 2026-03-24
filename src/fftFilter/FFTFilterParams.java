@@ -2,12 +2,11 @@ package fftFilter;
 
 import java.io.Serializable;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
 import Filters.FilterBand;
+import Filters.FilterParams;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamUtils.FrequencyFormat;
 
 public class FFTFilterParams implements Serializable, Cloneable, ManagedParameters {
@@ -17,6 +16,21 @@ public class FFTFilterParams implements Serializable, Cloneable, ManagedParamete
 	public FilterBand filterBand = FilterBand.HIGHPASS;
 
 	public double lowPassFreq, highPassFreq;
+	
+	/**
+	 * Constructor from other type of filter params. 
+	 * @param fp
+	 */
+	public FFTFilterParams(FilterParams fp) {
+		this.filterBand = fp.filterBand;
+		this.lowPassFreq = fp.lowPassFreq;
+		this.highPassFreq = fp.highPassFreq;
+	}
+
+	public FFTFilterParams() {
+		super();
+		// TODO Auto-generated constructor stub
+	}
 
 	@Override
 	public FFTFilterParams clone() {
@@ -31,7 +45,7 @@ public class FFTFilterParams implements Serializable, Cloneable, ManagedParamete
 	@Override
 	public boolean equals(Object other) {	
 		if (other == null) return false;
-		if (FFTFilterParams.class.isAssignableFrom(other.getClass()) == false) {
+		if (!FFTFilterParams.class.isAssignableFrom(other.getClass())) {
 			return false;
 		}
 		FFTFilterParams that = (FFTFilterParams) other;
@@ -62,7 +76,7 @@ public class FFTFilterParams implements Serializable, Cloneable, ManagedParamete
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 }

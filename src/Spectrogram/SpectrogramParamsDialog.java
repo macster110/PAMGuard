@@ -41,17 +41,13 @@ import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 
-import fftManager.FFTDataBlock;
-import fftManager.FFTDataUnit;
-import noiseMonitor.ResolutionPanel;
-import warnings.WarningSystem;
 import Layout.DisplayPanelProvider;
 import Layout.DisplayProviderList;
 import PamController.PamController;
-import PamController.soundMedium.GlobalMedium;
 import PamUtils.PamUtils;
 import PamView.ColourArray;
 import PamView.ColourArray.ColourArrayType;
@@ -65,6 +61,9 @@ import PamguardMVC.PamConstants;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamProcess;
 import Spectrogram.SpectrogramDisplay.SpectrogramPanel;
+import fftManager.FFTDataBlock;
+import fftManager.FFTDataUnit;
+import noiseMonitor.ResolutionPanel;
 
 public class SpectrogramParamsDialog extends PamDialog implements ActionListener {
 
@@ -106,7 +105,7 @@ public class SpectrogramParamsDialog extends PamDialog implements ActionListener
 
 	private FFTDataBlock fftBlock;
 
-	private float defaultMinFreq, defaultMaxFreq;
+	private double defaultMinFreq, defaultMaxFreq;
 	
 	private PluginPanel pluginPanel;
 	
@@ -236,6 +235,7 @@ public class SpectrogramParamsDialog extends PamDialog implements ActionListener
 		
 	}
 
+	@Override
 	public void actionPerformed(ActionEvent e) {
 
 		if (e.getSource() == pixs) {
@@ -310,7 +310,7 @@ public class SpectrogramParamsDialog extends PamDialog implements ActionListener
 //			addComponent(bot, sourceData, constraints);
 			constraints.gridy = 1;
 			constraints.gridwidth = 1;
-			addComponent(chanPanel, new JLabel(" Number of Panels ", JLabel.RIGHT), constraints);
+			addComponent(chanPanel, new JLabel(" Number of Panels ", SwingConstants.RIGHT), constraints);
 			constraints.gridx = 1;
 			constraints.gridwidth = 1;
 			addComponent(chanPanel, nPanels, constraints);
@@ -322,7 +322,7 @@ public class SpectrogramParamsDialog extends PamDialog implements ActionListener
 				constraints.gridx = 0;
 				constraints.gridy ++;
 				constraints.gridwidth = 1;
-				addComponent(chanPanel, panelChannelLabel[i] = new JLabel(" Panel " + i + " channel ", JLabel.RIGHT), constraints);
+				addComponent(chanPanel, panelChannelLabel[i] = new JLabel(" Panel " + i + " channel ", SwingConstants.RIGHT), constraints);
 				constraints.gridx += constraints.gridwidth;
 				constraints.gridwidth = 1;
 				addComponent(chanPanel, panelChannelList[i] = new JComboBox(), constraints);
@@ -416,7 +416,7 @@ public class SpectrogramParamsDialog extends PamDialog implements ActionListener
 				nP = Integer.valueOf(nPanels.getText());
 			}
 			catch (NumberFormatException Ex) {
-				nP = 0;;
+				nP = 0;
 			}
 			if (nP <= 0) {
 				nPanels.setText("1");
@@ -511,8 +511,8 @@ public class SpectrogramParamsDialog extends PamDialog implements ActionListener
 		if (fftBlock == null) {
 			return;
 		}
-		defaultMinFreq = 0;
-		defaultMaxFreq = fftBlock.getSampleRate() / 2;
+		defaultMinFreq = fftBlock.getMinDataValue();
+		defaultMaxFreq = fftBlock.getMaxDataValue();
 
 		nPanels.setText(String.format("%d", spectrogramParameters.nPanels)); //Xiao Yan Deng commented
 //		System.out.println("SpectrogramParameterDialog.java->fillSourcePanelData()numChannel:"+numChannel);
@@ -543,8 +543,8 @@ public class SpectrogramParamsDialog extends PamDialog implements ActionListener
 				spectrogramParameters.amplitudeLimits[1]));
 		colourList.setSelectedIndex(spectrogramParameters.getColourMap().ordinal());
 
-		pixs.setSelected(spectrogramParameters.timeScaleFixed == false);
-		secs.setSelected(spectrogramParameters.timeScaleFixed == true);
+		pixs.setSelected(!spectrogramParameters.timeScaleFixed);
+		secs.setSelected(spectrogramParameters.timeScaleFixed);
 
 		pixsPerSlice.setText(String.format("%d",
 				spectrogramParameters.pixelsPerSlics));
@@ -864,13 +864,13 @@ public class SpectrogramParamsDialog extends PamDialog implements ActionListener
 			return showWarning("Invalid source data block " + sourcePanel.getSource());
 		}
 
-		int ch;
+		Integer ch;
 		try {
 			spectrogramParameters.nPanels = dialogSourcePanel.getNumPanels();
 			for (int i = 0; i < Math.min(spectrogramParameters.nPanels, currentNumPanels); i++) {
 				ch = (Integer) panelChannelList[i].getSelectedItem();
 //				ch = Integer.valueOf(str);
-				spectrogramParameters.channelList[i] = ch;
+				if (ch!=null) spectrogramParameters.channelList[i] = ch;
 			}
 
 			spectrogramParameters.frequencyLimits[0] = Double.valueOf(

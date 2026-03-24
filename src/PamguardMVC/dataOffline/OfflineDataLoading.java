@@ -14,6 +14,7 @@ import PamguardMVC.LoadObserver;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObserver;
+import PamguardMVC.PamRawDataBlock;
 
 /**
  * Handles the loading of offline data from a PamDataBlock. 
@@ -189,11 +190,11 @@ public class OfflineDataLoading<T extends PamDataUnit> {
 						switch (offlineDataInfo.getInterrupt()) {
 						case OFFLINE_DATA_INTERRUPT:
 							//						System.out.println("Request order cancelling");
-
+							int giveUp = 0;
 
 							if (orderData.cancelOrder()) {			
 
-								while (orderData!=null || !orderData.isDone()) {
+								while ((orderData!=null || !orderData.isDone()) & giveUp++ < 300) {
 									try {
 										Thread.sleep(10);
 									} catch (InterruptedException e) {
@@ -237,9 +238,14 @@ public class OfflineDataLoading<T extends PamDataUnit> {
 			//System.out.println(String.format("%s waited %d, %d, %d, %d during ordering load", 
 			//		getDataName(), t2-t1, t3-t2, t4-t3, t5-t4));
 
-			orderData = new OrderData(offlineDataInfo);
-			//			requestCancellationObject.cancel = true;
-			orderData.execute();
+			try {
+				orderData = new OrderData(offlineDataInfo);
+				orderData.execute();
+			}
+			catch (Exception e) {
+				// can throw if orderData gets set to null in a different thread .
+				// too complicated to try to understand threading right now and don't want to create a lock
+			}
 
 			//t = new Timer(1000, new StartOrderOnTimer(orderData));
 		} // end of order lock
@@ -475,9 +481,13 @@ public class OfflineDataLoading<T extends PamDataUnit> {
 			return lastRequestAnswer | REQUEST_SAME_REQUEST;
 		}
 
-		this.currentOfflineLoadKeep = offlineDataInfo.getLoadKeepLayers() > 0;
+//		if (pamDataBlock instanceof PamRawDataBlock) {
+//			System.out.printf("Keep layers in %s is %d\n", pamDataBlock.getLongDataName(), offlineDataInfo.getLoadKeepLayers());
+//		}
+		this.currentOfflineLoadKeep = true;//offlineDataInfo.getLoadKeepLayers() > 0;
 
 		//need to keep a record of these as they change through the upstream data request process. 
+		clearRequestingObservers();
 		addRequestingObserver(offlineDataInfo.getCurrentObserver());
 
 		pamDataBlock.clearAll();
@@ -507,6 +517,15 @@ public class OfflineDataLoading<T extends PamDataUnit> {
 		return lastRequestAnswer;
 	}
 
+	/**
+	 * Clear all requesting observers from the list. Stops them 
+	 * all adding up and everything getting everything !
+	 */
+	public void clearRequestingObservers() {
+		if (requestingObservers != null) {
+			requestingObservers.clear();
+		}
+	}
 	/**
 	 * Add observer to requesting observer list which is 
 	 * used to distribute data to selected observers when it's

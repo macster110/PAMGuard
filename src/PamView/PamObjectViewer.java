@@ -86,7 +86,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 
 	PopupListener popupListener;
 
-	JMenuItem printMenuItem, layoutMenuItem;;
+	JMenuItem printMenuItem, layoutMenuItem;
 
 	boolean doneLayout;
 
@@ -202,7 +202,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 		for (int iUnit = 0; iUnit < pamConfiguration.getNumControlledUnits(); iUnit++) {
 			pamControlledUnit = pamConfiguration.getControlledUnit(iUnit);
 			if (pamControlledUnit.getNumPamProcesses() == 0
-					&& pamObjectViewerSettings.showProcesslessModules == false) {
+					&& !pamObjectViewerSettings.showProcesslessModules) {
 				continue;
 			}
 			pamControllerView = new PamControllerView(pamControlledUnit);
@@ -227,7 +227,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 		}
 
 		int maxColums = controllerList.size() + 2;
-		;
+		
 
 		int[] columnWidths = new int[maxColums];
 		int[] columnBottoms = new int[maxColums];
@@ -416,9 +416,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 			setTitle("Pamguard Data Model");
 
 			// fixed case of Resources 17/8/08 DG.
-			setIconImage(new ImageIcon(ClassLoader
-					.getSystemResource("Resources/pamguardIcon.png"))
-					.getImage());
+			setIconImage(PamIcon.getPAMGuardImageIcon(PamIcon.SMALL).getImage());
 //			setIconImages(getOwner().getIconImages());
 
 			setSize(new Dimension(800, 700));
@@ -488,7 +486,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 				}
 			}
 			super.setVisible(b);
-			if (doneLayout == false) {
+			if (!doneLayout) {
 				layoutDiagram();
 			}
 		}
@@ -500,6 +498,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 		 * java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent
 		 * )
 		 */
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			if (e.getSource() == closeButton) {
 				setVisible(false);
@@ -920,7 +919,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 			Component c = findComponent(processNum, blockNum);
 			pt.y = this.getY() + getYOffset();
 			pt.y += c.getY();
-			if (dataModifier == false) {
+			if (!dataModifier) {
 				pt.y += c.getHeight() / 2;
 			}
 			else {
@@ -947,7 +946,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 			Component c = findComponent(dataBlock);
 			pt.y = this.getY() + getYOffset();
 			pt.y += c.getY();
-			if (dataModifier == false) {
+			if (!dataModifier) {
 				pt.y += c.getHeight() / 2;
 			}
 			else {
@@ -1204,6 +1203,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 		}
 
 		Timer blockTimer = new Timer(1000, new ActionListener() {
+			@Override
 			public void actionPerformed(ActionEvent evt) {
 				// fill in the CPU usage
 				for (int i = 0; i < processThings.size(); i++) {
@@ -1375,6 +1375,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 		}
 
 		Timer blockTimer = new Timer(1000, new ActionListener() {
+			@Override
 			public void actionPerformed(ActionEvent evt) {
 				// fill in the CPU usage
 				cpuTime.setText(String.format("%3.1f%%", pamProcess.getCpuPercent()));
@@ -1410,6 +1411,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 			this.pamDataBlock = pamDataBlock;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			JButton b = (JButton) e.getSource();
 			JPopupMenu menu = new JPopupMenu();
@@ -1437,6 +1439,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 			this.b = b;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			ObserverListPopup.show(objectFrame, b.getLocationOnScreen(),
 					pamDataBlock);
@@ -1452,6 +1455,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 			this.b = b;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			new AnnotationsPopup(objectFrame, b.getLocationOnScreen(),
 					pamDataBlock);
@@ -1520,6 +1524,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 		}
 
 		class RemoveAction implements ActionListener {
+			@Override
 			public void actionPerformed(ActionEvent e) {
 				// check user really wants to do that ...
 				int ans = JOptionPane.showConfirmDialog(objectFrame,
@@ -1541,6 +1546,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 				this.parentFrame = parentFrame;
 			}
 
+			@Override
 			public void actionPerformed(ActionEvent e) {
 				// check user really wants to do that ...
 				String newName = NewModuleDialog.showDialog(parentFrame,
@@ -1606,6 +1612,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	 * @seejava.awt.event.ComponentListener#componentHidden(java.awt.event.
 	 * ComponentEvent)
 	 */
+	@Override
 	public void componentHidden(ComponentEvent e) {
 
 	}
@@ -1617,6 +1624,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	 * java.awt.event.ComponentListener#componentMoved(java.awt.event.ComponentEvent
 	 * )
 	 */
+	@Override
 	public void componentMoved(ComponentEvent e) {
 		checkLayoutSize();
 		layoutPanel.repaint();
@@ -1628,6 +1636,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	 * @seejava.awt.event.ComponentListener#componentResized(java.awt.event.
 	 * ComponentEvent)
 	 */
+	@Override
 	public void componentResized(ComponentEvent e) {
 	}
 
@@ -1638,6 +1647,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	 * java.awt.event.ComponentListener#componentShown(java.awt.event.ComponentEvent
 	 * )
 	 */
+	@Override
 	public void componentShown(ComponentEvent e) {
 
 	}
@@ -1686,6 +1696,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	}
 
 	class setViewByController implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			if (pamObjectViewerSettings.viewStyle != PamObjectViewerSettings.VIEWBYCONTROLLER) {
 				pamObjectViewerSettings.viewStyle = PamObjectViewerSettings.VIEWBYCONTROLLER;
@@ -1696,6 +1707,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	}
 
 	class setViewByProcess implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			if (pamObjectViewerSettings.viewStyle != PamObjectViewerSettings.VIEWBYPROCESS) {
 				pamObjectViewerSettings.viewStyle = PamObjectViewerSettings.VIEWBYPROCESS;
@@ -1706,6 +1718,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	}
 
 	class ShowProcesslessModules implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			pamObjectViewerSettings.showProcesslessModules = !pamObjectViewerSettings.showProcesslessModules;
 			showProcesslessModules
@@ -1715,6 +1728,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	}
 
 	class menuModuleOrder implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			if (PamController.getInstance().orderModules(
 					getObjectViewer(null).objectFrame)) {
@@ -1748,6 +1762,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	 * 
 	 * @see PamView.PamViewInterface#ModelChanged()
 	 */
+	@Override
 	public void modelChanged(int changeType) {
 		// if (changeType == PamControllerInterface.CHANGED_PROCESS_SETTINGS)
 		// if (true) return;
@@ -1783,6 +1798,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	 * 
 	 * @see PamView.PamViewInterface#PamEnded()
 	 */
+	@Override
 	public void pamEnded() {
 
 	}
@@ -1792,27 +1808,33 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	 * 
 	 * @see PamView.PamViewInterface#PamStarted()
 	 */
+	@Override
 	public void pamStarted() {
 
 	}
 
+	@Override
 	public Serializable getSettingsReference() {
 		pamObjectViewerSettings.frameRectangle = objectFrame.getBounds();
 		return pamObjectViewerSettings;
 	}
 
+	@Override
 	public long getSettingsVersion() {
 		return PamObjectViewerSettings.serialVersionUID;
 	}
 
+	@Override
 	public String getUnitName() {
 		return "ObjectViewer";
 	}
 
+	@Override
 	public String getUnitType() {
 		return "ObjectViewer";
 	}
 
+	@Override
 	public boolean restoreSettings(
 			PamControlledUnitSettings pamControlledUnitSettings) {
 		pamObjectViewerSettings = (PamObjectViewerSettings) pamControlledUnitSettings
@@ -1823,11 +1845,13 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 		return true;
 	}
 
+	@Override
 	public void addControlledUnit(PamControlledUnit unit) {
 		// TODO Auto-generated method stub
 
 	}
 
+	@Override
 	public void removeControlledUnit(PamControlledUnit unit) {
 		// TODO Auto-generated method stub
 		// could potentially uswe this function to remove module graphics more
@@ -1835,6 +1859,7 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 		// redrawing the whole model view ?
 	}
 
+	@Override
 	public void showControlledUnit(PamControlledUnit unit) {
 		// TODO Auto-generated method stub
 

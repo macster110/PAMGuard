@@ -23,19 +23,17 @@
 
 package rocca;
 
-import PamDetection.PamDetection;
-import PamguardMVC.AcousticDataUnit;
-import PamguardMVC.PamDataUnit;
-
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import javax.swing.JLabel;
+
+import PamDetection.PamDetection;
+import PamguardMVC.PamDataUnit;
 
 /**
  * Container holding information about the current sighting, including pointers
@@ -234,8 +232,8 @@ public class RoccaSightingDataUnit extends PamDataUnit<PamDataUnit,PamDataUnit> 
         // add the latitude and longitude.
         if (roccaControl.roccaParameters.weAreUsingGPS()) {
         	try {
-        		latitude = roccaControl.roccaProcess.getGpsSourceData().getLastUnit().getGpsData().getLatitude();
-        		longitude = roccaControl.roccaProcess.getGpsSourceData().getLastUnit().getGpsData().getLongitude();
+        		latitude = roccaControl.getRoccaProcess().getGpsSourceData().getLastUnit().getGpsData().getLatitude();
+        		longitude = roccaControl.getRoccaProcess().getGpsSourceData().getLastUnit().getGpsData().getLongitude();
         	} catch (Exception e) {
         		latitude=0;
         		longitude=0;
@@ -665,7 +663,7 @@ public class RoccaSightingDataUnit extends PamDataUnit<PamDataUnit,PamDataUnit> 
     public void classifySighting(int threshold) {
     	
     	// if no classifier models are loaded, just return a "No Classifier"
-    	if (!roccaControl.roccaProcess.isClassifierLoaded()) {
+    	if (!roccaControl.getRoccaProcess().isClassifierLoaded()) {
     		sightClass = RoccaClassifier.NOCLASS;
     		return;
     	}

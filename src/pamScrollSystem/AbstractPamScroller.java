@@ -42,7 +42,7 @@ public abstract class AbstractPamScroller implements DataTimeLimits {
 	/*
 	 * List of play speeds for a quick menu
 	 */
-	protected double[] playSpeeds = {.1, 0.25, .5, 1.0, 2, 5, 10};
+	protected double[] playSpeeds = {.1, 0.25, .5, 1.0, 2, 5, 10, 20, 30, 60};
 
 //	private long realTimerStart;
 //
@@ -236,6 +236,7 @@ public abstract class AbstractPamScroller implements DataTimeLimits {
 	/**
 	 * @return the minimumMillis - the minimum of loaded data
 	 */
+	@Override
 	public long getMinimumMillis() {
 		return scrollerData.minimumMillis;
 	}
@@ -243,6 +244,7 @@ public abstract class AbstractPamScroller implements DataTimeLimits {
 	/**
 	 * @return the maximumMillis - the maximum of loaded data
 	 */
+	@Override
 	public long getMaximumMillis() {
 		return scrollerData.maximumMillis;
 	}

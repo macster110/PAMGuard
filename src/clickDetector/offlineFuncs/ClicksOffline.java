@@ -33,8 +33,11 @@ import clickDetector.ClickBinaryDataSource;
 import clickDetector.ClickControl;
 import clickDetector.ClickDataBlock;
 import clickDetector.ClickDetection;
+import clickDetector.offlineFuncs.eventtasks.EventCheckTask;
+import clickDetector.offlineFuncs.eventtasks.EventTaskGroup;
 import dataPlotsFX.JamieDev;
 import PamController.PamController;
+import PamModel.SMRUEnable;
 import PamView.CtrlKeyManager;
 import PamView.PamColors;
 import PamView.PamSymbol;
@@ -61,6 +64,10 @@ public class ClicksOffline {
 	private OfflineParameters offlineParameters = new OfflineParameters();
 
 	private OLProcessDialog clickOfflineDialog;
+
+	private OfflineTaskGroup offlineTaskGroup;
+
+	private OfflineTaskGroup eventTaskGroup;
 	
 	public static final String ClickTypeLookupName = "OfflineRCEvents";
 
@@ -108,6 +115,16 @@ public class ClicksOffline {
 		menuItem = new JMenuItem("Reanalyse clicks ...");
 		menuItem.addActionListener(new ReanalyseClicks());
 		menu.add(menuItem);
+		if (SMRUEnable.isDevEnable()) {
+			menuItem = new JMenuItem("Offline event dev task");
+			menuItem.addActionListener(new ActionListener() {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					offlineEventTask();
+				}
+			});
+			menu.add(menuItem);
+		}
 
 		return 2;
 	}
@@ -166,6 +183,7 @@ public class ClicksOffline {
 			}
 			
 			menuItem  = new JMenuItem("Label click ...");
+			menuItem.setToolTipText("Label click as being part of an event");
 			menuItem.addActionListener(new LabelClicks(overlayMark, singleDataUnit));
 			menu.add(menuItem);
 			nMenuItems++;
@@ -186,6 +204,7 @@ public class ClicksOffline {
 				nMenuItems++;
 			}
 			menuItem  = new JMenuItem("Label clicks (Ctrl+L) ...");
+			menuItem.setToolTipText("Label clicks as being part of an event");
 			menuItem.addActionListener(new LabelClicks(overlayMark, markedClicks));
 			menu.add(menuItem);
 			nMenuItems++;
@@ -462,6 +481,7 @@ public class ClicksOffline {
 			reAnalyseClicks();
 		}
 	}
+	
 
 	private class ExportEventData implements ActionListener {
 
@@ -544,9 +564,14 @@ public class ClicksOffline {
 	public void reAnalyseClicks() {
 		if (clickOfflineDialog == null) {
 			clickOfflineDialog = new OLProcessDialog(clickControl.getGuiFrame(), 
-					getOfflineTaskGroup(clickControl), "Click Reprocessing");
+					getOfflineTaskGroup(), "Click Reprocessing");
 		}
 		clickOfflineDialog.setVisible(true);
+	}
+
+	private void offlineEventTask() {
+		OLProcessDialog opd = new OLProcessDialog(clickControl.getGuiFrame(), eventTaskGroup, "Event Checking");
+		opd.setVisible(true);
 	}
 
 	public void exportEventData(Frame frame) {
@@ -569,28 +594,44 @@ public class ClicksOffline {
 
 		exportDialog.showDialog();
 	}
+	
+	/**
+	 * Get the task group for events. This isn't 
+	 * published in a menu in PAMGuard ,but is making an offline
+	 * task which can be called in batch. 
+	 * @return
+	 */
+	public OfflineTaskGroup getEventTaskGroup() {
+		if (eventTaskGroup == null) {
+			eventTaskGroup = new EventTaskGroup(clickControl, "Click train reprocessing");
+			eventTaskGroup.addTask(new EventCheckTask(clickControl, clickControl.getClickDetector().getOfflineEventDataBlock()));
+		}
+		return eventTaskGroup;
+	}
 
 	/**
 	 * Get / Create an offline task group for click re-processing. 
 	 * @return offline task group. Create if necessary
 	 */
-	public static OfflineTaskGroup getOfflineTaskGroup(ClickControl clickControl) {
-		
-		OfflineTaskGroup offlineTaskGroup = new OfflineTaskGroup(clickControl, "Click Reprocessing");
-		
-		/**
-		 * These tasks are not registered - gets too complicated since some of them 
-		 * need references to things that may not be set or created when main constructors are 
-		 * called. 
-		 */
-		offlineTaskGroup.addTask(new ClickReClassifyTask(clickControl));
-		offlineTaskGroup.addTask(new EchoDetectionTask(clickControl));
-		offlineTaskGroup.addTask(new ClickDelayTask(clickControl));
-		offlineTaskGroup.addTask(new ClickBearingTask(clickControl));
-		if (JamieDev.isEnabled()) {
-			//re import waveform data from raw wave files. 
-			offlineTaskGroup.addTask(new ClickWaveTask(clickControl));
+	public OfflineTaskGroup getOfflineTaskGroup() {
+
+		if (offlineTaskGroup == null) {
+			offlineTaskGroup = new OfflineTaskGroup(clickControl, "Click Reprocessing");
+
+			/**
+			 * These tasks are not registered - gets too complicated since some of them 
+			 * need references to things that may not be set or created when main constructors are 
+			 * called. 
+			 */
+			offlineTaskGroup.addTask(new ClickReClassifyTask(clickControl));
+			offlineTaskGroup.addTask(new EchoDetectionTask(clickControl));
+			offlineTaskGroup.addTask(new ClickDelayTask(clickControl));
+			offlineTaskGroup.addTask(new ClickBearingTask(clickControl));
 		}
+//		if (JamieDev.isEnabled()) {
+//			//re import waveform data from raw wave files. 
+//			offlineTaskGroup.addTask(new ClickWaveTask(clickControl));
+//		}
 		
 		/*
 		 * Add the click detector tasks first since these will need to operate
@@ -632,6 +673,7 @@ public class ClicksOffline {
 		OfflineEventDataUnit newUnit = new OfflineEventDataUnit(null, getNextEventColourIndex(), null);
 		newUnit = OfflineEventDialog.showDialog(win, clickControl, newUnit);
 		if (newUnit != null) {
+			clickControl.removeFromEvents(markedClicks);
 			newUnit.addSubDetections(markedClicks);
 			offlineEventDataBlock.addPamData(newUnit);
 			clickControl.setLatestOfflineEvent(newUnit);

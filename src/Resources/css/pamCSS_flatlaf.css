@@ -1,0 +1,220 @@
+/* flatlaf-custom.css - Enhancements for FlatLaf */
+
+/* General Styling */
+.root {
+    -fx-font-family: "Segoe UI bold", "Arial", sans-serif; /* Modern font stack */
+    -fx-font-size: 13px;
+    -fx-text-fill: black; /* Set default text color to black */
+    /* -fx-background-color: #f8f8f8;  Let FlatLaf handle the base background */
+}
+
+/* Buttons */
+.button {
+    -fx-font-weight: 500;
+    -fx-background-color: linear-gradient(to bottom, #0078D7, #0069c0); /* Blue gradient */
+    -fx-text-fill: white;
+    -fx-padding: 8px 16px;
+    -fx-border-radius: 4px;
+    -fx-effect: dropshadow(three-d, rgba(0,0,0,0.1), 4, 0, 0, 2);
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: linear-gradient(to bottom, #0069c0, #005ba3);
+}
+
+.button:pressed {
+    -fx-background-color: linear-gradient(to bottom, #005ba3, #004c85); /* Even darker */
+    -fx-effect: none; /* Remove shadow on press */
+}
+
+.button:disabled {
+    -fx-opacity: 0.6;
+    -fx-cursor: default;
+}
+
+/* Labels */
+.label {
+    -fx-text-fill: #333333;
+}
+
+/* Text Fields */
+.text-field {
+    -fx-prompt-text-fill: #999999;
+    -fx-border-color: #bbbbbb; /* Lighter border */
+    -fx-background-color: white; /* Explicit white background, sometimes needed */
+    -fx-padding: 6px;
+    -fx-border-radius: 4px;
+}
+
+.text-field:focused {
+    -fx-border-color: #0078D7; /* Blue border on focus */
+    -fx-effect: innershadow(three-d, rgba(0,0,0,0.1), 4, 0, 0, 2);
+}
+
+/* Checkboxes */
+.check-box .box {
+    -fx-border-color: #aaaaaa;
+    -fx-background-color: white; /* Needed for some FlatLaf themes */
+    -fx-border-radius: 2px;
+}
+
+.check-box:selected .box {
+    -fx-background-color: #0078D7;
+}
+
+.check-box:focused .box {
+    -fx-border-color: #0078D7;
+}
+
+
+/* Radio Buttons */
+.radio-button .radio {
+    -fx-border-color: #aaaaaa;
+    -fx-background-color: white;
+    -fx-border-radius: 50%;
+}
+
+.radio-button:selected .radio {
+    -fx-background-color: #0078D7;
+}
+
+.radio-button:focused .radio {
+    -fx-border-color: #0078D7;
+}
+
+/* Combo Boxes */
+.combo-box {
+    -fx-border-color: #bbbbbb;
+    -fx-background-color: white;
+    -fx-border-radius: 4px;
+}
+
+.combo-box .list-cell {
+    -fx-padding: 6px;
+}
+
+.combo-box:focused {
+    -fx-border-color: #0078D7;
+}
+
+/* List Views */
+.list-view {
+    -fx-border-color: #bbbbbb;
+    -fx-background-color: white;
+    -fx-border-radius: 4px;
+}
+
+.list-view .list-cell {
+    -fx-padding: 6px;
+}
+
+.list-view:focused .list-cell:filled:selected {
+    -fx-background-color: #0078D7;
+    -fx-text-fill: white;
+}
+
+/* Scroll Bars (Adjust as needed) */
+.scroll-bar {
+    -fx-background-color: #f0f0f0; /* Or transparent if FlatLaf handles it */
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #bbbbbb;
+    -fx-border-radius: 4px;
+}
+
+/* Hyperlink */
+.hyperlink {
+    -fx-color: #0078D7;
+    -fx-underline: false;
+}
+
+.hyperlink:hover {
+    -fx-underline: true;
+}
+
+/* Titled Pane */
+.titled-pane > .title {
+    -fx-font-weight: bold;
+    -fx-background-color: #e0e0e0; /* Or let FlatLaf style it */
+    -fx-padding: 6px;
+    -fx-border-color: #bbbbbb; /* Subtle border */
+    -fx-border-width: 0 0 1 0;
+}
+
+.titled-pane > .content {
+    -fx-padding: 10px;
+    -fx-background-color: white;
+}
+
+/* Progress Bar */
+.progress-bar {
+    -fx-background-color: #e0e0e0;
+    -fx-border-color: #bbbbbb;
+    -fx-border-width: 1px;
+    -fx-border-radius: 4px;
+}
+
+.progress-bar .bar {
+    -fx-background-color: #0078D7;
+    -fx-border-radius: 4px;
+}
+
+/* Tab Pane */
+.tab-pane .tab-header-area {
+    /* -fx-background-color: #e0e0e0;  Let FlatLaf handle it */
+}
+
+.tab-pane .tab {
+    -fx-background-color: #e0e0e0; /* Or a subtle gradient */
+    -fx-padding: 8px 16px;
+    -fx-border-color: #bbbbbb;
+    -fx-border-width: 1px 1px 0 1px;
+    -fx-border-radius: 4px 4px 0 0;
+}
+
+.tab-pane .tab:selected {
+    -fx-background-color: white;
+    -fx-border-color: #bbbbbb;
+    -fx-border-width: 1px;
+}
+
+.tab-pane .tab-content-area {
+    -fx-padding: 10px;
+    -fx-background-color: white;
+    -fx-border-color: #bbbbbb;
+    -fx-border-width: 0 1px 1px 1px;
+}
+
+/* Tool Bar */
+.tool-bar {
+    /* -fx-background-color: #e0e0e0; Let FlatLaf style it */
+    -fx-padding: 4px;
+}
+
+.tool-bar > .button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: #333333;
+    -fx-padding: 4px;
+    -fx-effect: none;
+}
+
+.tool-bar > .button:hover {
+    -fx-background-color: rgba(0, 120, 215, 0.2); /* Subtle blue highlight */
+    -fx-border-color: transparent;
+}
+
+.tool-bar > .button:pressed {
+    -fx-background-color: rgba(0, 120, 215, 0.4);
+    -fx-border-color: transparent;
+}
+
+
+/* ... Add or modify other styles as needed ... */
+
+/* Example: Making the font a bit bolder overall */
+.button, .label, .text-field, .check-box, .radio-button, .combo-box, .list-view .list-cell, .tree-view .tree-cell, .hyperlink, .titled-pane > .title, .tab-pane .tab {
+    -fx-font-weight: 500; /* Adjust as needed */
+}

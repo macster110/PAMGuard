@@ -2,12 +2,14 @@ package GPS;
 
 import java.util.ListIterator;
 
-import nmeaEmulator.EmulatedData;
-import nmeaEmulator.NMEAEmulator;
-import pamScrollSystem.ViewLoadObserver;
+import GPS.effort.GpsEffortProvider;
+import PamUtils.LatLong;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamProcess;
 import PamguardMVC.dataOffline.OfflineDataLoadInfo;
+import nmeaEmulator.EmulatedData;
+import nmeaEmulator.NMEAEmulator;
+import pamScrollSystem.ViewLoadObserver;
 
 /**
  * Add a bit of extra functionality to GPSDataBlock so 
@@ -37,12 +39,13 @@ public class GPSDataBlock extends PamDataBlock<GpsDataUnit> implements NMEAEmula
 	public GPSDataBlock(PamProcess process) {
 		super(GpsDataUnit.class, process.getPamControlledUnit().getUnitName(), process, 1);
 		setSynchLock(NavDataSynchronisation.getSynchobject());
+		setEffortProvider(new GpsEffortProvider(this));
 	}
 
 	@Override
 	public void addPamData(GpsDataUnit gpsDataUnit) {
 		boolean r = isReasonable(gpsDataUnit);
-		if (r == false) {
+		if (!r) {
 			gpsDataUnit.getGpsData().setDataOk(false);
 		}
 		else {
@@ -66,7 +69,7 @@ public class GPSDataBlock extends PamDataBlock<GpsDataUnit> implements NMEAEmula
 		GpsData thisData, thatData;
 		thisData = gpsDataUnit.getGpsData();
 
-		if (thisData.isDataOk() == false) {
+		if (!thisData.isDataOk()) {
 			return false;
 		}
 		
@@ -81,7 +84,7 @@ public class GPSDataBlock extends PamDataBlock<GpsDataUnit> implements NMEAEmula
 					return true;
 				}
 				// ignore gps points flagged as bad. 
-				if (thatData.isDataOk() == false) {
+				if (!thatData.isDataOk()) {
 					continue;
 				}
 				// OK if it's gone too far back in time
@@ -116,7 +119,7 @@ public class GPSDataBlock extends PamDataBlock<GpsDataUnit> implements NMEAEmula
 			readyGGAData = null;
 			return dd;
 		}
-		if (emulatorIterator.hasNext() == false) {
+		if (!emulatorIterator.hasNext()) {
 			return null;
 		}
 		GpsDataUnit gpsUnit =  emulatorIterator.next();
@@ -133,6 +136,39 @@ public class GPSDataBlock extends PamDataBlock<GpsDataUnit> implements NMEAEmula
 		emulatorIterator = this.getListIterator(0);
 		emulatorTimeOffset = timeOffset;
 		return true;
+	}
+
+	/**
+	 * Find the closest GPS data to the given point. 
+	 * @param latLong
+	 * @return closest GPS data
+	 */
+	public GpsDataUnit findClosestGPS(LatLong latLong) {
+		return findClosestGPS(latLong, Double.MAX_VALUE);
+	}
+	
+	/**
+	 * Find the closest GPS unit, with an optional maximum where it will
+	 * return null if nothing is that close. 
+	 * @param latLong
+	 * @paran maxR max distance in metres. 
+	 * @return closest GPS data
+	 */
+	public GpsDataUnit findClosestGPS(LatLong latLong, double maxR) {
+		double minR = maxR;
+		GpsDataUnit gpsData = null;
+		synchronized (getSynchLock()) {
+			ListIterator<GpsDataUnit> it = getListIterator(0);
+			while (it.hasNext()) {
+				GpsDataUnit current = it.next();
+				double r = current.getGpsData().distanceToMetres(latLong);
+				if (r <= minR) {
+					minR = r;
+					gpsData = current;
+				}
+			}
+		}
+		return gpsData;
 	}
 
 	/* (non-Javadoc)

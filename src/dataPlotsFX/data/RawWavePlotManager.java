@@ -214,7 +214,12 @@ public abstract class RawWavePlotManager {
 
 					if (samplesPerPixel<1 && !Double.isNaN(y1)) {
 						//System.out.println("x1: " + x1 + " x2: " + x2 +  " y1: " + y1 + " y2: " + y2 + " millisPerPixel: " + millisPerPixel +  "  tcMillis: "  +tcMillis  ); 
+						
+						if (samplesPerPixel<1) {
 						g.fillOval(x1-circleWidth/2, y1-circleWidth/4, circleWidth, circleWidth);
+						}
+						
+						
 						if (prevx1>0) {
 							g.strokeLine(prevx1, prevy1, x1, y1);
 						}
@@ -318,7 +323,6 @@ public abstract class RawWavePlotManager {
 		//check if we can plot click on this plot pane. 
 		if (!rawClipInfo.shouldDraw(plotNumber, pamDataUnit)) {
 			//System.out.println("Shoudl not draw!");
-
 			return null; 
 		}
 
@@ -361,7 +365,6 @@ public abstract class RawWavePlotManager {
 			return null;
 		}
 
-		//System.out.println("RawWavePlotManager: chanPlot: " + chanClick[0] + "  chanplot: " + chanPlot[0]);
 		Path2D path2D = null; 
 		//draw click spectrum
 		for (int i=0; i<chanClick.length; i++){

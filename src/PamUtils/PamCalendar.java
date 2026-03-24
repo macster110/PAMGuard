@@ -47,10 +47,7 @@ public class PamCalendar {
 	
 	public static TimeZone defaultTimeZone = TimeZone.getTimeZone("UTC");
 	
-	/*
-	 * Not used: all now handled in PamCalendar.
-	 */
-//	private static TimeZone localTimeZone = defaultTimeZone;// TimeZone.getDefault();
+	private static TimeZone localTimeZone = defaultTimeZone;// TimeZone.getDefault();
 
 	public static final long millisPerDay = 1000L*24L*3600L;
 
@@ -63,19 +60,19 @@ public class PamCalendar {
 	private static boolean soundFile;
 
 	/**
-	 * time from the start of the file to the current moment. 
+	 * time from the start of the file to the currentmoment. 
 	 * This is updated every time data re read from the file, so is
 	 * accurate to about 1/10 second. 
 	 * For accurate timing within detectors, always try to use sample number
 	 * and count samples from the start time for the detector.
 	 */
-	private static long soundFileTimeInMillis;
+	private static volatile long soundFileTimeInMillis;
 
 	/**
 	 * Time that data processing started - can be set to a file time
 	 * when files are being processed, otherwise it's just the current time. 
 	 */
-	private static long sessionStartTime;
+	private static volatile long sessionStartTime;
 
 	/**
 	 * When running in viewer mode, use the sessionStartTime and the viewEndtime
@@ -88,7 +85,7 @@ public class PamCalendar {
 	 * viewPositions which is the number of milliseconds from the sessionsStartTime.
 	 */
 	private static long viewPosition;
-	
+		
 	
 	/**
 	 * If files are being analysed, return the time based on the file
@@ -116,6 +113,10 @@ public class PamCalendar {
 			return System.currentTimeMillis();
 		}
 		return System.currentTimeMillis() + timeCorrection;
+	}
+
+	public static long getSoundFileTimeInMillis() {
+		return soundFileTimeInMillis;
 	}
 
 	/**
@@ -180,44 +181,8 @@ public class PamCalendar {
 
 	public static TimeZone getDisplayTimeZone(boolean useLocal) {
 //		return TimeZone.getTimeZone("UTC");
-		return useLocal ? CalendarControl.getInstance().getChosenTimeZone() : defaultTimeZone;
-//		return useLocal ? localTimeZone : defaultTimeZone;
-	}
-	
-	/**
-	 * Get the display time zone offset in milliseconds. 
-	 * @param useLocal
-	 * @return
-	 */
-	public static long getDisplayTimeZoneOffest(boolean useLocal) {
-		TimeZone tz = getDisplayTimeZone(useLocal);
-		return tz.getOffset(getTimeInMillis());
-	}
-	
-	/**
-	 * Get a short string describing the time zone. This should be less than 
-	 * 10 characters. So if the full name of the TZ is long, then write it 
-	 * in the format "UTC+..."
-	 * @param useLocal
-	 * @return
-	 */
-	public static String getShortDisplayTimeZoneString(boolean useLocal) {
-		TimeZone tz = getDisplayTimeZone(useLocal);
-		String str = tz.getDisplayName();
-		str = CalendarControl.getInstance().getTZCode(true);
-		if (str.length() <= 10) {
-			return str;
-		}
-		// otherwise make up a string. 
-		long offset = getDisplayTimeZoneOffest(useLocal) / 1000;
-		boolean isInt = offset % 3600 == 0;
-		if (isInt) {
-			str = String.format("UTC%+d", offset/3600);
-		}
-		else {
-			str = String.format("UTC%+3.1f", (double) offset/3600.);
-		}
-		return str;
+//		return useLocal ? CalendarControl.getInstance().getChosenTimeZone() : defaultTimeZone;
+		return useLocal ? localTimeZone : defaultTimeZone;
 	}
 
 	public static String formatDateTime(Date date) {
@@ -301,7 +266,7 @@ public class PamCalendar {
 	 * @return formatted String
 	 */
 	public static String formatLocalDateTime(Date date) {
-		DateFormat df = DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.LONG);
+		DateFormat df = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.LONG);
 		return df.format(date);
 	}
 
@@ -430,13 +395,8 @@ public class PamCalendar {
 
 	public static String formatDBStyleTime(long timeInMillis, boolean showMillis, boolean useLocal) {
 		Calendar c = Calendar.getInstance();
-		TimeZone tz = getDisplayTimeZone(useLocal);
-//		if (tz != null) {
-//			long offs = tz.getOffset(timeInMillis);
-//			timeInMillis += tz.getOffset(timeInMillis);
-//		}
 		c.setTimeInMillis(timeInMillis);
-		c.setTimeZone(tz);
+		c.setTimeZone(getDisplayTimeZone(useLocal));
 		DateFormat df;
 		if (showMillis) {
 			df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
@@ -444,7 +404,7 @@ public class PamCalendar {
 		else {
 			df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 		}
-		df.setTimeZone(tz);
+		df.setTimeZone(getDisplayTimeZone(useLocal));
 		Date d = c.getTime();
 		//		return String.format("%tY-%<tm-%<td %<tH:%<tM:%<tS", d);
 
@@ -690,7 +650,7 @@ public class PamCalendar {
 	}
 
 	/**
-	 * Format date in format "yyyyMMdd" using GMT as the time zone
+	 * Format date in format "yyyyMMdd" using UTC as the time zone
 	 * @param timeMillis
 	 * @return
 	 */
@@ -776,7 +736,6 @@ public class PamCalendar {
 	public static long msFromDateString(String dateString) {
 		return msFromDateString(dateString, false);
 	}
-	
 	/**
 	 * Read a date string and turn it into a millisecond time.
 	 * @param dateString
@@ -922,17 +881,36 @@ public class PamCalendar {
 	/**
 	 * 
 	 * @param sessionStartTime the time that processing started
+	 * And also set the file time to zero within that since both this
+	 * and setSoundFileTime send out notifications, so this can really mess
+	 * up timing, causing new binary files to be created and all sorts of 
+	 * other problems. 
 	 */
 	public static void setSessionStartTime(long sessionStartTime) {
-		PamCalendar.sessionStartTime = sessionStartTime;
+//		System.out.printf("Session start : %s\n", formatDBDateTime(sessionStartTime, true));
+		setSessionStartTime(sessionStartTime, 0);
 	}
 
 	/**
 	 * 
-	 * @param soundFileTimeMillis The start time of a sound file
+	 * @param sessionStartTime the time that processing started
+	 * @param soundFileTimeMillis sound file time relative to start time. Good to set this zero right away. 
+	 */
+	public static void setSessionStartTime(long sessionStartTime, long soundFileTimeMillis) {
+		PamCalendar.sessionStartTime = sessionStartTime;
+		PamCalendar.soundFileTimeInMillis = soundFileTimeMillis;
+		PamController.getInstance().updateMasterClock(getTimeInMillis());
+	}
+
+	/**
+	 * 
+	 * Relative time within a sound file. This is always just added to sessionStartTime
+	 * to give an absolute time. 
+	 * @param soundFileTimeMillis The relative time of a sound file. 
 	 */
 	public static void setSoundFileTimeInMillis(long soundFileTimeMillis) {
 		PamCalendar.soundFileTimeInMillis = soundFileTimeMillis;
+		PamController.getInstance().updateMasterClock(getTimeInMillis());
 	}
 
 	/**
@@ -992,14 +970,15 @@ public class PamCalendar {
 			"yyyy-MM-dd HH_mm_ss", // Avisoft.
 			"yyyy-MM-dd_HH-mm-ss", // y2000 Cornell pop up data
 			"yyyyMMddHHmmss", //Tanzania survey (recorder using 'bul filerename' program)
-			"yyyy-MM-dd HH-mm-ss" // RS Orca recorder. index 32. Must remain at this position !!!!
+			"yyyy-MM-dd HH-mm-ss", // RS Orca recorder. index 32. Must remain at this position !!!!
+			"dd/MM/yyyy HH:ss" //An excel standard
 	};
 
 	public static Long unpackStandardDateTime(String numstr) {
 		Date dt = unpackUnknownDateString(numstr);
 		if (dt != null) {
 			Calendar cl = Calendar.getInstance();
-			cl.setTimeZone(TimeZone.getTimeZone("GMT"));
+			cl.setTimeZone(TimeZone.getTimeZone("UTC"));
 			cl.setTime(dt);
 			return cl.getTimeInMillis();
 		}
@@ -1045,7 +1024,7 @@ j:				for (int j = 0; j < formats.length; j++) {
 					//Now see if DateFormat can parse it.
 					try {
 						SimpleDateFormat df = new SimpleDateFormat(fmt);
-						df.setTimeZone(TimeZone.getTimeZone("GMT"));
+						df.setTimeZone(TimeZone.getTimeZone("UTC"));
 						Date d = df.parse(str);  //throws ParseException if no match
 //						setLastFormat("Auto \"" + fmt + "\"");
 						return d;     /////////////////////////////////found one!
@@ -1153,7 +1132,7 @@ j:				for (int j = 0; j < formats.length; j++) {
 		c.setTimeZone(getDisplayTimeZone(useLocal));
 		Date date = new Date(c.getTimeInMillis());
 		SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd_HHmmss");
-		String dateStr = format.format(date) + "_GMT";
+		String dateStr = format.format(date) + "_UTC";
 		return dateStr;
 	}
 

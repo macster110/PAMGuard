@@ -1,21 +1,18 @@
 package IshmaelDetector;
 
-import generalDatabase.PamTableDefinition;
-import generalDatabase.PamTableItem;
-import generalDatabase.SQLTypes;
-
 import java.sql.Types;
 
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
-
+import generalDatabase.EmptyTableDefinition;
 //import pamDatabase.SQLLogging;
 //import PamguardMVC.RecyclingDataBlock;
 import generalDatabase.PamDetectionLogging;
+import generalDatabase.PamTableItem;
+import generalDatabase.SQLTypes;
 
 public class IshLogger extends PamDetectionLogging {
 	IshDetControl ishDetControl;
-	PamTableDefinition tableDefinition;
 	PamTableItem systemDate, durationSecs, secSinceStart, peakHeight;
 	// Peak is more important than start time for matched filter & spectrogram correlation
 	PamTableItem peakSample, peakDelaySecs; 
@@ -25,7 +22,7 @@ public class IshLogger extends PamDetectionLogging {
 		super(pamDataBlock, UPDATE_POLICY_WRITENEW);
 		this.ishDetControl = ishDetControl;
 		
-		tableDefinition = getTableDefinition();
+		EmptyTableDefinition tableDefinition = getTableDefinition();
 		
 //		PamTableItem tableItem;
 //		setUpdatePolicy(UPDATE_POLICY_WRITENEW);

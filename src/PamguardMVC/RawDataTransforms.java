@@ -4,7 +4,6 @@ import java.util.Arrays;
 
 import PamUtils.PamUtils;
 import PamUtils.complex.ComplexArray;
-import Spectrogram.WindowFunction;
 import clickDetector.ClickDetection;
 import clipgenerator.ClipSpectrogram;
 import fftFilter.FFTFilter;
@@ -161,7 +160,9 @@ public class RawDataTransforms {
 	 */
 	public double[] getPowerSpectrum(int channel, int minBin, int maxBin, int fftLength) {
 		synchronized (synchObject) {
+
 			if (minBin==0 && maxBin>=this.getWaveData(0).length-1) {
+
 				return getPowerSpectrum(channel,  fftLength); 
 			}		
 			if (fftLength == 0) {
@@ -170,7 +171,7 @@ public class RawDataTransforms {
 
 			double[] waveformTrim = new double[maxBin-minBin]; 
 
-			//System.out.println("minBin: " +  minBin + " maxBin: " + maxBin + " raw waveform: " + this.getWaveData(channel).length); 
+			//			System.out.println("minBin: " +minBin + " maxBin: " + maxBin + "  " + Math.min(this.getWaveData(channel).length, waveformTrim.length) + " " + this.getWaveData(channel).length  + "  " + this.getSampleDuration());
 
 			System.arraycopy(this.getWaveData(channel), minBin, waveformTrim, 0, Math.min(this.getWaveData(channel).length-minBin-1, waveformTrim.length));
 
@@ -186,9 +187,10 @@ public class RawDataTransforms {
 	 * 
 	 * @param channel channel number
 	 * @param fftLength
+	 * @param Hann - true to use hanning window
 	 * @return Power spectrum
 	 */
-	public  double[] getPowerSpectrum(int channel, int fftLength) {
+	public  double[] getPowerSpectrum(int channel, int fftLength, boolean Hann) {
 		synchronized (synchObject) {
 			if (powerSpectra == null) {
 				powerSpectra = new double[PamUtils.getNumChannels(dataUnit.getChannelBitmap())][];
@@ -199,11 +201,17 @@ public class RawDataTransforms {
 
 			if (powerSpectra[channel] == null
 					|| powerSpectra[channel].length != fftLength / 2) {
-				ComplexArray cData = getComplexSpectrumHann(channel, fftLength);
+				ComplexArray cData;
+				if (Hann) {
+					cData = getComplexSpectrumHann(channel, fftLength);
+				}
+				else {
+					cData = getComplexSpectrum(channel, fftLength);
+				}
 				currentSpecLen = fftLength;
 				powerSpectra[channel] = cData.magsq();
 				if (powerSpectra==null){
-					System.err.println("DLDetection: could not calculate power spectra");
+					System.err.println("RawDataTransforms: could not calculate power spectra");
 					return null;
 
 				}
@@ -214,6 +222,19 @@ public class RawDataTransforms {
 			return powerSpectra[channel];
 		}
 	}
+
+	/**
+	 * Returns the power spectrum for a given channel (square of magnitude of
+	 * complex spectrum)
+	 * 
+	 * @param channel channel number
+	 * @param fftLength
+	 * @return Power spectrum
+	 */
+	public  double[] getPowerSpectrum(int channel, int fftLength) {
+		return getPowerSpectrum( channel,  fftLength, true); 
+	}
+
 
 
 	/**
@@ -305,7 +326,7 @@ public class RawDataTransforms {
 	 * Get the spectrum length
 	 * @return the spectrogram length. 
 	 */
-	private int getCurrentSpectrumLength() {
+	public int getCurrentSpectrumLength() {
 		if (currentSpecLen<=0) {
 			currentSpecLen = PamUtils.getMinFftLength(dataUnit.getSampleDuration());
 		}
@@ -409,7 +430,15 @@ public class RawDataTransforms {
 				paddedRawData = new double[fftLength];
 				rawData = getWaveData(channel);
 				//double[] rotData = getRotationCorrection(channel);
-				mn = Math.min(fftLength, getSampleDuration().intValue());
+
+				/**
+				 *FIXME
+				 * 11/07 Changed from getSampleDuration because an error sometimes occurs where the sample duration
+				 * is not the same as the wavefom length...not sure why. 
+				 */
+				//mn = Math.min(fftLength, getSampleDuration().intValue());
+				mn = Math.min(fftLength, rawData.length);
+				//				System.out.println("fftLength: " + rawData.length + " " + getSampleDuration().intValue() + " mn " +mn);
 				for (i = 0; i < mn; i++) {
 					paddedRawData[i] = rawData[i];//-rotData[i];
 				}
@@ -451,7 +480,7 @@ public class RawDataTransforms {
 	 */
 	public double[] getAnalyticWaveform(int iChan, boolean filtered, FFTFilterParams fftFilterParams) {
 		synchronized (synchObject) {
-			if (filtered == false || fftFilterParams == null) {
+			if (!filtered || fftFilterParams == null) {
 				return getAnalyticWaveform(iChan);
 			}
 			else {
@@ -573,14 +602,21 @@ public class RawDataTransforms {
 	 */
 	public FFTFilter getFFTFilter(FFTFilterParams fftFilterParams) {
 		if (fftFilter == null) {
-			fftFilter = new FFTFilter(fftFilterParams, this.dataUnit.getParentDataBlock().getSampleRate());
+			fftFilter = new FFTFilter(fftFilterParams,getSampleRate());
 		}
 		else {
-			fftFilter.setParams(fftFilterParams, this.dataUnit.getParentDataBlock().getSampleRate());
+			fftFilter.setParams(fftFilterParams, getSampleRate());
 		}
 		return fftFilter;
 	}
 
+	/**
+	 * Get the sample rate to use for transforms. 
+	 * @return the sample rate. 
+	 */
+	public float getSampleRate() {
+		return this.dataUnit.getParentDataBlock().getSampleRate();
+	}
 
 	/**
 	 * Get a correction based on the slope of the waveform which 

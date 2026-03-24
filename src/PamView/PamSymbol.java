@@ -38,6 +38,7 @@ import javax.swing.JPanel;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamView.PamColors.PamColor;
 import PamView.symbol.SymbolData;
 
@@ -586,6 +587,7 @@ public class PamSymbol extends PamSymbolBase implements Serializable, Icon, Clon
 	 * 
 	 * @return an int specifying the fixed width of the icon.
 	 */
+	@Override
 	public int getIconWidth() {
 		int iconWidth = 0;
 		if ((iconStyle & ICON_STYLE_SYMBOL) != 0) {
@@ -602,6 +604,7 @@ public class PamSymbol extends PamSymbolBase implements Serializable, Icon, Clon
 	 * 
 	 * @return an int specifying the fixed height of the icon.
 	 */
+	@Override
 	public int getIconHeight() {
 		if ((iconStyle & ICON_STYLE_SYMBOL) != 0) {
 			return 16;
@@ -612,10 +615,12 @@ public class PamSymbol extends PamSymbolBase implements Serializable, Icon, Clon
 		//		return 16;
 	}
 
+	@Override
 	public boolean isFill() {
 		return getSymbolData().fill;
 	}
 
+	@Override
 	public void setFill(boolean fill) {
 		getSymbolData().fill = fill;
 	}
@@ -808,7 +813,7 @@ public class PamSymbol extends PamSymbolBase implements Serializable, Icon, Clon
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DISPLAY);
 		return ps;
 	}
 

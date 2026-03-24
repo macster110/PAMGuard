@@ -1,17 +1,25 @@
 package PamController.fileprocessing;
 
+import java.awt.Frame;
 import java.util.ArrayList;
+import java.util.List;
+
+import javax.swing.SwingWorker;
 
 import PamController.DataInputStore;
 import PamController.DataOutputStore;
 import PamController.InputStoreInfo;
-import PamController.OfflineDataStore;
 import PamController.PamControlledUnit;
 import PamController.PamController;
 import PamController.PamGUIManager;
 import PamController.RawInputControlledUnit;
-import PamUtils.PamCalendar;
+import PamUtils.worker.PamWorkDialog;
+import PamUtils.worker.PamWorkMonitor;
+import PamUtils.worker.PamWorkProgressMessage;
 import PamView.dialog.warn.WarnOnce;
+import generalDatabase.DBControlUnit;
+import pamViewFX.pamTask.PamTaskUpdate;
+import pamViewFX.pamTask.SimplePamTaskUpdate;
 import pamguard.GlobalArguments;
 
 /**
@@ -21,7 +29,115 @@ import pamguard.GlobalArguments;
  *
  */
 public class ReprocessManager {
+
+	private volatile PamWorkDialog workDialog;
 	
+	private Object synch = new Object();
+	/**
+	 * Start a Swing worker thread to do the checks and to display a progress bar while doing it.<p>
+	 * Then when it's done, send the result to the monitor, which is basically telling PamController
+	 * whether or not to continue with start up 
+	 * @param mainFrame
+	 * @param mon monitor for final status message / instruction. 
+	 */
+	public void startCheckingThread(Frame mainFrame, ReprocessManagerMonitor mon) {
+		CheckWorker checkWorker = new CheckWorker(mainFrame, mon);
+		checkWorker.execute();	
+		
+		//TODO - JavaFX GUI crashes here
+		if (PamGUIManager.getGUIType() == PamGUIManager.FX) {
+			//do nothing - progress messages will be sent to PamController via the monitor interface.
+		}
+		else {
+			synchronized (synch) {
+				workDialog = new PamWorkDialog(mainFrame, 1, "Checking input files and existing output data");
+				workDialog.setVisible(true);
+			}
+		}
+	}
+	
+	private void closeWorkDialog() {
+		/**
+		 * This will only get called when job has finished - but that might happen before the
+		 * dialog is even open, so wait for up to a second for it to appear before closing it anyway. 
+		 */
+		long t = System.currentTimeMillis();
+		while (System.currentTimeMillis()-t < 1000) {
+			if (workDialog != null) {
+				break;
+			}
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+			}
+		}
+		synchronized (synch) {
+			if (workDialog != null) {
+				workDialog.setVisible(false);
+				workDialog.dispose();
+				workDialog = null;
+			}
+		}
+
+	}
+	
+	private class CheckWorker extends SwingWorker<Boolean, PamWorkProgressMessage> implements PamWorkMonitor {
+
+		private Frame mainFram;
+		private ReprocessManagerMonitor mon;
+		private volatile boolean result;
+		
+		public CheckWorker(Frame mainFram, ReprocessManagerMonitor mon) {
+			super();
+			this.mainFram = mainFram;
+			this.mon = mon;
+		}
+
+		@Override
+		protected Boolean doInBackground() throws Exception {
+			try {
+				result = checkOutputDataStatus(this);
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+			}
+			return result;
+		}
+
+		@Override
+		protected void process(List<PamWorkProgressMessage> chunks) {
+			for (PamWorkProgressMessage message : chunks) {
+				synchronized(synch) {
+					if (workDialog != null) {
+						workDialog.update(message);
+					}
+					
+				}
+			}
+		}
+
+		@Override
+		protected void done() {
+			closeWorkDialog();
+			mon.done(result);
+		}
+
+		@Override
+		public void update(PamWorkProgressMessage message) {
+			if (PamGUIManager.getGUIType() == PamGUIManager.FX) {
+				// in FX mode we just send the message to PamController which will deal with it.
+				PamController.getInstance().notifyTaskProgress(
+						new SimplePamTaskUpdate(message));
+			}
+			else {
+				//publish normally for SwingWorker
+				this.publish(message);
+			}
+		}
+		
+	}
+
+
 	/**
 	public ReprocessManager() {
 		// TODO Auto-generated constructor stub
@@ -32,10 +148,13 @@ public class ReprocessManager {
 	 *  we may not want to start again.  
 	 */
 	public boolean checkOutputDataStatus() {
+		return checkOutputDataStatus(null);
+	}
+	public boolean checkOutputDataStatus(PamWorkMonitor workMonitor) {
 		
 		StoreChoiceSummary choiceSummary = null;
 		if (isOfflineFiles()) {
-			choiceSummary = checkIOFilesStatus();
+			choiceSummary = checkIOFilesStatus(workMonitor);
 		}
 		else {
 			/*
@@ -62,11 +181,17 @@ public class ReprocessManager {
 		 */
 		boolean setupOK = setupInputStream(choiceSummary, choice);
 		
-		if (choice == ReprocessStoreChoice.DONTSSTART) {
+		if (choice == null || choice == ReprocessStoreChoice.DONTSSTART) {
 			return false;
 		}
 		
 		boolean deleteOK = deleteOldData(choiceSummary, choice);
+		
+		// Commit the database - this is important to make sure that any deletions are saved before we start reprocessing.
+		DBControlUnit dbControl = DBControlUnit.findDatabaseControl();
+		if (dbControl != null) {
+			dbControl.commitChanges();
+		}
 		
 		return true;
 		
@@ -82,10 +207,16 @@ public class ReprocessManager {
 		}
 		InputStoreInfo inputInfo = null;
 		boolean OK = true;
+		long procStartTime = deleteFrom;
+		if (choice == ReprocessStoreChoice.STARTNORMAL) {
+			procStartTime = 0;
+		}
 		for (PamControlledUnit aPCU : inputStores) {
 			DataInputStore inputStore = (DataInputStore) aPCU;
-			OK &= inputStore.setAnalysisStartTime(deleteFrom);
-//			System.out.println("Input store info: " + inputInfo);
+			OK &= inputStore.setAnalysisStartTime(procStartTime);
+			if (inputInfo != null) {
+				System.out.println("Input store info: " + inputInfo);
+			}
 		}
 		return OK;
 	}
@@ -110,6 +241,7 @@ public class ReprocessManager {
 			DataOutputStore offlineStore = (DataOutputStore) aPCU;
 			ok &= offlineStore.deleteDataFrom(deleteFrom);
 		}
+		
 		return ok;
 	}
 
@@ -149,9 +281,10 @@ public class ReprocessManager {
 	/**
 	 * Check the output of current files and databases and return a flag to PamController saying whether or
 	 * not processing should actually start, possibly overwriting, or if we need to not start to avoid overwriting. 
+	 * @param workMonitor 
 	 * @return true if processing should start. 
 	 */
-	private StoreChoiceSummary checkIOFilesStatus() {	
+	private StoreChoiceSummary checkIOFilesStatus(PamWorkMonitor workMonitor) {	
 		/**
 		 * Get information about the input. 
 		 * 
@@ -160,23 +293,18 @@ public class ReprocessManager {
 		if (inputStores == null || inputStores.size() == 0) {
 			return new StoreChoiceSummary(null, ReprocessStoreChoice.STARTNORMAL);
 		}
-		InputStoreInfo inputInfo = null;
-		for (PamControlledUnit aPCU : inputStores) {
-			DataInputStore inputStore = (DataInputStore) aPCU;
-			inputInfo = inputStore.getStoreInfo(true);
-//			System.out.println("Input store info: " + inputInfo);
-		}
-		StoreChoiceSummary choiceSummary = new StoreChoiceSummary(inputInfo);
-		
-		if (inputInfo == null || inputInfo.getFileStartTimes() == null) {
-			choiceSummary.addChoice(ReprocessStoreChoice.STARTNORMAL);
-			return choiceSummary;
-		}
+		StoreChoiceSummary choiceSummary = new StoreChoiceSummary(null);
+
+				
+		choiceSummary.addChoice(ReprocessStoreChoice.STARTNORMAL);
 		
 		ArrayList<PamControlledUnit> outputStores = PamController.getInstance().findControlledUnits(DataOutputStore.class, true);
 		boolean partStores = false; 
 		int nOutputStores = 0;
 		for (PamControlledUnit aPCU : outputStores) {
+			if (workMonitor != null) {
+				workMonitor.update(new PamWorkProgressMessage(-1, "Checking output data " + aPCU.getUnitName()));
+			}
 			DataOutputStore offlineStore = (DataOutputStore) aPCU;
 			StoreStatus status = offlineStore.getStoreStatus(false);
 			nOutputStores++;
@@ -195,7 +323,25 @@ public class ReprocessManager {
 		if (partStores == false)  {
 //			choiceSummary.addChoice(ReprocessStoreChoice.STARTNORMAL);
 			return null; // no part full stores, so can start without questions
+		}		
+		
+		// now deal with the input data. 
+		InputStoreInfo inputInfo = null;
+		for (PamControlledUnit aPCU : inputStores) {
+			DataInputStore inputStore = (DataInputStore) aPCU;
+			if (workMonitor != null) {
+				workMonitor.update(new PamWorkProgressMessage(-1, "Checking input data " + aPCU.getUnitName()));
+			}
+			inputInfo = inputStore.getStoreInfo(workMonitor, true);
+//			System.out.println("Input store info: " + inputInfo);
 		}
+		choiceSummary.setInputStoreInfo(inputInfo);
+		
+		if (inputInfo == null || inputInfo.getFileStartTimes() == null) {
+			choiceSummary.addChoice(ReprocessStoreChoice.STARTNORMAL);
+			return choiceSummary;
+		}
+		
 		if (choiceSummary.getInputStartTime() >= choiceSummary.getOutputEndTime()) {
 			/*
 			 *  looks like it's new data that starts after the end of the current store,
@@ -255,11 +401,17 @@ public class ReprocessManager {
 			System.out.println("In Nogui mode you should set a choice as to how to handle existing storage overwrites. Using default of overwriting everything");
 			return ReprocessStoreChoice.OVERWRITEALL;			
 		}
-		
-		// otherwise we'll need to show a dialog to let the user decide what to do 
-		ReprocessStoreChoice choice = ReprocessChoiceDialog.showDialog(PamController.getMainFrame(), choices);
-		
-		return choice;
+		else if (PamGUIManager.getGUIType() == PamGUIManager.FX) {
+			// otherwise we'll need to show a dialog to let the user decide what to do 
+			ReprocessStoreChoice choice = ReprocessChoiceDialogFX.showDialog(PamController.getMainStage(), choices);
+			return choice;
+		}
+		else {
+			// otherwise we'll need to show a dialog to let the user decide what to do 
+			ReprocessStoreChoice choice = ReprocessChoiceDialog.showDialog(PamController.getMainFrame(), choices);
+			
+			return choice;
+		}
 	}
 
 	/**

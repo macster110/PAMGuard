@@ -3,8 +3,7 @@ package loggerForms;
 import java.awt.Color;
 import java.awt.LayoutManager;
 
-import loggerForms.PropertyTypes;
-
+import PamView.ColorManaged;
 import PamView.PamColors;
 import PamView.panel.PamPanel;
 

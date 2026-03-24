@@ -7,10 +7,6 @@ import java.util.ArrayList;
 
 import javax.swing.SwingUtilities;
 
-import pamScrollSystem.AbstractScrollManager;
-import generalDatabase.DBControlUnit;
-import binaryFileStorage.BinaryStore;
-import dataMap.layoutFX.DataMapGUIFX;
 import PamController.OfflineDataStore;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitGUI;
@@ -26,6 +22,10 @@ import PamView.PamView;
 import PamView.WrapperControlledGUISwing;
 import PamguardMVC.PamConstants;
 import PamguardMVC.PamDataBlock;
+import binaryFileStorage.BinaryStore;
+import dataMap.layoutFX.DataMapGUIFX;
+import generalDatabase.DBControlUnit;
+import pamScrollSystem.AbstractScrollManager;
 
 /**
  * The data map appears only during PAMGUARD viewer mode and is the root of
@@ -92,11 +92,9 @@ public class DataMapControl extends PamControlledUnit implements PamSettings {
 	public DataMapControl(String unitName) {
 		super("Data map", unitName);
 		
-		
 		dataMapPanel = new DataMapPanel(this);
 		PamSettingManager.getInstance().registerSettings(this);
 		dataMapPanel.newSettings();
-		
 		
 		dataMapControl = this;
 	}
@@ -156,20 +154,27 @@ public class DataMapControl extends PamControlledUnit implements PamSettings {
 		super.notifyModelChanged(changeType);
 		switch (changeType) {
 		case PamControllerInterface.INITIALIZATION_COMPLETE:
+//			System.out.println("DataMap notification " + changeType);
 			initialisationComplete = true;
+			break;
 		case PamControllerInterface.CHANGED_OFFLINE_DATASTORE:
 		case PamControllerInterface.ADD_CONTROLLEDUNIT:
 		case PamControllerInterface.REMOVE_CONTROLLEDUNIT:
 		case PamControllerInterface.INITIALIZE_LOADDATA:
 		case PamControllerInterface.EXTERNAL_DATA_IMPORTED:
 			if (initialisationComplete) {
+//				System.out.println("DataMap notification " + changeType);
+				if (getDataMapGUI() == null) {
+					break;
+				}
 				findDataSources();
 				dataMapPanel.createDataGraphs();
 				getDataMapGUI().createDataGraphs();
 				dataMapPanel.repaintAll();
 			}
-			break;
+//			break;
 		case PamControllerInterface.OFFLINE_DATA_LOADED:
+//			System.out.println("DataMap notification " + changeType);
 			dataMapPanel.repaintAll();
 		}
 		
@@ -355,8 +360,7 @@ public class DataMapControl extends PamControlledUnit implements PamSettings {
 	}
 
 	@Override
-	public boolean restoreSettings(
-			PamControlledUnitSettings pamControlledUnitSettings) {
+	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 		dataMapParameters = ((DataMapParameters) pamControlledUnitSettings.getSettings()).clone();
 		return (dataMapParameters != null);
 	}
@@ -402,6 +406,7 @@ public class DataMapControl extends PamControlledUnit implements PamSettings {
 	 * @param flag. The GUI type flag defined in PAMGuiManager. 
 	 * @return the GUI for the PamControlledUnit unit. 
 	 */
+	@Override
 	public PamControlledUnitGUI getGUI(int flag) {
 		if (flag==PamGUIManager.FX) {
 			if (dataGramGUIFX ==null) {

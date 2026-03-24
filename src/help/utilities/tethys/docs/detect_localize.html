@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+    "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en">
+<head>
+
+<link href="../../../pamHelpStylesheet.css" type="text/css"
+	rel="STYLESHEET">
+<title>Detections/Localizations</title>
+<style type="text/css">
+img.wrap {
+	float: left
+}
+
+img.wrapright {
+	float: right
+}
+
+img {
+	float: right;
+}
+</style>
+</head>
+
+<body>
+      
+  <h1>Exporting Detections/Localizations (PAMGuard data blocks)</h1>
+    <br>
+  <p>
+    The bottom left panel of the Tethys module shows a list of
+    different types of PAMGuard data that can be exported.  The data
+    in this list correspond to the various PAMGuard modules that have
+    been configured.  See the
+    <a href="../../../overview/PamMasterHelp/docs/modelViewer.html">
+      data model viewer</a>
+    help for an example of how PAMGuard might be configured.
+  </p> 
+  
+  <h2>Species information</h2>
+
+  <p>
+    Some of these data represent detections of specific species or
+    phenomena that must be translated to Tethys.  A context menu
+    (right-click on most computers) will show the option "Species
+    info..." that will allow you to specify the
+    <a href="./tethys_speciescodes.html">translation of events</a>
+    to species identifiers and call/sound types.  If you try to export
+    without having done this, the species info dialog will be started
+    automatically prior to export.
+  </p>
+
+  <h2>Selecting data blocks for import</h2>
+  
+  <p>
+    In the sample data blocks below, four modules have been
+    configured, but only one of them has been run.  Column "N Pam
+    Data" indicates the number of data records that have been
+    produced, and "PAMGuard Time" tells us when the data were
+    processed.  "Tethys Documents" indicates how many Tethys records
+    have been produced, and should be 0 until the data are exported.
+  </p>
+    
+  <div>
+    <img src="./images/data_blocks.png" class=".center"
+	 alt="List of results showing detections and other module processing events"/>
+  </div>
+  
+  <p>
+    Select the data blocks to be exported by clicking on them.
+    Multiple lines can be selected by using keyboard modifiers such as
+    holding the shift while clicking to select all data blocks between
+    the last clicked block and where you click.  Holding the alternate
+    (ALT) key will allow selection or de-selection of a single item
+    without affecting the selection state of other blocks.
+  <p>
+
+
+  <h2> Exporting data blocks </h2>
+
+  <p>
+    Once the data blocks have been selected, press export.  A series
+    of dialogs will guide you through the export process.  The first
+    set of dialogs simply display a summary of information about what 
+    will be exported.
+  </p>
+
+  <div>
+    <img src="./images/stream_algo_info.png" class=".center"
+	 alt="List of details describing the mechanism, parameters, and version of modules used in processing"/>
+  </div>
+    
+    <br>
+  <p>
+    There is nothing to change in this summary.  Press Next once you
+    have reviewed it. </p>
+    
+    <img src="./images/stream_species.png">
+    
+    <br>
+    <p>The second panel allows you to check <a href="tethys_speciescodes.html">ITIS species codes and call types</a> 
+    and to select which call types you want to export. </p>
+    
+    
+    <img src="./images/stream_granularity.png">
+    
+    <br>
+    <p>The next panel allows you to chose whether to export Detections, Localizations (if available), or both. Here, you 
+    can also select the <a href="tethys_granularity.html">granularity</a>, which will be a choice of "Call", "Encounter", "Binned", or "Grouped", depending on the 
+    type of data. You can also select an optional data filter which will restrict the output using criteria specific to the 
+    detector you're using. Note that there may be overlap between the data filter and the selections you make in the earlier species
+    selection page.   </p>
+    
+    <img src="./images/stream_description.png">
+    
+    <br>
+    <p>This panel allows specification of your
+    objectives, abstract, and method.  Many modules will have
+    pre-populated the method for you.  It is recommended to populate
+    the objectives and abstract with as much information as possible.
+  </p>
+    
+    <img src="./images/stream_parameters.png">
+    
+    <br>
+  <p>
+    Press Next to proceed to the next step of the dialog.  You will be asked
+    what details you wish to store within the parameters that were used to
+    produce these data.  Your must select one of the following:
+  </p>
+  
+  <ul>
+    <li> 
+      None - Do not report any of parameters used to produce these
+      detections. This option is <strong>not recommended</strong> as
+      it severely limits your ability to reproduce your results at a
+      later date or know whether or not the results of different
+      studies can be used together. 
+    </li>
+    <li> Data selector only - Output only the details of the data filter (if any), for instance that
+    selected only a type of sound, or sounds with a received level above a set minimum.  
+    <li>
+      Module only - Report the parameters that were set with this
+      module.  Only parameters associated with the specific module
+      will be reported.  Examples include score and duration thresholds
+      as well as any other type of criterion used to determine whether
+      or not an event is associated with a specific phenomenon or species.
+    </li>
+    <li>
+      Full process chain (default) - This is the most verbose option.  It includes the module
+      parameters as well as anything else that is part of the signal processing chain that leads
+      to the module.  As an example, a module only setting would not report the parameters that were
+      used to generate a spectrogram that was presented to a module for classification, but the
+      full process chain would record these details as well.  Use of this option will dramatically
+      increase the potential to reproduce your results, but it will generate a large amount of data
+      about the signal processing chain, much of which might not be useful.
+    </li>
+  </ul>
+  
+    <img src="./images/stream_export.png">
+    <br>
+  <p>
+    The final page of the dialog has an "Export data" button.  Press either
+    this, or the Export button at the bottom of the dialog, to export the data.  The system will begin generating the
+    Tethys document and display progress as it works through the data. When complete, it will show a message to indicate that export was 
+    successful, or an error message.  
+
+  </p>
+  
+    
+  <p class="prevLink">
+    <a href="deployments.html">Previous: Deployments</a>
+  </p>
+  <p class="nextLink">
+    <a href="./tethys_speciescodes.html">Translating species to
+    taxonomic serial numbers</a> (species encoding)
+  </p>
+
+</body>
+</html>

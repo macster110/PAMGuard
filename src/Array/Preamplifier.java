@@ -25,6 +25,7 @@ import java.io.Serializable;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 
 /**
  * 
@@ -72,14 +73,14 @@ public class Preamplifier implements Serializable, Cloneable, ManagedParameters 
 		  return (Preamplifier) super.clone();
 		}
 		catch (CloneNotSupportedException Ex) {
-			Ex.printStackTrace();;
+			Ex.printStackTrace();
 			return null;
 		}
 	}
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 

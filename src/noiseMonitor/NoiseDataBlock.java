@@ -1,14 +1,19 @@
 package noiseMonitor;
 
-import noiseMonitor.alarm.NoiseAlarmCounter;
-import noiseMonitor.alarm.NoiseAlarmProvider;
-import alarm.AlarmCounter;
-import alarm.AlarmCounterProvider;
-import alarm.AlarmDataSource;
 import PamUtils.FrequencyFormat;
 import PamUtils.PamUtils;
+import PamguardMVC.DataAutomation;
+import PamguardMVC.DataAutomationInfo;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamProcess;
+import alarm.AlarmCounterProvider;
+import alarm.AlarmDataSource;
+import noiseMonitor.alarm.NoiseAlarmProvider;
+import noiseMonitor.species.TethysNoiseDataProvider;
+import tethys.TethysControl;
+import tethys.pamdata.TethysDataProvider;
+import tethys.species.DataBlockSpeciesManager;
+import tethys.species.FixedSpeciesManager;
 
 public class NoiseDataBlock extends PamDataBlock<NoiseDataUnit> implements AlarmDataSource {
 
@@ -32,7 +37,7 @@ public class NoiseDataBlock extends PamDataBlock<NoiseDataUnit> implements Alarm
 
 	private NoiseAlarmProvider noiseAlarmCounter;
 	/**
-	 * These are the names used in the database columns, so dont' change them on pain of 
+	 * These are the names used in the database columns, so don't change them on pain of 
 	 * nothing ever working ever again !
 	 */
 	public static final String[] measureNames = {"mean", "median", "low95", "high95", "Min", "Max", "Peak"};
@@ -40,12 +45,17 @@ public class NoiseDataBlock extends PamDataBlock<NoiseDataUnit> implements Alarm
 	
 	private int statisticTypes;
 	
+	
+	private TethysNoiseDataProvider tethysNoiseDataProvider;
+	private FixedSpeciesManager fixedSpeciesManager;
+	
 	public NoiseDataBlock(String dataName,
 			PamProcess parentProcess, int channelMap) {
 		super(NoiseDataUnit.class, dataName, parentProcess, channelMap);
 		
 	}
 
+	@Override
 	public void masterClockUpdate(long milliSeconds, long clockSample) {
 		super.masterClockUpdate(milliSeconds, clockSample);
 	}
@@ -195,7 +205,24 @@ public class NoiseDataBlock extends PamDataBlock<NoiseDataUnit> implements Alarm
 		double[] f = new double[2];
 		f[0] = bandLoEdges[iBand];
 		f[1] = bandHiEdges[iBand];
+		double fc = Math.sqrt(f[0]*f[1]);
 		return FrequencyFormat.formatFrequencyRange(f, true);
+	}
+	
+	/**
+	 * Geet the centre frequency of a banc. 
+	 * @param iBand
+	 * @return
+	 */
+	public Double getBandCentreFrequency(int iBand) {
+		if (bandLoEdges == null || bandHiEdges == null || bandLoEdges.length <= iBand) {
+			return null;
+		}
+		double[] f = new double[2];
+		f[0] = bandLoEdges[iBand];
+		f[1] = bandHiEdges[iBand];
+		double fc = Math.sqrt(f[0]*f[1]);
+		return fc;
 	}
 
 	public String[] getBandNames() {
@@ -243,6 +270,27 @@ public class NoiseDataBlock extends PamDataBlock<NoiseDataUnit> implements Alarm
 			noiseAlarmCounter = new NoiseAlarmProvider(this);
 		}
 		return noiseAlarmCounter;
+	}
+
+	@Override
+	public DataAutomationInfo getDataAutomationInfo() {
+		return new DataAutomationInfo(DataAutomation.AUTOMATIC);
+	}
+
+	@Override
+	public TethysDataProvider getTethysDataProvider(TethysControl tethysControl) {
+		if (tethysNoiseDataProvider == null) {
+			tethysNoiseDataProvider = new TethysNoiseDataProvider(tethysControl, this);
+		}
+		return tethysNoiseDataProvider;
+	}
+
+	@Override
+	public DataBlockSpeciesManager<NoiseDataUnit> getDatablockSpeciesManager() {
+		if (fixedSpeciesManager == null) {
+			fixedSpeciesManager = new FixedSpeciesManager<NoiseDataUnit>(this, -10, "anthropogenic", "noise");
+		}
+		return fixedSpeciesManager;
 	}
 	
 

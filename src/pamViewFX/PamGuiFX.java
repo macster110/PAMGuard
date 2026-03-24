@@ -5,20 +5,16 @@ import java.util.List;
 
 import javax.swing.JFrame;
 
+import org.controlsfx.control.ToggleSwitch;
+
+import Acquisition.layoutFX.PaneFactory;
+import Acquisition.layoutFX.PaneFactory.PaneFactoryPane;
 import PamController.PamControlledUnit;
 import PamController.PamController;
 import PamView.PamViewInterface;
-import pamViewFX.fxGlyphs.PamGlyphDude;
-import pamViewFX.fxNodes.PamBorderPane;
-import pamViewFX.fxNodes.PamButton;
-import pamViewFX.fxNodes.PamHBox;
-import pamViewFX.fxNodes.PamTabPane;
-import pamViewFX.fxNodes.PamVBox;
-import pamViewFX.fxNodes.hidingPane.HidingPane;
-import pamViewFX.pamTask.PamLoadingPane;
-import pamViewFX.pamTask.PamTaskUpdate;
-import userDisplayFX.UserDisplayNodeFX;
+import dataModelFX.DataModelPaneFX;
 import javafx.application.Platform;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
@@ -30,9 +26,17 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
-import dataModelFX.DataModelPaneFX;
+import pamViewFX.fxGlyphs.PamGlyphDude;
+import pamViewFX.fxNodes.PamBorderPane;
+import pamViewFX.fxNodes.PamButton;
+import pamViewFX.fxNodes.PamHBox;
+import pamViewFX.fxNodes.PamTabPane;
+import pamViewFX.fxNodes.PamVBox;
+import pamViewFX.fxNodes.hidingPane.HidingPane;
+import pamViewFX.pamTask.PamLoadingPane;
+import pamViewFX.pamTask.PamTaskUpdate;
+import userDisplayFX.UserDisplayNodeFX;
 
-import org.controlsfx.control.ToggleSwitch;
 
 
 /**
@@ -112,6 +116,8 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 	 */
 	private boolean showingLoadMode;
 
+	private ObservableList<Node> children;
+
 
 	/**
 	 * Create a new PamGUIFX.
@@ -125,7 +131,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		this.pamGuiManagerFX=pamGuiManagerFX; 
         this.mainTabPane = mainTabPane;
 		
-        Pane layout=createMainPane(mainTabPane, stage); 
+        Node layout=createMainPane(mainTabPane, stage); 
 
 		//add main pane to PamGui
 		this.getChildren().add(layout);
@@ -140,7 +146,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		//create the main tab pane. 
         this.mainTabPane = new PamTabPane();
        		
-        Pane layout=createMainPane(mainTabPane, stage); 
+        Node layout=createMainPane(mainTabPane, stage); 
 	   
 	    //add main pane to PamGui
 	    this.getChildren().add(layout);
@@ -154,7 +160,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 	 * @param stage - the stage holding this GUI.
 	 * @return a pane which sits in the stage. 
 	 */
-	private Pane createMainPane(PamTabPane mainTabPane, Stage stage){
+	private Node createMainPane(PamTabPane mainTabPane, Stage stage){
 
 		//create the pane which holds tab pane
 		final PamBorderPane layout = new PamBorderPane();
@@ -166,15 +172,17 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		sidePaneContent.setPadding(new Insets(25,5,5,5)); //give quite  abit of spacing at the top so that there is room for close button
 		sidePaneContent.setMinWidth(0);
 		hidingSidePane=new HidingPane(Side.RIGHT, sidePaneContent, this, false);
+		hidingSidePane.setShowButtonOpacity(1.0);
+
 		hidingSidePane.showHidePane(false);
 
 		//create the button which shows the hiding panel. Although we get this button from the hiding pane, where to place
 		//it and what colour it is etc has to be set for whatever pane it is to be located in. 
 		PamButton showButtonRight=hidingSidePane.getShowButton();
 //		showButtonRight.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.CHEVRON_LEFT, PamGuiManagerFX.iconColor, PamGuiManagerFX.iconSize));
-		showButtonRight.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", PamGuiManagerFX.iconColor, PamGuiManagerFX.iconSize));
+		showButtonRight.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", PamGuiManagerFX.iconSize));
 		//showLeftButton.setText(PamFontAwesome.ICON_CHEVRON_LEFT);
-		showButtonRight.getStyleClass().add("close-button-left");
+		showButtonRight.getStyleClass().add("close-button-left-trans");
 		showButtonRight.setStyle("-fx-background-radius: 0 0 0 0;");
 
 		//alter animations to remove/add showButton to tab pane. 
@@ -199,8 +207,8 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		});
 
 		PamButton closeButtonLeft=hidingSidePane.getHideButton();
+		closeButtonLeft.getStyleClass().add("close-button-right-trans");
 //		closeButtonLeft.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.CHEVRON_RIGHT, Color.DARKGRAY.darker(), PamGuiManagerFX.iconSize));
-		closeButtonLeft.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-right", Color.DARKGRAY.darker(), PamGuiManagerFX.iconSize));
 		closeButtonLeft.prefHeightProperty().bind(mainTabPane.getHeaderHeightProperty());
 		
 		//add hiding pane to main pane. 
@@ -212,19 +220,19 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		hidingPaneLeft=new HidingPane(Side.LEFT, settingsPane, this, false);
 		hidingPaneLeft.showHidePane(false);
 		
-		hidingPaneLeft.getStylesheets().add(pamGuiManagerFX.getPamSettingsCSS());
+		hidingPaneLeft.getStylesheets().addAll(pamGuiManagerFX.getPamSettingsCSS());
 
 		PamButton showButtonLeft=hidingPaneLeft.getShowButton();
 //		showButtonLeft.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.BARS, Color.LIGHTGRAY, PamGuiManagerFX.iconSize));
-		showButtonLeft.setGraphic(PamGlyphDude.createPamIcon("mdi2m-menu", Color.LIGHTGRAY, PamGuiManagerFX.iconSize));
-		showButtonLeft.getStyleClass().add("close-button-right");
+		showButtonLeft.setGraphic(PamGlyphDude.createPamIcon("mdi2m-menu", PamGuiManagerFX.iconSize));
+		showButtonLeft.getStyleClass().add("close-button-right-trans");
 		showButtonLeft.setStyle(" -fx-background-radius: 0 0 0 0;");
 		
 		PamButton closeRightButton=hidingPaneLeft.getHideButton();
 		closeRightButton.setPrefWidth(40);
 		closeRightButton.getStyleClass().add("close-button-left-trans");
 //		closeRightButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.CHEVRON_LEFT, Color.WHITE, PamGuiManagerFX.iconSize));
-		closeRightButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", Color.WHITE, PamGuiManagerFX.iconSize));
+		closeRightButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", PamGuiManagerFX.iconSize));
 		closeRightButton.prefHeightProperty().bind(mainTabPane.getHeaderHeightProperty());
 		
 		//add hiding pane to main pane. 
@@ -242,23 +250,23 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 
 		mainTabPane.setTabEndRegion(showButtonRight);
 		mainTabPane.setTabStartRegion(showButtonLeft);
+//		mainTabPane.getStyleClass().add(Styles.TABS_FLOATING);
 
 		mainTabPane.getAddTabButton().setOnAction((value)->{
-		    addPamTab(new TabInfo("Display " + this.getNumTabs()+1), null ,true); 
+		    addPamTab(new TabInfo("Display " + (this.getNumTabs()+1)), null ,true); 
 		    mainTabPane.layout();
 		});
 		
 		//now have a holder - add the loading pane. 
 		/**create left hiding pane**/
 		loadPane=new PamLoadingPane(this.pamGuiManagerFX);
-		loadPane.setPrefWidth(250);
-		hidingLoadPane=new HidingPane(Side.LEFT, loadPane, this, false);
+		hidingLoadPane=new HidingPane(Side.TOP, loadPane, this, false);
+		hidingLoadPane.setPrefHeight(110);
 		hidingLoadPane.removeHideButton();
 		hidingLoadPane.showHidePane(false);
 		
 		PamBorderPane layoutHolder=new PamBorderPane(layout);
-		layoutHolder.setLeft(hidingLoadPane);
-		
+		layoutHolder.setTop(hidingLoadPane);
 
 	    return  layoutHolder; 
 	    
@@ -306,8 +314,23 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
         	}
         }
         
-        newTab.setDetachable(detachable);
+        newTab.setOnClosed((action)->{
+        	//when a tab is closer. 
+        	for (int i=0; i<newTab.getInternalPanes().size(); i++) {
+        		System.out.println("REMOVE TAB: " + newTab.getInternalPanes().size());
+
+	        	newTab.getInternalPanes().get(i).getUserDisplayNode().closeNode();
+	        	if (newTab.getInternalPanes().get(i).getUserDisplayNode().getUserDisplayControl()!=null) {
+	        		System.out.println("REMOVE CONTROLLED DISPLAY UNIT: " + newTab.getInternalPanes().get(i).getUserDisplayNode().getUserDisplayControl());
+	        		//the display is a standalone display and so remove the tab means the controlled unit should be removed from the data model 
+	        		PamController.getInstance().removeControlledUnt(newTab.getInternalPanes().get(i).getUserDisplayNode().getUserDisplayControl());
+	        		PamGuiManagerFX.getInstance().getDataModelFX().dataModeltoPamModel();
+	        	}
+        	}
+        });
         
+        newTab.setDetachable(detachable);
+   
         //add tab
         mainTabPane.getTabs().add(newTab);
         
@@ -392,6 +415,10 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		
 	}
 	
+	private boolean isViewer() {
+		return PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW;
+	}
+	
 
 	/**
 	 * Create the tool bar pane. The top of each tab content node contains a tool
@@ -406,17 +433,15 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 	 */
 	public class ToolBarPane extends PamBorderPane {
 		
+		Node runIcon = PamGlyphDude.createPamIcon("mdi2r-record-circle", Color.RED, 30);
+		Node stopIcon = PamGlyphDude.createPamIcon("mdi2p-pause", Color.BLACK, 30);
 		
 		/**
 		 * Record/batch process button. In real time starts/stops data acquisition. In viewer mode
 		 * opens the batch run manager to allow batch processing of data e.g. reclassifying clicks. 
 		 */
 		private PamButton recordButton;
-		
-		/**
-		 *Play/pause button. Plays back sound in real time/viewer mode. 
-		 */
-		private PamButton playButton;
+	
 		
 		/**
 		 * Holds all extra controls in the toolbar. 
@@ -455,48 +480,25 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 			this.pamGuiTab=pamGuiTab;
 		
 			//create record and play buttons. 
-			PamHBox playControls=new PamHBox();
-			recordButton=new PamButton();
-//			recordButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.CIRCLE, Color.LIMEGREEN, PamGuiManagerFX.iconSize));
-			recordButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-checkbox-blank-circle", Color.LIMEGREEN, PamGuiManagerFX.iconSize));
-			recordButton.getStyleClass().add("transparent-button");
-			recordButton.setStyle(" -fx-background-radius: 50;");
-			recordButton.setOnAction((action)->{
-				if (PamController.getInstance().getPamStatus()==PamController.PAM_RUNNING){
-					PamController.getInstance().pamStop();
-					pamGuiManagerFX.setPamRunning(false);
-				}
-				else {
-					PamController.getInstance().pamStart();
-					pamGuiManagerFX.setPamRunning(true);
-				}
-			});
+			Pane playControls;
+			
+			if (isViewer()) {
+				playControls = createViewerControls();
 
-			playButton=new PamButton();
-//			playButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.PLAY, Color.BLACK, PamGuiManagerFX.iconSize));
-			playButton.setGraphic(PamGlyphDude.createPamIcon("mdi2p-play", Color.BLACK, PamGuiManagerFX.iconSize));
-			playButton.getStyleClass().add("transparent-button");
-			playButton.setStyle(" -fx-background-radius: 50;");
-			playButton.setOnAction((action)->{
-				//TODO
-				//start pamguard
-				//PamController.getInstance().pamStart();
-			});
+			}
+			else {
+				playControls = createRealTimeControls();
+			}
 			
 			
-			playControls.getChildren().addAll(recordButton,playButton);
-			playControls.setSpacing(10);
-			playControls.setPadding(new Insets(0,10,0,20));
-			playControls.getStyleClass().add("pane-opaque");
-			playControls.setPrefHeight(prefHeight);
-			playControls.setAlignment(Pos.CENTER);
+
 			
 			//create window editing button. This holds a toggle to edit windows and options. 
 			rightHBox=new PamHBox();
 			rightHBox.setAlignment(Pos.CENTER_LEFT);
 			rightHBox.setPadding(new Insets(0,10,0,20));
 			rightHBox.setSpacing(5);
-			rightHBox.getStyleClass().add("pane-opaque");
+//			rightHBox.getStyleClass().add("pane-opaque");
 			
 			editWindows=new ToggleSwitch("Resize"); 
 			//HACK,
@@ -538,7 +540,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 			centerHBox=new PamHBox();
 			centerHBox.setSpacing(10);
 			//need to set this style to prevent the pane form being transparent. 
-			centerHBox.getStyleClass().add("pane-opaque");
+			//centerHBox.getStyleClass().add("pane-opaque");
 			centerHBox.setPrefHeight(prefHeight);
 			
 			this.setCenter(centerHBox);
@@ -546,12 +548,102 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 			this.setRight(rightHBox);
 			
 			this.setPrefHeight(prefHeight);
+//			this.getStyleClass().add("pane-opaque");
 
 
 			//this.setPadding(new Insets(0,0,0,0));
 			
 			this.toFront();
 
+		}
+		
+		
+		private Pane createViewerControls() {
+			
+			//create record and play buttons. 
+			PamHBox playControls = new PamHBox();
+			
+			PamButton reProcess=new PamButton("Reprocess");
+			reProcess.setGraphic(PamGlyphDude.createPamIcon("mdi2p-play", PamGuiManagerFX.iconSize));
+			reProcess.setOnAction((action)->{
+				//Open reprocess dialog. 
+				
+			});
+			
+			
+			PamButton exportButton = new PamButton("Export data");
+			exportButton.setGraphic(PamGlyphDude.createPamIcon("mdi2d-database-export", PamGuiManagerFX.iconSize));
+			exportButton.setOnAction((action)->{
+				//export dialog
+				
+			});
+			
+			PamButton importButton = new PamButton("Import data");
+			importButton.setGraphic(PamGlyphDude.createPamIcon("mdi2d-database-import", PamGuiManagerFX.iconSize));
+			importButton.setOnAction((action)->{
+				//import dialog
+			});
+
+
+			
+			playControls.getChildren().addAll(reProcess, exportButton, importButton);
+			playControls.setSpacing(5);
+			playControls.setPadding(new Insets(0,10,0,50));
+//			playControls.getStyleClass().add("pane-opaque");
+			playControls.setPrefHeight(prefHeight);
+			playControls.setAlignment(Pos.CENTER_LEFT);
+			
+			return playControls;
+			
+		}
+		
+		
+		/**
+		 * Create controls for PAMGuard for real time processing. 
+		 * @return
+		 */
+		private Pane createRealTimeControls() {
+		
+
+			//create record and play buttons. 
+			PamHBox playControls=new PamHBox();
+			recordButton=new PamButton("Process");
+//			recordButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.CIRCLE, Color.LIMEGREEN, PamGuiManagerFX.iconSize));
+			recordButton.setGraphic(runIcon);
+			//recordButton.getStyleClass().add("transparent-button");
+			recordButton.setStyle(" -fx-padding: 1 15 1 5");
+			
+			recordButton.setOnAction((action)->{
+				if (PamController.getInstance().getPamStatus()==PamController.PAM_RUNNING){
+					PamController.getInstance().pamStop();
+					//recordButton.setGraphic(PamGlyphDude.createPamIcon("mdi2r-record-circle", Color.RED, PamGuiManagerFX.iconSize));
+
+				}
+				else {
+					PamController.getInstance().pamStart();
+					//recordButton.setGraphic(PamGlyphDude.createPamIcon("mdi2p-pause", Color.DARKGRAY, PamGuiManagerFX.iconSize));
+				}
+			});
+
+//			playButton=new PamButton();
+////			playButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.PLAY, Color.BLACK, PamGuiManagerFX.iconSize));
+//			playButton.setGraphic(PamGlyphDude.createPamIcon("mdi2p-play", Color.BLACK, PamGuiManagerFX.iconSize));
+//			playButton.getStyleClass().add("transparent-button");
+////			playButton.setStyle(" -fx-background-radius: 50;");
+//			playButton.setOnAction((action)->{
+//				//TODO
+//				//start pamguard
+//				//PamController.getInstance().pamStart();
+//			});
+			
+			playControls.getChildren().addAll(recordButton);
+			playControls.setSpacing(10);
+			playControls.setPadding(new Insets(0,10,0,20));
+//			playControls.getStyleClass().add("pane-opaque");
+			playControls.setPrefHeight(prefHeight);
+			playControls.setAlignment(Pos.CENTER);
+			
+			return playControls;
 		}
 		
 		
@@ -577,6 +669,17 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		 */
 		public Button getRecordButton(){
 			return recordButton; 
+		}
+		
+		public void setRecordButtonState(boolean running) {
+			if (running) {
+				recordButton.setGraphic(stopIcon);
+				recordButton.setText("Pause");
+			}
+			else {
+				recordButton.setGraphic(runIcon);
+				recordButton.setText("Process");
+			}
 		}
 		
 		/**
@@ -659,14 +762,76 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 
 	@Override
 	public void pamStarted() {
-		this.pamGuiManagerFX.pamStarted();
-		
+		//System.out.println("PAMGUIFX: Pam started");
+		 setRecordbuttonState(true);
 	}
 
 	@Override
 	public void pamEnded() {
-		this.pamGuiManagerFX.pamEnded();		
+		//System.out.println("PAMGUIFX: Pam ended");
+		 setRecordbuttonState(false);
+;	
 	}
+	
+	/**
+	 * Set the state of the record button in all tabs.
+	 * @param running - true if PAMGuard is running
+	 */
+	public void setRecordbuttonState(boolean running) {
+		for (int i=0; i<this.getNumTabs(); i++){
+			this.getTab(i).getContentToolbar().setRecordButtonState(running);
+		}
+	}
+	
+	
+	/**
+	 * Add a pane to the tool bar of all tabs.
+	 * @param paneFactory
+	 */
+	public boolean addStatusBarPane(PaneFactory paneFactory) {
+		
+		System.out.println("PamGuiFX: addToolBarPane: adding pane factory " + paneFactory.getPaneFactoryName());
+		
+		boolean statusPaneAdded=false;
+		for (int i=0; i<this.getNumTabs(); i++){
+			//check that a pane factory of this type does not exist.
+			children = this.getTab(i).getContentToolbar().getCenterHBox().getChildren();
+			
+			boolean add=true;
+			//we want to searc h through all the children in the pane and see if they were created by the same factory.
+			//If so, don't add another. 
+			for (int j=0; j<children.size(); j++) {
+				if (children.get(j) instanceof PaneFactoryPane) {
+					PaneFactory factory = ((PaneFactoryPane) children.get(j)).getFactoryRef();
+					if (factory.equals(paneFactory)) {
+						//pane factory of this instance already exists- do not add another. 
+						add = false;
+					}
+				}
+			}
+			
+			if (add) {
+				this.getTab(i).getContentToolbar().getCenterHBox().getChildren().add(paneFactory.createPane());
+				statusPaneAdded= add;
+			}
+			
+		}
+		
+		//return true if at least one pane was added.
+		return statusPaneAdded;
+
+	}
+	
+
+	public void removeStatusBarPane(PaneFactory statusPaneFactory) {
+		//TODO
+//		for (int i=0; i<this.getNumTabs(); i++){
+//			this.getTab(i).getContentToolbar().getCenterHBox().getChildren().add(paneFactory);
+//		}
+	}
+
+
+
 
 	@Override
 	public void modelChanged(int changeType) {
@@ -765,4 +930,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 	public void renameTab(String selectedItem, int tabIndex) {
 		//TODO
 	}
+
+
+
 }

@@ -1,37 +1,19 @@
 package generalDatabase;
 
-import generalDatabase.external.CopyManager;
-import generalDatabase.layoutFX.DBGuiFX;
-import generalDatabase.lookupTables.LookUpTables;
-import generalDatabase.lookupTables.LookupList;
-import generalDatabase.pamCursor.PamCursor;
-import generalDatabase.postgresql.PostgreSQLSystem;
-import generalDatabase.sqlite.SqliteSystem;
-import loggerForms.FormsControl;
-
 import java.awt.Component;
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
 import java.io.Serializable;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Properties;
 
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
-import org.apache.commons.io.FilenameUtils;
-
-import offlineProcessing.DataCopyTask;
-import offlineProcessing.OLProcessDialog;
-import offlineProcessing.OfflineTaskGroup;
-import warnings.PamWarning;
-import warnings.WarningSystem;
 import PamController.PamConfiguration;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitGUI;
@@ -49,6 +31,19 @@ import PamView.dialog.warn.WarnOnce;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import annotation.userforms.UserFormAnnotationType;
+import generalDatabase.external.CopyManager;
+import generalDatabase.layoutFX.DBGuiFX;
+import generalDatabase.lookupTables.LookUpTables;
+import generalDatabase.lookupTables.LookupList;
+import generalDatabase.pamCursor.PamCursor;
+import generalDatabase.sqlite.SqliteSystem;
+import loggerForms.FormsControl;
+import offlineProcessing.DataCopyTask;
+import offlineProcessing.OLProcessDialog;
+import offlineProcessing.OfflineTaskGroup;
+import pamguard.GlobalArguments;
+import warnings.PamWarning;
+import warnings.WarningSystem;
 
 /**
  * Database system for accessing data in just about any type of odbc database.
@@ -123,12 +118,18 @@ PamSettingsSource {
 	}
 
 	protected boolean addDatabaseSystem(DBSystem dbSystem) {
+		try {
 		if (dbSystem.hasDriver()) {
 			databaseSystems.add(dbSystem);
 		}
 		else {
 			System.out.println(String.format("%s Database system is unavailable on this platform", 
 					dbSystem.getSystemName()));
+			return false;
+		}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
 			return false;
 		}
 		return true;
@@ -158,7 +159,7 @@ PamSettingsSource {
 
 		//		selectDatabase(null);
 
-		if (isInMainConfiguration() == false) {
+		if (!isInMainConfiguration()) {
 			openImmediately = false;
 		}
 		if (databaseSystem == null){
@@ -219,13 +220,14 @@ PamSettingsSource {
 		//			databaseSystem.setDatabaseName(dbParameters.databaseName);
 		// Do a quick check here to see if the database exists.  If not, warn the user before creating a new one.  Note that if
 		// the database name is null, the user is creating a brand new database so skip the check
+		checkDatabaseSystem(forcedName);
 		boolean checkExists = databaseSystem.checkDatabaseExists(forcedName);
-		if (checkExists == false && forcedName != null) {
+		if (!checkExists && forcedName != null) {
 			databaseSystem.createNewDatabase(forcedName);
 			checkExists = databaseSystem.checkDatabaseExists(forcedName);
 		}
 
-		if (checkExists == false) {
+		if (!checkExists) {
 			String title = "Database not found";
 			String msg = "PAMGuard is unable to access the following database:<br><br><b>" +
 					forcedName +
@@ -248,13 +250,15 @@ PamSettingsSource {
 				System.out.println("Database system     : " + databaseSystem.getSystemName());
 				DatabaseMetaData metaData = connection.getConnection().getMetaData();
 				System.out.println("Driver              : " + metaData.getDriverName());
-				System.out.println("ANSI92EntryLevelSQL : " + metaData.supportsANSI92EntryLevelSQL());
-				System.out.println("Keywords            : " + metaData.getSQLKeywords());
-				System.out.println("Add Column          : " + metaData.supportsAlterTableWithAddColumn());
-				System.out.println("Auto Commit         : " + connection.getConnection().getAutoCommit());
-				System.out.println("Updatable resultset : " + metaData.supportsResultSetConcurrency(
-						ResultSet.TYPE_SCROLL_INSENSITIVE,
-						ResultSet.CONCUR_UPDATABLE));
+				if (SMRUEnable.isEnable()) {
+					System.out.println("ANSI92EntryLevelSQL : " + metaData.supportsANSI92EntryLevelSQL());
+					System.out.println("Keywords            : " + metaData.getSQLKeywords());
+					System.out.println("Add Column          : " + metaData.supportsAlterTableWithAddColumn());
+					System.out.println("Auto Commit         : " + connection.getConnection().getAutoCommit());
+					System.out.println("Updatable resultset : " + metaData.supportsResultSetConcurrency(
+							ResultSet.TYPE_SCROLL_INSENSITIVE,
+							ResultSet.CONCUR_UPDATABLE));
+				}
 			}
 			catch (SQLException ex) {
 
@@ -270,6 +274,62 @@ PamSettingsSource {
 			//				" is not available");
 		}
 		return true;
+	}
+
+	/**
+	 * Try to check that we've a valid database system for this type of database. 
+	 * Hard to do just based on name, but will work for sqlite and other file based systems I hope. 
+	 * @param forcedName
+	 */
+	private void checkDatabaseSystem(String forcedName) {
+		if (forcedName == null) {
+			return;
+		}
+		DBSystem forcedSystem = findSystem(forcedName);
+		if (forcedSystem != null && databaseSystem != forcedSystem) {
+			selectSystem(forcedSystem.getClass(), false, forcedName);
+		}
+	}
+	
+	/**
+	 * Find a database system based on name. Not good ! Will struggle with server
+	 * databases. Need a better way of doing this. 
+	 * @param databaseName
+	 * @return
+	 */
+	private DBSystem findSystem(String databaseName) {
+		if (databaseName == null) {
+			return null;
+		}
+		int lastDot = databaseName.lastIndexOf('.');
+		if (lastDot < 0) {
+			return null;
+		}
+		String fEnd = databaseName.substring(lastDot).toLowerCase();
+		switch (fEnd) {
+		case ".sqlite":
+		case ".sqlite3":
+			return getSystem(SqliteSystem.class);
+		case ".accdb":
+			return getSystem(MSAccessSystem.class);
+
+		}
+		return null;
+	}
+	
+	/**
+	 * Get a database system by it's class name. 
+	 * @param systemClass
+	 * @return
+	 */
+	public DBSystem getSystem(Class systemClass) {
+		for (int i = 0; i < databaseSystems.size(); i++) {
+			DBSystem aSys = databaseSystems.get(i);
+			if (aSys.getClass() == systemClass) {
+				return aSys;
+			}
+		}
+		return null;		
 	}
 
 	/**
@@ -302,7 +362,8 @@ PamSettingsSource {
 		}
 		synchronized (DBControl.class) {
 			try {
-				if (connection.getConnection().getAutoCommit() == false) {
+				if (!connection.getConnection().getAutoCommit()) {
+//					System.out.println("Database commit");
 					connection.getConnection().commit();
 				}
 			} catch (SQLException e) {
@@ -367,15 +428,18 @@ PamSettingsSource {
 		return connection;
 	}
 
+	@Override
 	public Serializable getSettingsReference() {
 		dbParameters.setDatabaseName(getLongDatabaseName());
 		return dbParameters;
 	}
 
+	@Override
 	public long getSettingsVersion() {
 		return DBParameters.serialVersionUID;
 	}
 
+	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 		DBParameters np = (DBParameters) pamControlledUnitSettings.getSettings();
 		dbParameters = np.clone();
@@ -418,7 +482,7 @@ PamSettingsSource {
 
 //		if (dbParameters.getUseAutoCommit() == false) {
 			JMenuItem commitItem = new JMenuItem("Commit Changes");
-			commitItem.setEnabled(dbParameters.getUseAutoCommit() == false);
+			commitItem.setEnabled(!dbParameters.getUseAutoCommit());
 			commitItem.setToolTipText("Immediately commit recent changes to the database");
 			commitItem.addActionListener(new ActionListener() {
 				@Override
@@ -464,6 +528,7 @@ PamSettingsSource {
 			this.frame = frame;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 
 			selectDatabase(frame, null);
@@ -577,9 +642,15 @@ PamSettingsSource {
 	 */
 	@Override
 	public boolean saveStartSettings(long timeNow) {
-		return dbProcess.saveStartSettings();
+		return dbProcess.saveStartSettings(timeNow);
 	}
 
+
+	@Override
+	public boolean saveEndSettings(long timeNow) {
+		// TODO Auto-generated method stub
+		return true;
+	}
 
 	@Override
 	public int getNumSettings() {
@@ -595,6 +666,14 @@ PamSettingsSource {
 			return null;
 		}
 		return dbSettingsStore.getSettingsGroup(settingsIndex);
+	}
+	
+	/**
+	 * Get the DB Setting store. Need to occasionally manipulate this externally. 
+	 * @return database settings store. 
+	 */
+	public DBSettingsStore getSettingsStore() {
+		return dbSettingsStore;
 	}
 
 	@Override
@@ -698,9 +777,17 @@ PamSettingsSource {
 	 */
 	public boolean selectDatabase(Frame frame, String selectTitle) {
 
+		
 		//this is a bit messy but difficult to figure this out in controller framework because
 		//this is called before the controller has initialised properly. 
-		if (PamGUIManager.getGUIType()==PamGUIManager.FX) {
+		// also have to allow for the database being passed as a command line option, in which case 
+		// we don't want to open the dialog. 
+		String currentDB = null;
+		DBParameters newParams = checkPassedDatabase();
+		if (newParams != null) {
+			
+		}
+		else if (PamGUIManager.getGUIType()==PamGUIManager.FX) {
 			//open FX
 			return ((DBGuiFX) getGUI(PamGUIManager.FX)).selectDatabase(PamController.getMainStage(), selectTitle, true); 
 		}
@@ -711,12 +798,13 @@ PamSettingsSource {
 			// object and retrieving the name of the first database in the recently-used list.  Double-check the connection
 			// field - if it's null, it means we don't actually have the database loaded so just clear the name and continue
 			// (this happens when starting Viewer mode)
-			String currentDB = databaseSystems.get(dbParameters.getDatabaseSystem()).getDatabaseName();
+			currentDB = databaseSystems.get(dbParameters.getDatabaseSystem()).getDatabaseName();
 			if (connection==null) {
 				currentDB = null;
 			}
 
-			DBParameters newParams = DBDialog.showDialog(this, frame, dbParameters, selectTitle);
+			newParams = DBDialog.showDialog(this, frame, dbParameters, selectTitle);
+		}
 			if (newParams != null) {
 				// first, check if there is a Lookup table.  If so, make sure to copy the contents over before
 				// we lose the reference to the old database
@@ -757,8 +845,28 @@ PamSettingsSource {
 				PamController.getInstance().getUidManager().runStartupChecks();	// if we've loaded a new database, synch the datablocks with the UID info
 				return true;
 			}
-		}
 		return false;
+	}
+	
+	/**
+	 * Check to see if a database has been passed to PAMGuard as a parameter from the command line. 
+	 * @return 
+	 */
+	DBParameters checkPassedDatabase() {
+		String passedDatabase = GlobalArguments.getParam(DBControl.GlobalDatabaseNameArg);
+		if (passedDatabase != null) {
+			/*
+			 * assume it's a file based database. Anything else is going to get more complicated and will require
+			 * a fair amount of type checing, connecint to servers, etc. 
+			 */
+			if (passedDatabase.endsWith(".sqlite3")) {
+				DBParameters newParams = dbParameters;
+				newParams.setDatabaseName(passedDatabase);
+				newParams.setDatabaseSystem(0);
+				return newParams;
+			}
+		}
+		return null;
 	}
 
 	/**

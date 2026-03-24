@@ -46,7 +46,7 @@ public class LoadOptionsDialog extends PamDialog {
 	private AbstractScrollManager scrollManager;
 	
 	private long[] standardLoadTimes = {1000, 2000, 5000, 10000, 30000, 60*1000, 2*60*1000,
-			5*60*1000, 10*60*1000, 15*60*1000, 30*60*1000, 3600*1000, 3600*2*1000, 3600*6*1000,
+			5*60*1000, 10*60*1000, 15*60*1000, 20*60*1000, 30*60*1000, 3600*1000, 3600*2*1000, 3600*6*1000,
 			3600*12*1000, 3600*24*1000, 2*3600*24*1000, 7*3600*24*1000, 14L*3600L*24L*1000L, 30L*3600L*24L*1000L,
 			60L*3600L*24L*1000L, 365L*3600L*24L*1000L};
 	
@@ -68,7 +68,7 @@ public class LoadOptionsDialog extends PamDialog {
 		c.gridwidth = 1;
 		addComponent(panel, startTime = new JTextField(14), c);
 		c.gridx++;
-		addComponent(panel, startTimeZone = new JLabel("", JLabel.LEFT), c);
+		addComponent(panel, startTimeZone = new JLabel("", SwingConstants.LEFT), c);
 		c.gridx = 0;
 		c.gridwidth = 1;
 		c.gridy++;
@@ -100,6 +100,7 @@ public class LoadOptionsDialog extends PamDialog {
 //		pack();
 		setLocationRelativeTo(parentComponent);
 		
+		setHelpPoint("overview.PamMasterHelp.docs.viewerMode");
 		
 	}
 	

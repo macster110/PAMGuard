@@ -6,10 +6,10 @@ import java.util.Vector;
 
 import javax.swing.JPopupMenu;
 
-import dataMap.OfflineDataMap;
-import pamScrollSystem.coupling.ScrollerCoupling;
 import PamController.PamController;
 import PamguardMVC.PamDataBlock;
+import dataMap.OfflineDataMap;
+import pamScrollSystem.coupling.ScrollerCoupling;
 
 public abstract class AbstractScrollManager {
 
@@ -103,6 +103,13 @@ public abstract class AbstractScrollManager {
 	 * @param menuMouseTime time in milliseconds
 	 */
 	abstract public void centreDataAt(PamDataBlock dataBlock, long menuMouseTime);
+
+	/**
+	 * Move scroll to given time. Don't move the outer scroller unless necessary. 
+	 * @param dataBlock
+	 * @param menuMouseTime
+	 */
+	abstract public void scrollToTime(PamDataBlock dataBlock, long menuMouseTime);
 
 	/**
 	 * Start all data in all data blocks at the given time

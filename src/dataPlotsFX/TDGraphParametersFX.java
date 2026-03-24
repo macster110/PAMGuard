@@ -7,14 +7,15 @@ import java.util.Hashtable;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 import PamView.GeneralProjector.ParameterType;
 import PamView.GeneralProjector.ParameterUnits;
-import javafx.scene.paint.Color;
 import dataPlots.layout.DataListInfo;
 import dataPlots.layout.GraphParameters;
 import dataPlotsFX.data.DataTypeInfo;
 import dataPlotsFX.data.TDScaleInfoData;
+import javafx.scene.paint.Color;
 
 /**
  * The settings for an individual graph. 
@@ -50,7 +51,7 @@ public class TDGraphParametersFX implements Serializable, Cloneable, ManagedPara
 	/**
 	 * The current data type to show.
 	 */
-	public DataTypeInfo currentDataType= new DataTypeInfo(ParameterType.AMPLITUDE, ParameterUnits.DB); ; 
+	public DataTypeInfo currentDataType= new DataTypeInfo(ParameterType.AMPLITUDE, ParameterUnits.DB); 
 	
 	/**
 	 * Allows TDDataInfo to be created when graph is initialised. Can't just have TDDataInfo here as a whole data block would 
@@ -78,6 +79,18 @@ public class TDGraphParametersFX implements Serializable, Cloneable, ManagedPara
 	 * Used only when saving as Color (javafx) is not serializable. 
 	 */
 	public String plotFillS = "white";
+	
+	/**
+	 * Show the hide panel on the left on start up. Note only used when first opening 
+	 * saved settings or saving settings. 
+	 */
+	public boolean showHidePaneLeft = true;
+	
+	/**
+	 * Show the hide panel on the right on start up. Note only used when first opening 
+	 * saved settings or saving settings. 
+	 */
+	public boolean showHidePaneRight = false;
 
 
 	/* (non-Javadoc)
@@ -137,7 +150,7 @@ public class TDGraphParametersFX implements Serializable, Cloneable, ManagedPara
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DISPLAY);
 		try {
 			Field field = this.getClass().getDeclaredField("channels");
 			ps.put(new PrivatePamParameterData(this, field) {

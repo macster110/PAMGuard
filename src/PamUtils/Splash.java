@@ -26,13 +26,13 @@ import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
+import java.awt.Rectangle;
+import java.awt.SplashScreen;
 import java.awt.Toolkit;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.awt.SplashScreen;
-import java.awt.Rectangle;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
@@ -49,6 +49,7 @@ import javax.swing.border.EmptyBorder;
 
 import PamController.PamController;
 import PamController.PamguardVersionInfo;
+import PamController.PamguardVersionInfo.ReleaseType;
 import PamUtils.PlatformInfo.OSType;
 import pamguard.Pamguard;
 
@@ -107,6 +108,7 @@ public class Splash extends JWindow implements Runnable {
 	}
 	
 	
+	@Override
 	public void run()  
 	   { 
 		//let's see if we have a JVM SplashScreen already displayed
@@ -162,11 +164,15 @@ public class Splash extends JWindow implements Runnable {
 		else if (runMode == PamController.RUN_PAMVIEW) {
 			modeText = "Viewer";
 		}
+		String typeText = " " + PamguardVersionInfo.getReleaseType().toString();
+		if (PamguardVersionInfo.getReleaseType() == ReleaseType.CORE) {
+			typeText = "";
+		}
 		if (modeText != null) {
-			version = modeText + " " + PamguardVersionInfo.version + " " + PamguardVersionInfo.getReleaseType().toString();
+			version = modeText + " " + PamguardVersionInfo.version + typeText;
 		}
 		else {
-			version = "Version " + PamguardVersionInfo.version + " " + PamguardVersionInfo.getReleaseType().toString();
+			version = "Version " + PamguardVersionInfo.version + typeText;
 		}
 		
 		// get image graphics handle.
@@ -236,6 +242,7 @@ public class Splash extends JWindow implements Runnable {
 		}
 		
 		final Runnable closeSplashRunnable = new Runnable() {
+			@Override
 			public void run() {
 				try {
 					setVisible(false);
@@ -250,6 +257,7 @@ public class Splash extends JWindow implements Runnable {
 		final int pauseTimeout = displayDuration; // Cast to final
 
 		Runnable displayDurationRunnable = new Runnable() {
+			@Override
 			public void run() {
 				try {
 					Thread.sleep(pauseTimeout);

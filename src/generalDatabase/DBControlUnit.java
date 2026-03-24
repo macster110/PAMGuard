@@ -12,14 +12,9 @@ import java.util.List;
 
 import javax.swing.SwingWorker;
 
-import dataGram.DatagramManager;
-import dataMap.OfflineDataMapPoint;
-import generalDatabase.backup.DatabaseBackupStream;
-import pamScrollSystem.ViewLoadObserver;
-import pamViewFX.pamTask.PamTaskUpdate;
 import PamController.AWTScheduler;
+import PamController.DataIntegrityChecker;
 import PamController.DataOutputStore;
-import PamController.OfflineDataStore;
 import PamController.PamConfiguration;
 import PamController.PamControlledUnit;
 import PamController.PamController;
@@ -31,9 +26,13 @@ import PamController.status.ModuleStatus;
 import PamController.status.QuickRemedialAction;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamProcess;
-import PamguardMVC.RequestCancellationObject;
 import PamguardMVC.dataOffline.OfflineDataLoadInfo;
 import backupmanager.BackupInformation;
+import dataGram.DatagramManager;
+import dataMap.OfflineDataMapPoint;
+import generalDatabase.backup.DatabaseBackupStream;
+import pamScrollSystem.ViewLoadObserver;
+import pamViewFX.pamTask.PamTaskUpdate;
 
 /**
  * Version of DBControl for normal use while PAMGUARD is running 
@@ -50,6 +49,7 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 	private boolean initialisationComplete;
 	
 	private BackupInformation backupInformation;
+	private CreateDataMap createDataMap;
 
 	public DBControlUnit(String unitName) {
 		this(null, unitName);
@@ -112,19 +112,20 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 	public void notifyModelChanged(int changeType) {
 		super.notifyModelChanged(changeType);
 		switch (changeType) {
-		case PamController.INITIALIZATION_COMPLETE:
+		case PamControllerInterface.INITIALIZATION_COMPLETE:
 			initialisationComplete = true;
 			if (isViewer) {
 				createOfflineDataMap(null);
 			}
 			getDbProcess().checkTables();
+			getDbProcess().storeVersionInfo();
 			break;
-		case PamController.ADD_DATABLOCK:
+		case PamControllerInterface.ADD_DATABLOCK:
 			if (initialisationComplete) {
 				getDbProcess().checkTables();
 			}
 			break;
-		case PamController.ADD_CONTROLLEDUNIT:
+		case PamControllerInterface.ADD_CONTROLLEDUNIT:
 			if (initialisationComplete) {
 				PamController pc = PamController.getInstance();
 				int nUnit = pc.getNumControlledUnits();
@@ -188,8 +189,8 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 			pamDataBlocks.get(i).removeOfflineDataMap(THIS);
 			updateDataBlocks.add(pamDataBlocks.get(i));
 		}
-		
-		AWTScheduler.getInstance().scheduleTask(new CreateDataMap(updateDataBlocks));
+		createDataMap = new CreateDataMap(updateDataBlocks);
+		AWTScheduler.getInstance().scheduleTask(createDataMap);
 		
 	}
 	
@@ -258,6 +259,7 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 		 */
 		public CreateDataMap(ArrayList<PamDataBlock> loggingBlocks) {
 			super();
+			createDataMap = this;
 			this.loggingBlocks = loggingBlocks;
 		}
 
@@ -328,7 +330,7 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 				while (resultSet.next()) {
 					timestamp = resultSet.getObject(1);//  getTimestamp(1);
 					actualMillis = (Integer) resultSet.getObject(2);
-					utcMillis = sqlTypes.millisFromTimeStamp(timestamp);
+					utcMillis = SQLTypes.millisFromTimeStamp(timestamp);
 					if (utcMillis % 1000 == 0 && actualMillis != null && dataMapPoint != null) {
 						/*
 						 * dataMapPoint == null is indicate of it being the first map point in 
@@ -379,6 +381,7 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 			PamController.getInstance().notifyTaskProgress(new CreateMapInfo(PamTaskUpdate.STATUS_DONE));
 			PamController.getInstance().notifyModelChanged(PamControllerInterface.CHANGED_OFFLINE_DATASTORE);
 //			System.out.println("Create datamap point: DONE2"); 
+			createDataMap = null;
 		}
 
 		/* (non-Javadoc)
@@ -388,7 +391,7 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 		protected void process(List<CreateMapInfo> dataList) {
 			if (PamGUIManager.isSwing()) {
 				if (dbMapDialog == null) {
-					dbMapDialog = DBMapMakingDialog.showDialog(null);
+					dbMapDialog = DBMapMakingDialog.showDialog(PamController.getMainFrame());
 				}
 				for (int i = 0; i < dataList.size(); i++) {
 					dbMapDialog.newData(dataList.get(i));
@@ -406,6 +409,11 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 	@Override
 	public String getDataSourceName() {
 		return getUnitName();
+	}
+
+	@Override
+	public String getDataLocation() {
+		return getDatabaseName();
 	}
 
 	@Override
@@ -470,7 +478,7 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 		PamConnection con = getConnection();
 		ModuleStatus moduleStatus;
 		if (con == null) {
-			moduleStatus = new ModuleStatus(ModuleStatus.STATUS_ERROR, "No database connection");
+			moduleStatus = new ModuleStatus(ModuleStatus.STATUS_ERROR, "DBControlledUnit:getModuleStatus() No database connection");
 			moduleStatus.setRemedialAction(new QuickRemedialAction(this, "Fix database connection", new ActionListener() {
 				@Override
 				public void actionPerformed(ActionEvent e) {
@@ -508,5 +516,18 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 		return getDbProcess().deleteDataFrom(timeMillis);
 	}
 
+	@Override
+	public int getOfflineState() {
+		int state = super.getOfflineState();
+		if (createDataMap != null) {
+			state = Math.max(state, PamController.PAM_MAPMAKING);
+		}
+		return state;
+	}
+	@Override
+	public DataIntegrityChecker getInegrityChecker() {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
 }

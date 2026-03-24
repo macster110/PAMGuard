@@ -1,6 +1,5 @@
 package dbht;
 
-import dbht.offline.DbHtDatagramProvider;
 import Acquisition.AcquisitionProcess;
 import Filters.FIRArbitraryFilter;
 import Filters.Filter;
@@ -13,6 +12,7 @@ import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
 import PamguardMVC.PamProcess;
 import PamguardMVC.PamRawDataBlock;
+import dbht.offline.DbHtDatagramProvider;
 
 public class DbHtProcess extends PamProcess {
 	
@@ -91,7 +91,7 @@ public class DbHtProcess extends PamProcess {
 			return;
 		}
 		FIRArbitraryFilter faf = new FIRArbitraryFilter(sr, null);
-		faf.setResponse(params.getFilterFrequencies(sampleRate), params.getFilterGains(sr), 
+		faf.setResponse(params.getFilterFrequencies(getSampleRate()), params.getFilterGains(sr), 
 				params.filterLogOrder, params.chebyGamma);
 		int nTap = faf.calculateFilter();
 		if (nTap == 0) {
@@ -123,6 +123,7 @@ public class DbHtProcess extends PamProcess {
 	/**
 	 * @return the sourceDataBlock
 	 */
+	@Override
 	public PamRawDataBlock getRawSourceDataBlock() {
 		return rawSourceDataBlock;
 	}

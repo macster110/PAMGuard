@@ -21,6 +21,7 @@
 package IshmaelDetector;
 
 import java.awt.Frame;
+
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JCheckBox;
@@ -42,6 +43,7 @@ public class SgramCorrParamsDialog extends IshDetParamsDialog  {
 
 	private SgramCorrParamsDialog(Frame parentFrame, Class inputDataClass) {
 		super(parentFrame, "Spectrogram Correlation Parameters", inputDataClass);
+		setHelpPoint("detectors.ishmael.docs.ishmael_speccorrelation");
 	}
 
 	public static SgramCorrParams showDialog2(Frame parentFrame, SgramCorrParams oldParams) 

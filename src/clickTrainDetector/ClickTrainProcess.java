@@ -4,8 +4,8 @@ import PamController.PamController;
 import PamController.status.ProcessCheck;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
-import PamguardMVC.PamInstantProcess;
 import PamguardMVC.PamObservable;
+import PamguardMVC.PamProcess;
 import clickDetector.ClickDetection;
 import clickTrainDetector.layout.CTDataUnitGraphics;
 import clickTrainDetector.layout.UnconfirmedCTSymbolManager;
@@ -19,7 +19,7 @@ import pamScrollSystem.AbstractScrollManager;
  * @author Jamie Macaulay 
  *
  */
-public class ClickTrainProcess extends PamInstantProcess {
+public class ClickTrainProcess extends PamProcess {
 
 	/**
 	 * The source data block 
@@ -47,7 +47,7 @@ public class ClickTrainProcess extends PamInstantProcess {
 	private CTProcessCheck processCheck;
 
 	public ClickTrainProcess(ClickTrainControl pamControlledUnit) {
-		super(pamControlledUnit);
+		super(pamControlledUnit, null);
 		this.clickTrainControl=pamControlledUnit; 
 
 		this.processCheck=new CTProcessCheck(this);
@@ -91,7 +91,8 @@ public class ClickTrainProcess extends PamInstantProcess {
 		/*
 		 * Identify by long name since that is unique, otherwise doesn't work with multiple click detectors. 
 		 */
-		sourceDataBlock = PamController.getInstance().getDataBlockByLongName(getClickTrainParams().dataSourceName);
+		String dsName = getClickTrainParams().dataSourceName;
+		sourceDataBlock = clickTrainControl.getPamConfiguration().getDataBlockByLongName(dsName);
 		if (sourceDataBlock == null) {
 			// otherwise find any click detector. 
 			sourceDataBlock = PamController.getInstance().getDataBlock(ClickDetection.class, 0);
@@ -100,6 +101,9 @@ public class ClickTrainProcess extends PamInstantProcess {
 		if (sourceDataBlock==null) {
 			sourceDataBlock = PamController.getInstance().getDataBlock(CPODClick.class, 
 					getClickTrainParams().dataSourceName);
+		}
+		if (sourceDataBlock == null) {
+			System.out.println("Unable to find CTD source data block  " + getClickTrainParams().dataSourceName);
 		}
 		
 		//System.out.println("CPOD sample rate: " + sourceDataBlock.getSampleRate()); 

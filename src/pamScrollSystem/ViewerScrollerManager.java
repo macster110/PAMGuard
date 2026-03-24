@@ -17,13 +17,12 @@ import PamController.PamControllerInterface;
 import PamController.PamGUIManager;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
+import PamUtils.PamCalendar;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.dataOffline.OfflineDataLoadInfo;
 import PamguardMVC.superdet.SuperDetDataBlock;
-import clickDetector.offlineFuncs.OfflineEventDataBlock;
 import dataMap.DataMapControl;
 import dataMap.OfflineDataMap;
-import detectiongrouplocaliser.DetectionGroupDataBlock;
 import generalDatabase.SQLLogging;
 import generalDatabase.SuperDetLogging;
 import offlineProcessing.superdet.OfflineSuperDetFilter;
@@ -33,7 +32,7 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 
 	private boolean initialisationComplete;
 
-	private boolean intialiseLoadDone;
+	private volatile boolean intialiseLoadDone = false;
 
 	private StoredScrollerData oldScrollerData = new StoredScrollerData();
 
@@ -86,7 +85,7 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 			}
 			aScroller.anotherScrollerMovedOuter(newMin, newMax);
 		}
-		if (currentScrollInitialisation == false) {
+		if (!currentScrollInitialisation) {
 			loadData(false);
 		}
 	}
@@ -227,7 +226,7 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 	private void loadSubformData(ArrayList<DataLoadQueData> dataLoadQueue, DataLoader dataLoader) {
 		for (int i=0; i<dataLoadQueue.size(); i++) {
 			PamDataBlock dataBlock = dataLoadQueue.get(i).getPamDataBlock();
-			if (dataBlock instanceof SuperDetDataBlock  == false) {
+			if (!(dataBlock instanceof SuperDetDataBlock)) {
 				continue;
 			}
 //			System.out.println("Load subform data for datablock " + i + ": " + dataBlock.getLongDataName());
@@ -247,6 +246,8 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 		for (int i = 0; i < pamScrollers.size(); i++) {
 			pamScrollers.get(i).notifyRangeChange();
 		}
+		PamController.getInstance().notifyModelChanged(PamControllerInterface.DATA_LOAD_COMPLETE);
+		PamController.getInstance().notifyTaskProgress(new LoadQueueProgressData(PamTaskUpdate.STATUS_DONE));
 		PamController.getInstance().notifyModelChanged(PamControllerInterface.OFFLINE_DATA_LOADED);
 	}
 
@@ -391,7 +392,7 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 				 */
 				for (int i = 0; i < dataLoadQueue.size(); i++) {
 					DataLoadQueData queueItem = dataLoadQueue.get(i);
-					if (queueItem.isHasSubTable() == false) {
+					if (!queueItem.isHasSubTable()) {
 						continue;
 					}
 					OfflineDataMap priMap = dataLoadQueue.get(i).getPamDataBlock().getPrimaryDataMap();
@@ -429,7 +430,7 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 				 */
 				for (int i = 0; i < dataLoadQueue.size(); i++) {
 					DataLoadQueData queueItem = dataLoadQueue.get(i);
-					if (queueItem.isHasSubTable() == true) {
+					if (queueItem.isHasSubTable()) {
 						continue;
 					}
 					LoadQueueProgressData lpd = new LoadQueueProgressData(storeName, 
@@ -450,7 +451,6 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 					"Data Load Complete, updating displays", 
 					dataLoadQueue.size(), dataLoadQueue.size(), 0, 0, 0, 0, 0);
 			publish(lpd);
-			PamController.getInstance().notifyModelChanged(PamControllerInterface.DATA_LOAD_COMPLETE);
 			return null;
 		}
 		
@@ -469,7 +469,6 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 				}
 			}
 			loadDone();
-			PamController.getInstance().notifyTaskProgress(new LoadQueueProgressData(PamTaskUpdate.STATUS_DONE));
 
 		}
 
@@ -543,11 +542,16 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 			initialisationComplete = true;
 			break;
 		case PamControllerInterface.INITIALIZE_LOADDATA:
-			intialiseLoadDone = true;
 		case PamControllerInterface.CHANGED_OFFLINE_DATASTORE:
 		case PamControllerInterface.ADD_CONTROLLEDUNIT:
 		case PamControllerInterface.REMOVE_CONTROLLEDUNIT:
-			if (initialisationComplete && intialiseLoadDone) {
+			if (initialisationComplete && intialiseLoadDone == false) {
+				/*
+				 *  changed 20240114 so that this is only called once. Stops it 
+				 *  from resetting every time the datamap is updated e.g. if the 
+				 *  acquisition file map changes when user selects correct folder.  
+				 */
+				intialiseLoadDone = true; // move earlier to avoid risk of recursion. 
 				initialiseScrollers();
 			}
 			break;
@@ -626,19 +630,51 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 	public void centreDataAt(PamDataBlock dataBlock, long menuMouseTime) {
 		// centre all scroll bars as close to the above as is possible.
 		AbstractPamScroller aScroller;
-		long scrollRange, newMax, newMin;
 		for (int i = 0; i < pamScrollers.size(); i++) {
 			aScroller = pamScrollers.get(i);
-			scrollRange = aScroller.getMaximumMillis() - aScroller.getMinimumMillis();
-			newMin = checkMinimumTime(menuMouseTime - scrollRange / 2);
-			newMax = checkMaximumTime(newMin + scrollRange);
-			newMin = newMax-scrollRange;
-			newMin = checkGapPos(dataBlock, newMin, newMax);
-			newMax = newMin + scrollRange;
-			aScroller.setRangeMillis(newMin, newMax, false);
-			//			aScroller.setValueMillis(menuMouseTime - scrollRange/2);
+			centreScrollerAt(aScroller, dataBlock, menuMouseTime);
 		}
 		loadData(false);
+	}
+	
+	/**
+	 * Moves outer scroller to centre at given time. 
+	 * @param aScroller
+	 * @param dataBlock
+	 * @param menuMouseTime
+	 */
+	private void centreScrollerAt(AbstractPamScroller aScroller, PamDataBlock dataBlock, long menuMouseTime) {
+		long scrollRange, newMax, newMin;
+		scrollRange = aScroller.getMaximumMillis() - aScroller.getMinimumMillis();
+		newMin = checkMinimumTime(menuMouseTime - scrollRange / 2);
+		newMax = checkMaximumTime(newMin + scrollRange);
+		newMin = menuMouseTime - scrollRange/2;
+//		newMin = checkGapPos(dataBlock, newMin, newMax);
+		newMax = newMin + scrollRange;
+//		System.out.printf("Centering scoller at %s, range %s to %s\n", PamCalendar.formatDBDateTime(menuMouseTime),
+//				PamCalendar.formatDBDateTime(newMin), PamCalendar.formatDBDateTime(newMax));
+		aScroller.setRangeMillis(newMin, newMax, false);
+		aScroller.setValueMillis(menuMouseTime);
+	}
+	
+	@Override
+	public void scrollToTime(PamDataBlock dataBlock, long menuMouseTime) {
+		// centre all scroll bars as close to the above as is possible.
+		AbstractPamScroller aScroller;
+		boolean moved = false;
+		for (int i = 0; i < pamScrollers.size(); i++) {
+			aScroller = pamScrollers.get(i);
+			long scrollerMin = aScroller.getMinimumMillis();
+			long scrollerMax = aScroller.getMaximumMillis();
+			if (menuMouseTime < scrollerMin || menuMouseTime > scrollerMax) {
+				centreScrollerAt(aScroller, dataBlock, menuMouseTime);
+				moved = true;
+			}
+			aScroller.setValueMillis(menuMouseTime);
+		}
+		if (moved) {
+			loadData(false);
+		}
 	}
 
 	@Override
@@ -765,7 +801,7 @@ public class ViewerScrollerManager extends AbstractScrollManager implements PamS
 			 *  the next data.  
 			 */
 			if ((oldMinGap == OfflineDataMap.IN_GAP)) {
-				newStart = getNextDataStart(scroller, oldMin);
+				newStart = getNextDataStart(scroller, newMin);
 				if (newStart != Long.MAX_VALUE) {
 					return newStart;
 				}

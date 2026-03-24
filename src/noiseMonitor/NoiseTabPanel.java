@@ -34,13 +34,6 @@ import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 
-import noiseBandMonitor.NoiseBandSettings;
-import pamScrollSystem.AbstractPamScroller;
-import pamScrollSystem.AbstractPamScrollerAWT;
-import pamScrollSystem.PamScrollObserver;
-import pamScrollSystem.PamScroller;
-import pamScrollSystem.RangeSpinner;
-import pamScrollSystem.RangeSpinnerListener;
 import Layout.PamAxis;
 import Layout.PamAxisPanel;
 import PamController.PamControlledUnit;
@@ -48,6 +41,7 @@ import PamController.PamControlledUnitSettings;
 import PamController.PamController;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
+import PamController.soundMedium.GlobalMedium;
 import PamUtils.FrequencyFormat;
 import PamUtils.PamCalendar;
 import PamUtils.PamUtils;
@@ -55,11 +49,11 @@ import PamView.BasicKeyItem;
 import PamView.ColourArray;
 import PamView.LineKeyItem;
 import PamView.PamColors;
+import PamView.PamColors.PamColor;
 import PamView.PamKeyItem;
 import PamView.PamSymbol;
 import PamView.PamSymbolType;
 import PamView.PamTabPanel;
-import PamView.PamColors.PamColor;
 import PamView.dialog.PamCheckBox;
 import PamView.dialog.PamGridBagContraints;
 import PamView.dialog.PamLabel;
@@ -69,18 +63,21 @@ import PamView.panel.JPanelWithPamKey;
 import PamView.panel.KeyPanel;
 import PamView.panel.PamPanel;
 import PamguardMVC.PamConstants;
-import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
-import PamguardMVC.PamObserver;
 import PamguardMVC.PamObserverAdapter;
-import PamController.soundMedium.GlobalMedium;
+import pamScrollSystem.AbstractPamScroller;
+import pamScrollSystem.AbstractPamScrollerAWT;
+import pamScrollSystem.PamScrollObserver;
+import pamScrollSystem.PamScroller;
+import pamScrollSystem.RangeSpinner;
+import pamScrollSystem.RangeSpinnerListener;
 
 public class NoiseTabPanel implements PamTabPanel {
 
-//	private NoiseControl noiseControl;
+	//	private NoiseControl noiseControl;
 	private PamControlledUnit pamControlledUnit;
-	
+
 	private NoiseDisplaySettings noiseDisplaySettings = new NoiseDisplaySettings();
 
 	private JPanel mainPanel;
@@ -92,7 +89,7 @@ public class NoiseTabPanel implements PamTabPanel {
 	private PlotAxesPanel plotAxesPanel;
 
 	private PlotPanel plotPanel;
-	
+
 	private SpecPlotPanel specPlotPanel;
 
 	private DataSelectionPanel dataSelectionPanel;
@@ -119,7 +116,7 @@ public class NoiseTabPanel implements PamTabPanel {
 	private PamSymbolType[] symbolTypes = {PamSymbolType.SYMBOL_CIRCLE, PamSymbolType.SYMBOL_SQUARE, 
 			PamSymbolType.SYMBOL_TRIANGLEU, PamSymbolType.SYMBOL_TRIANGLED, PamSymbolType.SYMBOL_DIAMOND,
 			PamSymbolType.SYMBOL_STAR, PamSymbolType.SYMBOL_TRIANGLEU};
-	
+
 	private int[] symbolTypeLUT = new int[6];
 
 	public RangeSpinner rangeSpinner;
@@ -140,9 +137,9 @@ public class NoiseTabPanel implements PamTabPanel {
 	public NoiseTabPanel(PamControlledUnit pamControlledUnit, NoiseDataBlock noiseDataBlock) {
 		this.pamControlledUnit = pamControlledUnit;
 		this.noiseDataBlock = noiseDataBlock;
-		
+
 		PamSettingManager.getInstance().registerSettings(new DisplaySettingManager());
-		
+
 		mainPanel = new JPanel(new BorderLayout());
 		leftPanel = new PamPanel(PamColor.BORDER);
 		centerPanel = new PamPanel(PamColor.BORDER);
@@ -172,10 +169,10 @@ public class NoiseTabPanel implements PamTabPanel {
 		timeLabelPanel.add(BorderLayout.EAST, mouseTime = new PamLabel("  "));
 		centBotPanel.add(BorderLayout.NORTH, timeLabelPanel);
 
-//		if (!isViewer) {
-			centTopPanel.setLayout(new BorderLayout());
-			centTopPanel.add(BorderLayout.CENTER, specAxisPanel = new SpecPlotAxesPanel());
-//		}
+		//		if (!isViewer) {
+		centTopPanel.setLayout(new BorderLayout());
+		centTopPanel.add(BorderLayout.CENTER, specAxisPanel = new SpecPlotAxesPanel());
+		//		}
 
 		dataSelectionPanel = new DataSelectionPanel();
 		channelSelectionPanel = new ChannelSelectionPanel();
@@ -216,8 +213,8 @@ public class NoiseTabPanel implements PamTabPanel {
 		if (noiseDisplaySettings.selectedChannels == null) {
 			noiseDisplaySettings.selectedChannels = new boolean[PamConstants.MAX_CHANNELS];
 		}
-		
-//		int nChan = PamUtils.getNumChannels(noiseDataBlock.getChannelMap());
+
+		//		int nChan = PamUtils.getNumChannels(noiseDataBlock.getChannelMap());
 		int nChan = PamUtils.getNumChannels(noiseDataBlock.getSequenceMap());
 		for (int i = 0; i < nChan; i++) {
 			noiseDisplaySettings.selectedChannels[channelSelectionPanel.channelLUT[i]] = channelSelectionPanel.checkBoxes[i].isSelected();
@@ -234,7 +231,7 @@ public class NoiseTabPanel implements PamTabPanel {
 				noiseDisplaySettings.bandOption = i;
 			}
 		}
-		
+
 		int noiseStats = noiseDataBlock.getStatisticTypes();
 		int nStats = PamUtils.getNumChannels(noiseStats);
 		for (int i = 0; i < nStats; i++) {
@@ -250,7 +247,7 @@ public class NoiseTabPanel implements PamTabPanel {
 		if (dataSelectionPanel.checkBoxes == null) {
 			return;
 		}
-//		nChan = PamUtils.getHighestChannel(noiseDataBlock.getChannelMap());
+		//		nChan = PamUtils.getHighestChannel(noiseDataBlock.getChannelMap());
 		nChan = PamUtils.getHighestChannel(noiseDataBlock.getSequenceMap());
 		Color c1, c2;
 		channelColours = new Color[nChan+1][];
@@ -266,7 +263,7 @@ public class NoiseTabPanel implements PamTabPanel {
 				channelColours[i] = ColourArray.createMergedArray(nThings, c1, c2).getColours();
 			}
 		}
-		
+
 		int nBands = noiseDataBlock.getNumMeasurementBands();
 		bandCorrection = new double[nBands];
 		if (noiseDisplaySettings.bandOption == NoiseDisplaySettings.SPECTRUM_LEVEL) {
@@ -276,7 +273,7 @@ public class NoiseTabPanel implements PamTabPanel {
 				bandCorrection[i] = -10.*Math.log10(hiE[i]-loE[i]);
 			}
 		}
-		
+
 		setAxisLabels();
 
 		plotPanel.createKey();
@@ -286,7 +283,7 @@ public class NoiseTabPanel implements PamTabPanel {
 		plotPanel.repaint();
 	}
 
-private void setAxisLabels() {
+	private void setAxisLabels() {
 		// TODO Auto-generated method stub
 		String label;
 		if (noiseDisplaySettings.bandOption == NoiseDisplaySettings.BAND_ENERGY) {
@@ -300,19 +297,21 @@ private void setAxisLabels() {
 		specLevelAxis.setLabel(label);
 	}
 
-//	private NoiseSettings getCurrentNoiseSettings() {
-//		return noiseControl.noiseSettings;
-//	}
+	//	private NoiseSettings getCurrentNoiseSettings() {
+	//		return noiseControl.noiseSettings;
+	//	}
 
 	public void newSettings() {
-//		NoiseSettings ns = getCurrentNoiseSettings();
+		//		NoiseSettings ns = getCurrentNoiseSettings();
+		// clear existing data since it may not have the right number of bands. 
+		noiseDataBlock.clearAll();
 		channelSelectionPanel.createCheckBoxes();
 		statsSelectionPanel.setParams();
 		dataSelectionPanel.createCheckBoxes();
 		if (noiseDataBlock != null) {
 			noiseDataBlock.addObserver(noiseObserver);
 		}
-		if (noiseDisplaySettings.autoScale == false) {
+		if (!noiseDisplaySettings.autoScale) {
 			levelAxis.setMinVal(noiseDisplaySettings.levelMin);
 			levelAxis.setMaxVal(noiseDisplaySettings.levelMax);
 			if (specLevelAxis != null) {
@@ -351,9 +350,9 @@ private void setAxisLabels() {
 	}
 
 	private void setAutoScale() {
-		
+
 		autoFreqScale();
-		
+
 		double max = Double.MIN_VALUE;
 		double min = Double.MAX_VALUE;
 		if (noiseDataBlock == null) {
@@ -373,10 +372,10 @@ private void setAxisLabels() {
 				aUnit = noiseIterator.next();
 
 				noiseData = aUnit.getNoiseBandData();
-//				chan = PamUtils.getSingleChannel(aUnit.getChannelBitmap());
+				//				chan = PamUtils.getSingleChannel(aUnit.getChannelBitmap());
 				chan = PamUtils.getSingleChannel(aUnit.getSequenceBitmap());
-				if (noiseDisplaySettings.selectedChannels[chan] == false) {
-//					continue;
+				if (!noiseDisplaySettings.selectedChannels[chan]) {
+					//					continue;
 				}
 				nBands = noiseData.length;
 				if (nBands > 0) {
@@ -384,8 +383,8 @@ private void setAxisLabels() {
 				}
 				lastUnit = lastChanUnit[chan];
 				for (int i = 0; i < nMeasures; i++) {
-					if (noiseDisplaySettings.isSelectData(i) == false) {
-//						continue;
+					if (!noiseDisplaySettings.isSelectData(i)) {
+						//						continue;
 					}
 					for (int m = 0; m < nBands; m++) {
 						max = Math.max(max, noiseData[m][i]+bandCorrection[m]);
@@ -505,7 +504,7 @@ private void setAxisLabels() {
 			autoFreqScale();
 			setWestAxis(specLevelAxis);
 			setSouthAxis(freqAxis);
-			
+
 			setMinNorth(10);
 			setMinEast(10);
 			setMinSouth(10);
@@ -513,7 +512,7 @@ private void setAxisLabels() {
 			setAutoInsets(true);
 		}
 
-		
+
 	}
 
 	private class SpecPlotPanel extends JPanelWithPamKey {
@@ -521,7 +520,7 @@ private void setAxisLabels() {
 		private SpecPlotAxesPanel specPlotAxesPanel;
 		private NoiseDataUnit[] latestNoise = new NoiseDataUnit[PamConstants.MAX_CHANNELS];
 		PamSymbol symbol = new PamSymbol(PamSymbolType.SYMBOL_CIRCLE, 10, 10, true, Color.RED, Color.RED);
-		 
+
 		public SpecPlotPanel(SpecPlotAxesPanel specPlotAxesPanel) {
 			this.specPlotAxesPanel = specPlotAxesPanel;
 			setBorder(BorderFactory.createBevelBorder(1));
@@ -531,7 +530,7 @@ private void setAxisLabels() {
 		}
 
 		public void repaint(NoiseDataUnit noiseData) {
-//			int chan = PamUtils.getSingleChannel(noiseData.getChannelBitmap());
+			//			int chan = PamUtils.getSingleChannel(noiseData.getChannelBitmap());
 			int chan = PamUtils.getSingleChannel(noiseData.getSequenceBitmap());
 			latestNoise[chan] = noiseData;
 			repaint();
@@ -550,14 +549,14 @@ private void setAxisLabels() {
 			if (noiseDataBlock == null) {
 				return;
 			}
-//			sortScales();
+			//			sortScales();
 			NoiseDataUnit aUnit;
 			double[][] noiseData;
 			int chan;
 			int nBands = noiseDataBlock.getNumMeasurementBands();
 			int x1, x2, x0, y[];
 			y = new int[NoiseDataBlock.NNOISETYPES];
-//			int hChan = PamUtils.getHighestChannel(noiseDataBlock.getChannelMap());
+			//			int hChan = PamUtils.getHighestChannel(noiseDataBlock.getChannelMap());
 			int hChan = PamUtils.getHighestChannel(noiseDataBlock.getSequenceMap());
 			int topWidth;
 			double[] loEdges = noiseDataBlock.getBandLoEdges();
@@ -565,13 +564,13 @@ private void setAxisLabels() {
 			int nStats = noiseDataBlock.getNumUsedStats();
 			if (noiseDisplaySettings.selectedChannels == null) {
 				return;
-			};
+			}
 			for (int iChan = 0; iChan <= hChan; iChan++) {
-//				if (((1<<iChan) & noiseDataBlock.getChannelMap()) == 0) {
+				//				if (((1<<iChan) & noiseDataBlock.getChannelMap()) == 0) {
 				if (((1<<iChan) & noiseDataBlock.getSequenceMap()) == 0) {
 					continue;
 				}
-				if (noiseDisplaySettings.selectedChannels[iChan] == false) {
+				if (!noiseDisplaySettings.selectedChannels[iChan]) {
 					continue;
 				}
 				aUnit = latestNoise[iChan];
@@ -681,7 +680,7 @@ private void setAxisLabels() {
 	}
 
 	private void setSymbol(PamSymbol symbol, int chan, int iMeasure, int iStat) {
-		
+
 		try{
 			symbol.setSymbol(symbolTypes[symbolTypeLUT[iStat]]);
 			symbol.setLineColor(channelColours[chan][iMeasure]);
@@ -723,7 +722,7 @@ private void setAxisLabels() {
 			 * Only need to do the symbols once for all four measurement type
 			 * USe the colour of the first entry for this. 
 			 */
-			if (noiseDisplaySettings.selectedStats == 0 || noiseDisplaySettings.showKey == false) { 
+			if (noiseDisplaySettings.selectedStats == 0 || !noiseDisplaySettings.showKey) { 
 				setKeyPanel(null);
 				return;
 			}
@@ -742,7 +741,7 @@ private void setAxisLabels() {
 					keyPanel.add(keyItem);
 				}
 			}
-//			int nChan = PamUtils.getNumChannels(noiseDataBlock.getChannelMap());
+			//			int nChan = PamUtils.getNumChannels(noiseDataBlock.getChannelMap());
 			int nChan = PamUtils.getNumChannels(noiseDataBlock.getSequenceMap());
 			int chanNum;
 			int nThings = dataSelectionPanel.checkBoxes.length;
@@ -750,15 +749,15 @@ private void setAxisLabels() {
 			String txt;
 			for (int iChan = 0; iChan < nChan; iChan++) {
 				chanNum = channelIndexToNumber(iChan);
-				if (noiseDisplaySettings.selectedChannels[chanNum] == false) {
+				if (!noiseDisplaySettings.selectedChannels[chanNum]) {
 					continue;
 				}
 				for (int iM = 0; iM < nThings; iM++) {
-					if (noiseDisplaySettings.isSelectData(iM) == false) {
+					if (!noiseDisplaySettings.isSelectData(iM)) {
 						continue;
 					}
-//					txt = String.format("Ch %d %s", channelSelectionPanel.channelLUT[iChan],
-//							ns.getMeasurementBand(iM).getLongName());
+					//					txt = String.format("Ch %d %s", channelSelectionPanel.channelLUT[iChan],
+					//							ns.getMeasurementBand(iM).getLongName());
 					txt = String.format("Ch %d %s", channelSelectionPanel.channelLUT[iChan],
 							noiseDataBlock.getBandLongName(iM));
 					keyItem = new LineKeyItem(channelColours[iChan][iM], txt);
@@ -774,7 +773,7 @@ private void setAxisLabels() {
 		@Override
 		public void paintComponent(Graphics g) {
 			super.paintComponent(g);
-//			long t1 = System.nanoTime();
+			//			long t1 = System.nanoTime();
 			if (noiseDisplaySettings.showGrid) {
 				levelAxis.drawGrid(g, getSize(), getInsets(), 0);
 				timeAxis.drawGrid(g, getSize(), getInsets(), 0);
@@ -789,54 +788,66 @@ private void setAxisLabels() {
 			double[][] noiseData, lastNoisedata = null;
 			int chan;
 			int nMeasures = noiseDataBlock.getNumMeasurementBands();
-			int x1, x2=0, y1, y2;
+			int x1, x2=0, y1=0, y2;
 			int xWin = getWidth() / 10;
-			synchronized (noiseDataBlock.getSynchLock()) {
-				noiseIterator = noiseDataBlock.getListIterator(0);
-				int nStats = noiseDataBlock.getNumUsedStats();
-				while (noiseIterator.hasNext()) {
-					aUnit = noiseIterator.next();
-					noiseData = aUnit.getNoiseBandData();
-//					chan = PamUtils.getSingleChannel(aUnit.getChannelBitmap());
-					chan = PamUtils.getSingleChannel(aUnit.getSequenceBitmap());
-					if (noiseDisplaySettings.selectedChannels[chan] == false) {
-						continue;
-					}
-					lastUnit = lastChanUnit[chan];
-					x1 = timeToXPix(aUnit.getTimeMilliseconds());
-					if (x1 < -xWin) {
-						continue;
-					}
-					if (lastUnit != null) {
-						x2 = timeToXPix(lastUnit.getTimeMilliseconds());
-						lastNoisedata = lastUnit.getNoiseBandData();
-					}
-					nMeasures = noiseData.length;
-					for (int i = 0; i < nMeasures; i++) {
-						if (noiseDisplaySettings.isSelectData(i) == false) {
+			try {
+				synchronized (noiseDataBlock.getSynchLock()) {
+					noiseIterator = noiseDataBlock.getListIterator(0);
+					int nStats = noiseDataBlock.getNumUsedStats();
+					while (noiseIterator.hasNext()) {
+						aUnit = noiseIterator.next();
+						noiseData = aUnit.getNoiseBandData();
+						//					chan = PamUtils.getSingleChannel(aUnit.getChannelBitmap());
+						chan = PamUtils.getSingleChannel(aUnit.getSequenceBitmap());
+						if (!noiseDisplaySettings.selectedChannels[chan]) {
 							continue;
 						}
-						for (int m = 0; m < nStats; m++) {
-							if ((noiseDisplaySettings.selectedStats & noiseDataBlock.statIndexToBit(m)) == 0) {
+						lastUnit = lastChanUnit[chan];
+						x1 = timeToXPix(aUnit.getTimeMilliseconds());
+						if (x1 < -xWin) {
+							continue;
+						}
+						if (lastUnit != null) {
+							x2 = timeToXPix(lastUnit.getTimeMilliseconds());
+							lastNoisedata = lastUnit.getNoiseBandData();
+						}
+						nMeasures = noiseData.length;
+
+						for (int i = 0; i < nMeasures; i++) {
+							if (!noiseDisplaySettings.isSelectData(i)) {
 								continue;
 							}
-							y1 = dBToYPix(noiseData[i][m]+bandCorrection[i]);
-							setSymbol(symbol, chan, i, m);
-							symbol.draw(g, new Point(x1, y1));
-							if (lastNoisedata != null && lastNoisedata.length > i) {
-								y2 = dBToYPix(lastNoisedata[i][m]+bandCorrection[i]);
-								g.drawLine(x1, y1, x2, y2);
+							nStats = noiseData[i].length;
+							for (int m = 0; m < nStats; m++) {
+								if ((noiseDisplaySettings.selectedStats & noiseDataBlock.statIndexToBit(m)) == 0) {
+									continue;
+								}
+//								try {
+									y1 = dBToYPix(noiseData[i][m]+bandCorrection[i]);
+//								}
+//								catch (Exception e) {
+//									e.printStackTrace();
+//								}
+								setSymbol(symbol, chan, i, m);
+								symbol.draw(g, new Point(x1, y1));
+								if (lastNoisedata != null && lastNoisedata.length > i) {
+									y2 = dBToYPix(lastNoisedata[i][m]+bandCorrection[i]);
+									g.drawLine(x1, y1, x2, y2);
+								}
 							}
 						}
+						if (x1 > getWidth()) {
+							break;
+						}
+						lastChanUnit[chan] = aUnit;
 					}
-					if (x1 > getWidth()) {
-						break;
-					}
-					lastChanUnit[chan] = aUnit;
 				}
 			}
-//			long t2 = System.nanoTime();
-//			System.out.println(String.format("Noise draw took %3.1f ms", (double)(t2-t1) / 1000000.));
+			catch (Exception e) {
+				// drawing exception can occurr when bands have been changed. Ignore it. 
+			}
+			//			long t2 = System.nanoTime();
+			//			System.out.println(String.format("Noise draw took %3.1f ms", (double)(t2-t1) / 1000000.));
 		}
 
 		PamSymbol symbol = new PamSymbol(PamSymbolType.SYMBOL_CIRCLE, 10, 10, true, Color.RED, Color.RED);
@@ -860,13 +871,13 @@ private void setAxisLabels() {
 	}
 
 	private class SpecMouse extends MouseAdapter {
-	
+
 
 		@Override
 		public void mouseExited(MouseEvent e) {
 			sayMouseData(null, null);
 		}
-	
+
 		/* (non-Javadoc)
 		 * @see java.awt.event.MouseAdapter#mouseMoved(java.awt.event.MouseEvent)
 		 */
@@ -874,7 +885,7 @@ private void setAxisLabels() {
 		public void mouseMoved(MouseEvent e) {
 			saySpecMouseData(e.getX(), e.getY());
 		}
-		
+
 	}
 
 	private class PlotMouse extends MouseAdapter {
@@ -956,7 +967,7 @@ private void setAxisLabels() {
 				bandBoxes[i].addActionListener(bandChanged);
 				c.gridy++;
 			}
-			
+
 		}
 
 		void setParams() {
@@ -974,12 +985,12 @@ private void setAxisLabels() {
 			for (int i = 0; i < 2; i++) {
 				bandBoxes[i].setSelected(noiseDisplaySettings.bandOption == i);
 			}
-//			if (noiseDisplaySettings.selectedStats != null && noiseDisplaySettings.selectedStats.length == 4) {
-//				mean.setSelected(noiseDisplaySettings.selectedStats[0]);
-//				median.setSelected(noiseDisplaySettings.selectedStats[1]);
-//				lo95.setSelected(noiseDisplaySettings.selectedStats[2]);
-//				hi95.setSelected(noiseDisplaySettings.selectedStats[3]);
-//			}
+			//			if (noiseDisplaySettings.selectedStats != null && noiseDisplaySettings.selectedStats.length == 4) {
+			//				mean.setSelected(noiseDisplaySettings.selectedStats[0]);
+			//				median.setSelected(noiseDisplaySettings.selectedStats[1]);
+			//				lo95.setSelected(noiseDisplaySettings.selectedStats[2]);
+			//				hi95.setSelected(noiseDisplaySettings.selectedStats[3]);
+			//			}
 		}
 	}
 
@@ -993,7 +1004,7 @@ private void setAxisLabels() {
 		}
 
 		public void createCheckBoxes() {
-//			int channelMap = noiseDataBlock.getChannelMap();
+			//			int channelMap = noiseDataBlock.getChannelMap();
 			int channelMap = noiseDataBlock.getSequenceMap();
 			int n = PamUtils.getNumChannels(channelMap);
 			int iChan;
@@ -1059,8 +1070,15 @@ private void setAxisLabels() {
 			NoiseMeasurementBand mb;
 			checkBoxes = new JCheckBox[nBands];
 			for (int i = 0; i < nBands; i++) {
-				buttonPanel.add(checkBoxes[i] = new PamCheckBox(noiseDataBlock.getBandLongName(i)));
+				String name = noiseDataBlock.getBandLongName(i);
+				buttonPanel.add(checkBoxes[i] = new PamCheckBox(name));
 				checkBoxes[i].addActionListener(selectionChanged);
+				Double fc = noiseDataBlock.getBandCentreFrequency(i);
+				if (fc != null) {
+					String tip = String.format("Centre frequency %s, range %s", 
+							FrequencyFormat.formatFrequency(fc, true), name);
+					checkBoxes[i].setToolTipText(tip);
+				}
 			}
 			for (int i = 0; i < checkBoxes.length; i++) {
 				checkBoxes[i].setSelected(noiseDisplaySettings.isSelectData(i));
@@ -1168,19 +1186,19 @@ private void setAxisLabels() {
 		}
 		NoiseDataUnit du;
 		// may be multiple channels to find !
-//		int nChan = PamUtils.getNumChannels(noiseDataBlock.getChannelMap());
+		//		int nChan = PamUtils.getNumChannels(noiseDataBlock.getChannelMap());
 		int nChan = PamUtils.getNumChannels(noiseDataBlock.getSequenceMap());
 		int aChan;
 		for (int i = 0; i < nChan; i++) {
-//			aChan = PamUtils.getNthChannel(i, noiseDataBlock.getChannelMap());
+			//			aChan = PamUtils.getNthChannel(i, noiseDataBlock.getChannelMap());
 			aChan = PamUtils.getNthChannel(i, noiseDataBlock.getSequenceMap());
 			du = noiseDataBlock.getClosestUnitMillis(t, 1<<aChan);
 			if (du != null) {
 				specPlotPanel.repaint(du);
 			}
 		}
-		
-		
+
+
 	}
 
 	private JPopupMenu mouseMenu;
@@ -1195,7 +1213,7 @@ private void setAxisLabels() {
 		}
 		mouseMenu.show(e.getComponent(), e.getX(), e.getY());
 	}
-	
+
 	class DisplayOptions implements ActionListener {
 
 		private Frame frame;
@@ -1250,7 +1268,7 @@ private void setAxisLabels() {
 			noiseDisplaySettings = ((NoiseDisplaySettings) pamControlledUnitSettings.getSettings()).clone();
 			return noiseDisplaySettings != null;
 		}
-		
+
 	}
 
 }

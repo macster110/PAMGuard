@@ -26,23 +26,17 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.ListIterator;
 
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
-import rocca.RoccaControl;
-import soundPlayback.PlaybackControl;
-import targetMotionOld.TargetMotionLocaliser;
-
-
-import binaryFileStorage.BinaryStore;
 import Filters.FilterDialog;
 import Filters.FilterParams;
+import Localiser.LocalisationAlgorithm;
+import Localiser.LocalisationAlgorithmInfo;
 import Localiser.detectionGroupLocaliser.GroupDetection;
 import PamController.PamConfiguration;
 import PamController.PamControlledUnit;
@@ -67,6 +61,7 @@ import PamguardMVC.PamRawDataBlock;
 import PamguardMVC.debug.Debug;
 import alarm.AlarmCounterProvider;
 import angleVetoes.AngleVetoes;
+import binaryFileStorage.BinaryStore;
 import clickDetector.ClickClassifiers.ClickClassifierManager;
 import clickDetector.ClickClassifiers.ClickClassifyDialog;
 import clickDetector.ClickClassifiers.ClickIdentifier;
@@ -98,7 +93,10 @@ import dataPlotsFX.data.TDDataProviderRegisterFX;
 import detectionPlotFX.data.DDPlotRegister;
 import detectionPlotFX.rawDDPlot.ClickDDPlotProvider;
 import fftManager.fftorganiser.FFTDataOrganiser;
-import offlineProcessing.OfflineTaskGroup;
+import rocca.RoccaControl;
+import soundPlayback.PlaybackControl;
+import targetMotionOld.TargetMotionLocaliser;
+import tethys.localization.LocalizationCreator;
 
 /**
  * Main Controller for click detection.
@@ -111,7 +109,7 @@ import offlineProcessing.OfflineTaskGroup;
  * 
  */
 
-public class ClickControl extends PamControlledUnit implements PamSettings {
+public class ClickControl extends PamControlledUnit implements PamSettings, LocalisationAlgorithm {
 
 	protected ClickDetector clickDetector;
 
@@ -229,6 +227,8 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		sortDataBlockPrefix();
 
 		viewerMode = PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW;
+		
+		boolean secondConfig = pamConfiguration != PamController.getInstance().getPamConfiguration();
 		//
 		//		if (inputControl.getPamProcess(0).getOutputDataBlock(0).getDataType() == DataType.RAW) {
 		//			rawDataBlock = (PamRawDataBlock) inputControl.getPamProcess(0).getOutputDataBlock(0);
@@ -249,7 +249,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 
 		addPamProcess(clickDetector = new ClickDetector(this));
 
-		if (PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW) {
+		if (isViewer || secondConfig) {
 			clicksOffline = new ClicksOffline(this);
 			//			offlineToolbar.addButtons(getClicksOffline().getCommandButtons());
 		}
@@ -293,7 +293,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		}
 
 		//viewer mode controls. 
-		if (viewerMode) {
+		if (viewerMode || secondConfig) {
 			targetMotionLocaliser = new TargetMotionLocaliser(this, 
 					clickDetector.getOfflineEventDataBlock(), clickDetector.getClickDataBlock());
 			clickDetector.setTargetMotionLocaliser(targetMotionLocaliser);
@@ -301,10 +301,12 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 			// check if a Rocca module is loaded.
 			roccaControl = (RoccaControl) PamController.getInstance().findControlledUnit(RoccaControl.unitType);
 
+			clicksOffline.getOfflineTaskGroup();
+			clicksOffline.getEventTaskGroup();
+
 		}
-		else {
-			ClicksOffline.getOfflineTaskGroup(this);
-		}
+//		else {
+//		}
 
 		if (PamGUIManager.isSwing()) {
 
@@ -498,6 +500,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 			pf = parentFrame;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			ClickParameters newParameters = ClickParamsDialog.showDialog(pf, clickControl, clickParameters);
 			if (newParameters != null) {
@@ -518,6 +521,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 			pf = parentFrame;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			ClickLocParams newLocParameters = ClickLocalisationDialog.showDialog(clickControl, pf, 
 					clickControl.clickTrainDetector.getDetectionGroupLocaliser());
@@ -612,6 +616,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		public MenuPreFilter(Frame parentFrame) {
 			pf = parentFrame;
 		}
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			FilterParams newParams = FilterDialog.showDialog(pf,
 					clickParameters.preFilter, getClickDetector()
@@ -630,6 +635,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		public MenuTriggerFilter(Frame parentFrame) {
 			pf = parentFrame;
 		}
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			FilterParams newParams = FilterDialog.showDialog(pf,
 					clickParameters.triggerFilter, getClickDetector()
@@ -648,6 +654,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		public MenuClickTrainId(Frame parentFrame) {
 			pf = parentFrame;
 		}
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			ClickTrainIdParams newParams;
 			if ((newParams = ClickTrainIdDialog.showDialog(pf, clickTrainDetector.getClickTrainIdParameters())) != null) {
@@ -664,6 +671,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		public MenuClickClassification(Frame parentFrame) {
 			pf = parentFrame;
 		}
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			classificationDialog(pf);
 		}
@@ -700,6 +708,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		public MenuStorageOptions(Frame parentFrame) {
 			pf = parentFrame;
 		}
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			ClickParameters newParams;
 			if ((newParams = ClickStorageOptionsDialog.showDialog(pf, clickParameters)) != null) {
@@ -716,6 +725,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		public MenuAlarm(Frame parentFrame) {
 			pf = parentFrame;
 		}
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			ClickParameters newParams;
 			if ((newParams = ClickAlarmDialog.showDialog(pf, clickParameters))
@@ -741,6 +751,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 			this.parentFrame = parentFrame;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			batchConvertClicks(parentFrame);
 		}
@@ -753,6 +764,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 			this.parentFrame = parentFrame;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 			batchConvertClickDatabase(parentFrame);
 		}
@@ -844,14 +856,17 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		return super.canClose();
 	}
 
+	@Override
 	public long getSettingsVersion() {
 		return ClickParameters.serialVersionUID;
 	}
 
+	@Override
 	public Serializable getSettingsReference() {
 		return clickParameters;
 	}
 
+	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 		this.clickParameters = ((ClickParameters) pamControlledUnitSettings.getSettings()).clone();
 		if (clickParameters.createRCFile) {
@@ -868,7 +883,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		return true;
 	}
 
-	JMenuBar clickTabMenu = null;
+	JMenuBar tabMenu = null;
 
 	private ClickFFTOrganiser clickFFTDataOrganiser;
 
@@ -878,26 +893,46 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 	@Override
 	public JMenuBar getTabSpecificMenuBar(Frame parentFrame, JMenuBar standardMenu, PamGui pamGui) {
 		JMenu aMenu;
-		// start bymaking a completely new copy.
+		// start by making a completely new copy.
 		//		if (clickTabMenu == null) {
-		clickTabMenu = standardMenu;
-		for (int i = 0; i < clickTabMenu.getMenuCount(); i++) {
-			if (clickTabMenu.getMenu(i).getText().equals("Display")) {
+		tabMenu = standardMenu;
+		for (int i = 0; i < tabMenu.getMenuCount(); i++) {
+			if (tabMenu.getMenu(i).getText().equals("Display")) {
 				//clickTabMenu.remove(clickTabMenu.getMenu(i));
 
 				aMenu = createDetectionMenu(parentFrame);
-				aMenu.setText("Click Detection");
-				clickTabMenu.add(aMenu, i+1);
+				String txt = aMenu.getText();
+				txt = checkMenuTit(txt, "settings");
+				aMenu.setText(txt);
+				tabMenu.add(aMenu, i+1);
 
 				aMenu = tabPanelControl.createMenu(parentFrame);
-				aMenu.setText("Click Display");
-				clickTabMenu.add(aMenu, i+2);
+//				aMenu.setText("Click Display");
+				txt = aMenu.getText();
+				txt = checkMenuTit(txt, "display");
+				aMenu.setText(txt);
+				tabMenu.add(aMenu, i+2);
 
 				break;
 			}
 		}
 		//		}
-		return clickTabMenu;
+		return tabMenu;
+	}
+
+	/**
+	 * fiddle a bit with the meny name for the display menu. 
+	 * @param fullTxt
+	 * @return
+	 */
+	private String checkMenuTit(String fullTxt, String append) {
+		int dInd = fullTxt.toLowerCase().indexOf("detector");
+		if (dInd > 0) {
+			fullTxt = fullTxt.substring(0, dInd);
+		}
+		fullTxt = fullTxt.trim();
+		fullTxt += " " + append;
+		return fullTxt;
 	}
 
 	@Override
@@ -1071,7 +1106,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 				subDet.removeSuperDetection(event);
 			}
 		}
-		clickDetector.getOfflineEventDataBlock().remove(event);
+		clickDetector.getOfflineEventDataBlock().remove(event, true);
 	}
 
 	@Override
@@ -1168,6 +1203,31 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 		return targetMotionLocaliser;
 	}
 
+	/**
+	 * Remove clicks from existing events, if they have any. They may not. 
+	 * This is called whenever clicks are assigned to a new event to make 
+	 * sure that they don't end up in two events. 
+	 * @param markedClicks
+	 */
+	public void removeFromEvents(List<PamDataUnit> markedClicks) {
+		if (markedClicks == null) {
+			return;
+		}
+		for (PamDataUnit dataUnit : markedClicks) {
+			OfflineEventDataUnit anEvent = (OfflineEventDataUnit) dataUnit.getSuperDetection(OfflineEventDataUnit.class);
+			if (anEvent == null) {
+				continue;
+			}
+			anEvent.removeSubDetection(dataUnit);
+			if (anEvent.getSubDetectionsCount() == 0) {
+				deleteEvent(anEvent);
+			}
+			else  {
+				anEvent.updateDataUnit(System.currentTimeMillis());
+			}
+		}
+		
+	}
 
 	/**
 	 * Reassign all the clicks on one event to a different event 
@@ -1199,7 +1259,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 			}
 			clickEvent.setComment(clickEvent.getComment() + " Clicks reassigned to event " + reassignEvent.getEventId());
 			offlineEventDataBlock.updatePamData(clickEvent, PamCalendar.getTimeInMillis());
-			offlineEventDataBlock.remove(clickEvent);
+			offlineEventDataBlock.remove(clickEvent, true);
 			reassignEvent.sortSubDetections();
 			offlineEventDataBlock.updatePamData(reassignEvent, now);
 			if (ClickTrainDetection.class.isAssignableFrom(reassignEvent.getClass())) {
@@ -1236,6 +1296,7 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 	 * @param flag. The GUI type flag defined in PAMGuiManager. 
 	 * @return the GUI for the PamControlledUnit unit. 
 	 */
+	@Override
 	public PamControlledUnitGUI getGUI(int flag) {
 		if (flag==PamGUIManager.FX) {
 			if (clickGUIFX ==null) {
@@ -1265,6 +1326,17 @@ public class ClickControl extends PamControlledUnit implements PamSettings {
 			clickFFTDataOrganiser = new ClickFFTOrganiser(this);
 		}
 		return clickFFTDataOrganiser;
+	}
+
+	@Override
+	public LocalisationAlgorithmInfo getAlgorithmInfo() {
+		return clickDetector.getLocaliserInfo();
+	}
+
+	@Override
+	public LocalizationCreator getTethysCreator() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 

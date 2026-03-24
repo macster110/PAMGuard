@@ -9,7 +9,7 @@ import generalDatabase.SuperDetLogging;
 
 /**
  * Logs the the children of the click train detection. 
- * @author macst
+ * @author Jamie Macaulay
  *
  */
 public class ClickTrainDetSubLogging extends SQLLogging {
@@ -20,7 +20,6 @@ public class ClickTrainDetSubLogging extends SQLLogging {
 		super(pamDataBlock);		
 		this.clickTrainLogging = clickTrainLogging;
 		setTableDefinition(new PamSubtableDefinition(clickTrainLogging.getClickTrainControl().getUnitName()+"_Children"));
-
 	}
 
 	@Override

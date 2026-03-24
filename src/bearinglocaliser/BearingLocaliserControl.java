@@ -1,6 +1,7 @@
 package bearinglocaliser;
 
 import java.awt.Frame;
+import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.Serializable;
@@ -10,14 +11,20 @@ import java.util.List;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
+import Localiser.LocalisationAlgorithm;
+import Localiser.LocalisationAlgorithmInfo;
+import PamController.PamConfiguration;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
+import PamController.PamControllerInterface;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
+import PamDetection.LocContents;
 import PamUtils.SimpleObservable;
+import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
-import beamformer.algorithms.BeamAlgorithmProvider;
+import bearinglocaliser.algorithms.BearingAlgorithm;
 import bearinglocaliser.algorithms.BearingAlgorithmProvider;
 import bearinglocaliser.annotation.BearingAnnotationType;
 import bearinglocaliser.beamformer.BeamFormBearingWrapper;
@@ -28,9 +35,12 @@ import bearinglocaliser.toad.TOADBearingProvider;
 import offlineProcessing.OLProcessDialog;
 import offlineProcessing.OfflineTaskGroup;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX2AWT;
+import tethys.localization.LocalizationBuilder;
+import tethys.localization.LocalizationCreator;
+import tethys.swing.export.LocalizationOptionsPanel;
 import userDisplay.UserDisplayControl;
 
-public class BearingLocaliserControl extends PamControlledUnit implements PamSettings {
+public class BearingLocaliserControl extends PamControlledUnit implements PamSettings, LocalisationAlgorithm, LocalisationAlgorithmInfo {
 	
 	public static final String unitType = "Bearing Calculator";
 	
@@ -49,8 +59,12 @@ public class BearingLocaliserControl extends PamControlledUnit implements PamSet
 	private SimpleObservable<PamDataUnit> configObservable = new SimpleObservable<>(); 
 	
 	private OLProcessDialog olProcessDialog;
+
+	private OfflineTaskGroup bearingTaskGroup;
+
+	private BLOfflineTask bearingOfflineTask;
 	
-	public BearingLocaliserControl(String unitName) {
+	public BearingLocaliserControl(PamConfiguration pamConfiguration, String unitName) {
 		super(unitType, unitName);
 
 		detectionMonitor = new DetectionMonitor(this);
@@ -67,6 +81,11 @@ public class BearingLocaliserControl extends PamControlledUnit implements PamSet
 		UserDisplayControl.addUserDisplayProvider(bearingDisplayProvider);
 		
 		PamSettingManager.getInstance().registerSettings(this);
+
+		boolean secondConfig = pamConfiguration != PamController.getInstance().getPamConfiguration();
+		if (isViewer() || secondConfig) {
+			getOfflineTasks();
+		}
 		
 	}
 
@@ -91,7 +110,7 @@ public class BearingLocaliserControl extends PamControlledUnit implements PamSet
 				showDetectionMenu(parentFrame);
 			}
 		});
-		if (isViewer() == false) {
+		if (!isViewer()) {
 			return menuItem;
 		}
 		JMenu menu = new JMenu(getUnitName());
@@ -107,13 +126,21 @@ public class BearingLocaliserControl extends PamControlledUnit implements PamSet
 		return menu;
 	}
 	
+	/**
+	 * Create single instance of offline tasks so that it can be created in 
+	 * constructor and get's registered for offline batch processing. 
+	 * @return
+	 */
+	private OfflineTaskGroup getOfflineTasks() {
+		bearingTaskGroup = new OfflineTaskGroup(this, this.getUnitName());
+		bearingTaskGroup.addTask(bearingOfflineTask = new BLOfflineTask(this));
+		return bearingTaskGroup;
+	}
+	
 	protected void showOfflineDialog(Frame parentFrame) {
-//		if (olProcessDialog == null) {
-			OfflineTaskGroup otg = new OfflineTaskGroup(this, this.getUnitName());
-			otg.addTask(new BLOfflineTask(this));
-			otg.setPrimaryDataBlock(detectionMonitor.getParentDataBlock());
-			olProcessDialog = new OLProcessDialog(parentFrame, otg, getUnitName());
-//		}
+		OfflineTaskGroup otg = getOfflineTasks();
+		bearingTaskGroup.setPrimaryDataBlock(detectionMonitor.getParentDataBlock());
+		olProcessDialog = new OLProcessDialog(parentFrame, otg, getUnitName());
 		olProcessDialog.setVisible(true);		
 	}
 
@@ -123,7 +150,7 @@ public class BearingLocaliserControl extends PamControlledUnit implements PamSet
 	@Override
 	public void notifyModelChanged(int changeType) {
 		switch(changeType) {
-		case PamController.INITIALIZATION_COMPLETE:
+		case PamControllerInterface.INITIALIZATION_COMPLETE:
 			detectionMonitor.prepareProcess();
 			bearingProcess.prepareBearingGroups();
 			break;
@@ -227,5 +254,68 @@ public class BearingLocaliserControl extends PamControlledUnit implements PamSet
 
 	public String getHelpPoint() {
 		return helpPoint;
+	}
+
+	@Override
+	public LocalisationAlgorithmInfo getAlgorithmInfo() {
+		return this;
+	}
+
+	@Override
+	public LocalizationCreator getTethysCreator() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	
+	private BearingAlgorithm findAlgorithm() {
+		BearingAlgorithmGroup[] groups = bearingProcess.getBearingAlgorithmGroups();
+		if (groups == null) {
+			return null;
+		}
+		for (int i = 0; i < groups.length; i++) {
+			BearingAlgorithm ba = groups[i].bearingAlgorithm;
+			if (ba != null) {
+				return ba;
+			}
+		}
+		return null;
+	}
+	
+	@Override
+	public int getLocalisationContents() {
+		int cont = LocContents.HAS_BEARING | LocContents.HAS_BEARINGERROR;
+		// work out if we should also add ambiguity. How to work that out ? 
+		return cont;
+	}
+
+	@Override
+	public String getAlgorithmName() {
+//		BearingAlgorithm ba = findAlgorithm();
+//		if (ba == null) {
+//			return null;
+//		}
+//		ba.getParams().
+		return getUnitType();
+	}
+
+	@Override
+	public Serializable getParameters() {
+		return bearingLocaliserParams;
+	}
+
+	@Override
+	public LocalizationOptionsPanel getLocalizationOptionsPanel(Window parent, LocalizationBuilder locBuilder) {
+		return null;
+	}
+
+	public void setParentDataBlock(PamDataBlock sourceDataBlock) {
+		PamDataBlock parentblock = detectionMonitor.getParentDataBlock();
+		if (bearingTaskGroup != null) {
+			bearingTaskGroup.setPrimaryDataBlock(detectionMonitor.getParentDataBlock());
+		}
+		if (bearingOfflineTask != null) {
+			bearingOfflineTask.checkDataBlocks();
+		}
 	}
 }

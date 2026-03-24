@@ -4,28 +4,24 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Vector;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
+import PamController.PamConfiguration;
+import PamController.PamControlledUnit;
+import PamController.PamController;
+import PamUtils.complex.ComplexArray;
+import PamguardMVC.PamDataBlock;
+import PamguardMVC.PamDataUnit;
+import PamguardMVC.PamObservable;
+import PamguardMVC.PamProcess;
+import PamguardMVC.ProcessAnnotation;
+import PamguardMVC.dataOffline.OfflineDataLoadInfo;
+import Spectrogram.SpectrumBackgrounds;
+import fftManager.FFTDataBlock;
+import fftManager.FFTDataUnit;
 import spectrogramNoiseReduction.averageSubtraction.AverageSubtraction;
 import spectrogramNoiseReduction.kernelSmoothing.KernelSmoothing;
 import spectrogramNoiseReduction.medianFilter.SpectrogramMedianFilter;
 import spectrogramNoiseReduction.threshold.SpectrogramThreshold;
 import spectrogramNoiseReduction.threshold.ThresholdParams;
-
-import fftManager.FFTDataBlock;
-import fftManager.FFTDataUnit;
-import PamController.PamConfiguration;
-import PamController.PamControlledUnit;
-import PamController.PamController;
-import PamUtils.complex.ComplexArray;
-import PamguardMVC.ProcessAnnotation;
-import PamguardMVC.PamDataBlock;
-import PamguardMVC.PamDataUnit;
-import PamguardMVC.PamObservable;
-import PamguardMVC.PamProcess;
-import PamguardMVC.dataOffline.OfflineDataLoadInfo;
-import Spectrogram.SpectrumBackgrounds;
 
 public class SpectrogramNoiseProcess extends PamProcess {
 
@@ -72,6 +68,9 @@ public class SpectrogramNoiseProcess extends PamProcess {
 		sourceData = (FFTDataBlock) getPamControlledUnit().getPamConfiguration().getDataBlock(FFTDataUnit.class, 
 				getNoiseSettings().dataSource);
 		setParentDataBlock(sourceData);
+		if (sourceData != null) {
+			outputData.setLogScale(sourceData.isLogScale());
+		}
 		
 		prepareProcess();
 		
@@ -283,6 +282,14 @@ public class SpectrogramNoiseProcess extends PamProcess {
 	@Override
 	public ArrayList getCompatibleDataUnits() {
 		return new ArrayList<Class<? extends PamDataUnit>>(Arrays.asList(FFTDataUnit.class));
+	}
+
+	/**
+	 * The original input to the noise process. May not be normal FFT data, e.g. Mel spectrogram. 
+	 * @return the sourceData
+	 */
+	public FFTDataBlock getSourceData() {
+		return sourceData;
 	}
 
 	

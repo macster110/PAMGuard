@@ -2,13 +2,11 @@ package PamController;
 
 import java.awt.Window;
 
-import PamController.fileprocessing.StoreStatus;
+import PamguardMVC.PamDataBlock;
+import PamguardMVC.dataOffline.OfflineDataLoadInfo;
 import dataGram.DatagramManager;
 import dataMap.OfflineDataMapPoint;
 import pamScrollSystem.ViewLoadObserver;
-import PamguardMVC.PamDataBlock;
-import PamguardMVC.RequestCancellationObject;
-import PamguardMVC.dataOffline.OfflineDataLoadInfo;
 
 /**
  * Interface implemented by PamControlledUnits which 
@@ -32,6 +30,13 @@ public interface OfflineDataStore {
 	 * @return data source name
 	 */
 	public String getDataSourceName();
+	
+	/**
+	 * Get the data location. This may be a specific file, or might be a folder
+	 * if data are in many files, a URI, etc. 
+	 * @return store locations
+	 */
+	public String getDataLocation();
 	
 	/**
 	 * Load data for a given datablock between two time limits. 

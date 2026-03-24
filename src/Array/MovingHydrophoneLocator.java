@@ -1,10 +1,5 @@
 package Array;
 
-import GPS.GpsData;
-import GPS.GpsDataUnit;
-import PamUtils.LatLong;
-import PamguardMVC.PamDataBlock;
-
 abstract public class MovingHydrophoneLocator extends SimpleHydrophoneLocator {
 
 	/**
@@ -14,6 +9,11 @@ abstract public class MovingHydrophoneLocator extends SimpleHydrophoneLocator {
 
 	public MovingHydrophoneLocator(PamArray pamArray, Streamer streamer) {
 		super(pamArray, streamer);
+	}
+
+	@Override
+	public boolean isChangeable() {
+		return true;
 	}
 
 

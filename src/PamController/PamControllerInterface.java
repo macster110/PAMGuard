@@ -332,7 +332,7 @@ public interface PamControllerInterface {
 	 * Notification sent out when new offline data have
 	 * been loaded. This is sent in the AWT thread after the 
 	 * worker thread loading the data has completed. 
-	 * <p>Also see DATA__LOAD_COMPLETE 
+	 * <p>Also see DATA_LOAD_COMPLETE 
 	 * which is sent around 
 	 * within the same worker thread and therefore
 	 * executes BEFORE this one. 
@@ -414,6 +414,11 @@ public interface PamControllerInterface {
 	 * go. 
 	 */
 	public static final int READY_TO_RUN = 25;
+	
+	/**
+	 * Sent when project metadata has been updated. 
+	 */
+	public static final int PROJECT_META_UPDATE = 26;
 
 	
 
@@ -458,6 +463,17 @@ public interface PamControllerInterface {
 	 * Close all modules and free up resources. 
 	 */
 	public void pamClose();
+
+	/**
+	 * Start function called from button to do a bit of extra book keeping
+	 * @return
+	 */
+	public boolean manualStart();
+
+	/**
+	 * Stop function called from button to do a bit of extra book keeping
+	 */
+	public void manualStop();
 	
 	//public void controllerAddFileMenuItem();
 

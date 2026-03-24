@@ -1,8 +1,7 @@
 package annotation;
 
-import generalDatabase.SQLLoggingAddon;
+import org.w3c.dom.Element;
 
-import PamView.symbol.AnnotationSymbolChooser;
 import PamView.symbol.PamSymbolChooser;
 import PamView.symbol.modifier.SymbolModifier;
 import PamguardMVC.PamDataBlock;
@@ -10,8 +9,11 @@ import PamguardMVC.PamDataUnit;
 import PamguardMVC.dataSelector.DataSelector;
 import annotation.binary.AnnotationBinaryHandler;
 import annotation.dataselect.AnnotationDataSelCreator;
-import annotation.dataselect.AnnotationDataSelector;
 import annotation.handler.AnnotationOptions;
+import annotation.xml.AnnotationXMLWriter;
+import annotation.xml.SQLXMLWriter;
+import generalDatabase.SQLLoggingAddon;
+import tethys.species.DataBlockSpeciesManager;
 
 /**
  * Something that can tell us a little more about 
@@ -24,7 +26,7 @@ import annotation.handler.AnnotationOptions;
  * @see SoloAnnotationType
  *
  */
-public abstract class DataAnnotationType<TDataAnnotation extends DataAnnotation> {
+public abstract class DataAnnotationType<TDataAnnotation extends DataAnnotation<?>> {
 
 	public abstract String getAnnotationName();
 
@@ -33,6 +35,8 @@ public abstract class DataAnnotationType<TDataAnnotation extends DataAnnotation>
 	public static final int SHORTIDCODELENGTH = 4;
 	
 	private PamDataBlock targetDataBlock;
+
+	private SQLXMLWriter annotationWriter;
 
 	/**
 	 * Get the annotation as a string for use in tables, tool tips, etc. 
@@ -86,6 +90,26 @@ public abstract class DataAnnotationType<TDataAnnotation extends DataAnnotation>
 	}
 	
 	/**
+	 * Get something that can write an annotation as XML
+	 * @return
+	 */
+	public AnnotationXMLWriter<TDataAnnotation> getXMLWriter() {
+		/*
+		 *  can do this automatically if we've got sqllogging, otherwise 
+		 *  override and do something bespoke. 
+		 */
+		if (annotationWriter != null) {
+			return annotationWriter;
+		}
+		SQLLoggingAddon sqlLogging = getSQLLoggingAddon();
+		if (sqlLogging == null) {
+			return null; 
+		}
+		annotationWriter = new SQLXMLWriter<>(this);
+		return annotationWriter;
+	}
+	
+	/**
 	 * Get an optional AnnotationBinaryHandler which can be used to add the 
 	 * annotation information for binary files and also read data back from 
 	 * them. 
@@ -105,10 +129,22 @@ public abstract class DataAnnotationType<TDataAnnotation extends DataAnnotation>
 		return null;
 	}
 	
+	/**
+	 * Get a settings panel to configure how the annotation works. Note
+	 * that this is not the same as the dialog panel which can be used to enter
+	 * data for a specific annotation. 
+	 * @return settings panel. 
+	 */
 	public AnnotationSettingsPanel getSettingsPanel() {
 		return null;
 	}
 	
+	/**
+	 * Has a settings panel to configure how the annotation works. Note
+	 * that this is not the same as the dialog panel which can be used to enter
+	 * data for a specific annotation. 
+	 * @return
+	 */
 	public boolean hasSettingsPanel() {
 		return false;
 	}
@@ -205,6 +241,14 @@ public abstract class DataAnnotationType<TDataAnnotation extends DataAnnotation>
 	 */
 	public void setTargetDataBlock(PamDataBlock targetDataBlock) {
 		this.targetDataBlock = targetDataBlock;
+	}
+	
+	/**
+	 * Annotations may have a species manager. Most won't. 
+	 * @return
+	 */
+	public DataBlockSpeciesManager getDataBlockSpeciesManager() {
+		return null;
 	}
 	
 

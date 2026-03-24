@@ -1,15 +1,12 @@
 package pamScrollSystem;
 
 import java.awt.BorderLayout;
-import java.awt.Insets;
-import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 
 import javax.swing.JComponent;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
-import javax.swing.border.Border;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -39,6 +36,7 @@ public class PamScrollSlider extends AbstractPamScrollerAWT {
 			panel.add(BorderLayout.CENTER, slider);
 			panel.add(BorderLayout.SOUTH, getButtonPanel());
 		}
+//		slider.setFocusable(false);
 	}
 	
 	class SliderListener implements ChangeListener {
@@ -95,11 +93,12 @@ public class PamScrollSlider extends AbstractPamScrollerAWT {
 	}
 
 	@Override
-	void doMouseWheelAction(MouseWheelEvent mouseWheelEvent) {
+	public void doMouseWheelAction(MouseWheelEvent mouseWheelEvent) {
 		int n = mouseWheelEvent.getWheelRotation();
 		slider.setValue(slider.getValue() - n);
 		scrollMoved();
 	}
+	
 	public void scrollMoved() {
 		AbstractScrollManager.getScrollManager().moveInnerScroller(this, getValueMillis());	
 		notifyValueChange();
@@ -148,6 +147,7 @@ public class PamScrollSlider extends AbstractPamScrollerAWT {
 	public long getVisibleAmount() {
 		return 0;
 	}
+
 	/* (non-Javadoc)
 	 * @see pamScrollSystem.AbstractPamScroller#setRangeMillis(long, long, boolean)
 	 */
@@ -179,6 +179,12 @@ public class PamScrollSlider extends AbstractPamScrollerAWT {
 	public void setPageStep(int pageStep) {
 		// TODO Auto-generated method stub
 		super.setPageStep(pageStep);
+	}
+	/**
+	 * @return the slider
+	 */
+	public JSlider getSlider() {
+		return slider;
 	}
 
 }

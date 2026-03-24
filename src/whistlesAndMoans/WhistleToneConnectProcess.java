@@ -5,16 +5,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 
-import networkTransfer.receive.BuoyStatusDataUnit;
-import spectrogramNoiseReduction.SpectrogramNoiseProcess;
-import spectrogramNoiseReduction.SpectrogramNoiseSettings;
-import whistlesAndMoans.plots.WhistleSymbolManager;
-import eventCounter.DataCounter;
-import fftManager.FFTDataBlock;
-import fftManager.FFTDataUnit;
-import generalDatabase.PamDetectionLogging;
-import generalDatabase.SQLLogging;
 import Array.ArrayManager;
+import Localiser.LocalisationAlgorithmInfo;
 import Localiser.algorithms.Correlations;
 import Localiser.algorithms.timeDelayLocalisers.bearingLoc.BearingLocaliser;
 import Localiser.algorithms.timeDelayLocalisers.bearingLoc.BearingLocaliserSelector;
@@ -36,6 +28,15 @@ import PamguardMVC.PamProcess;
 import PamguardMVC.background.SpecBackgroundDataUnit;
 import PamguardMVC.background.SpecBackgroundManager;
 import Spectrogram.SpectrumBackgrounds;
+import eventCounter.DataCounter;
+import fftManager.FFTDataBlock;
+import fftManager.FFTDataUnit;
+import generalDatabase.PamDetectionLogging;
+import generalDatabase.SQLLogging;
+import networkTransfer.receive.BuoyStatusDataUnit;
+import spectrogramNoiseReduction.SpectrogramNoiseProcess;
+import spectrogramNoiseReduction.SpectrogramNoiseSettings;
+import whistlesAndMoans.plots.WhistleSymbolManager;
 
 public class WhistleToneConnectProcess extends PamProcess {
 	
@@ -92,6 +93,8 @@ public class WhistleToneConnectProcess extends PamProcess {
 	private SpecBackgroundManager specBackgroundManager;
 	
 	private long lastBackgroundTime = 0;
+
+	private FFTDataBlock trueSourceData;
 
 	public WhistleToneConnectProcess(WhistleMoanControl whitesWhistleControl) {
 		super(whitesWhistleControl, null);
@@ -204,6 +207,7 @@ public class WhistleToneConnectProcess extends PamProcess {
 		
 		SpectrogramNoiseProcess snp = whistleMoanControl.getSpectrogramNoiseProcess();
 		setParentDataBlock(snp.getOutputDataBlock());
+		trueSourceData = snp.getSourceData();
 		if (whistleMoanControl.whistleToneParameters.getDataSource() == null) {
 			return;
 		}
@@ -348,7 +352,7 @@ public class WhistleToneConnectProcess extends PamProcess {
 		if (sbProcess == null) {
 			return sourceBlock;
 		}
-		if (sbProcess instanceof SpectrogramNoiseProcess == false) {
+		if (!(sbProcess instanceof SpectrogramNoiseProcess)) {
 			return sourceBlock;
 		}
 		else {
@@ -424,7 +428,9 @@ public class WhistleToneConnectProcess extends PamProcess {
 		private RegionFragmenter regionFragmenter = new NullFragmenter(); 
 
 		private BearingLocaliser bearingLocaliser;
-		private int hydrophoneMap;
+		
+		private int[] hydrophoneList;
+		
 		private double maxDelaySeconds;
 
 		/**
@@ -439,7 +445,7 @@ public class WhistleToneConnectProcess extends PamProcess {
 			this.iD = iD;
 			this.groupChannels = groupChannels;
 			// this next line gets updated to the correct map before any localisation takes place !
-			hydrophoneMap = groupChannels;
+//			hydrophoneMap = groupChannels;
 
 			this.firstChannel = PamUtils.getLowestChannel(groupChannels);
 			setConnectionType(connectType);
@@ -477,21 +483,28 @@ public class WhistleToneConnectProcess extends PamProcess {
 			if (sourceData == null) {
 				return;
 			}
+			if (trueSourceData == null) {
+				trueSourceData = sourceData;
+			}
 			// only create bearing localiser objects if we have a channel list manager and we're not dealing with sequence numbers
-			if (sourceData.getChannelListManager() != null && sourceData.getSequenceMapObject()==null) {
-				hydrophoneMap = sourceData.getChannelListManager().channelIndexesToPhones(groupChannels);
+			if (trueSourceData.getChannelListManager() != null && trueSourceData.getSequenceMapObject()==null) {
+				hydrophoneList = trueSourceData.getChannelListManager().channelMapToPhonesList(groupChannels);
+				int hydrophoneMap = PamUtils.makeChannelMap(hydrophoneList);
 				double timingError = Correlations.defaultTimingError(getSampleRate());
-				bearingLocaliser = BearingLocaliserSelector.createBearingLocaliser(hydrophoneMap, timingError); 
+				bearingLocaliser = BearingLocaliserSelector.createBearingLocaliser(hydrophoneList, timingError); 
 				maxDelaySeconds = ArrayManager.getArrayManager().getCurrentArray().getMaxPhoneSeparation(hydrophoneMap, PamCalendar.getTimeInMillis()) / 
 						ArrayManager.getArrayManager().getCurrentArray().getSpeedOfSound();
 			}
 			whistleDelays.prepareBearings();
-			searchBin1 = (int) (whistleMoanControl.whistleToneParameters.getMinFrequency() * 
-					sourceData.getFftLength() / getSampleRate());			
-			searchBin2 = (int) (whistleMoanControl.whistleToneParameters.getMaxFrequency(getSampleRate()) * 
-					sourceData.getFftLength() / getSampleRate());
-			searchBin1 = Math.max(0, Math.min(sourceData.getFftLength()/2, searchBin1));
-			searchBin2 = Math.max(0, Math.min(sourceData.getFftLength()/2, searchBin2));
+//			searchBin1 = (int) (whistleMoanControl.whistleToneParameters.getMinFrequency() * 
+//					sourceData.getFftLength() / getSampleRate());			
+//			searchBin2 = (int) (whistleMoanControl.whistleToneParameters.getMaxFrequency(getSampleRate()) * 
+//					sourceData.getFftLength() / getSampleRate());
+			WhistleToneParameters whistleParams = whistleMoanControl.whistleToneParameters;
+			searchBin1 = (int) trueSourceData.value2bin(whistleParams.getMinFrequency(), firstChannel);
+			searchBin2 = (int) trueSourceData.value2bin(whistleParams.getMaxFrequency(getSampleRate()), firstChannel);
+			searchBin1 = Math.max(0, Math.min(trueSourceData.getDataWidth(firstChannel)-1, searchBin1));
+			searchBin2 = Math.max(0, Math.min(trueSourceData.getDataWidth(firstChannel)-1, searchBin2));
 		}
 
 		/**
@@ -558,7 +571,7 @@ public class WhistleToneConnectProcess extends PamProcess {
 
 			// loop over new data
 			for (int i = space; i < dataLen+space; i++) {
-				if (spacedArray[i] == false) {
+				if (!spacedArray[i]) {
 					continue; // continue of this pixel is not set. 
 				}
 				/*
@@ -605,7 +618,7 @@ public class WhistleToneConnectProcess extends PamProcess {
 					 * this region, but didn't get assigned. 
 					 */
 					for (int ii = i-1; ii >0; ii--) {
-						if (spacedArray[ii] == false || regionArray[1][ii] != null) {
+						if (!spacedArray[ii] || regionArray[1][ii] != null) {
 							break;
 						}
 						regionArray[1][ii] = regionArray[1][i];
@@ -618,7 +631,7 @@ public class WhistleToneConnectProcess extends PamProcess {
 			 * need to run up the column again creating new regions. 
 			 */
 			for (int i = space; i < dataLen+space; i++) {
-				if (spacedArray[i] == false || regionArray[1][i] != null) {
+				if (!spacedArray[i] || regionArray[1][i] != null) {
 					continue; // continue of this pixel is not set. 
 				}
 				/*
@@ -733,9 +746,9 @@ public class WhistleToneConnectProcess extends PamProcess {
 			ConnectedRegion r;
 			while(rl.hasNext()) {
 				r=rl.next();
-				if (r.isGrowing() == false) {
+				if (!r.isGrowing()) {
 					rl.remove();
-					if (completeRegion(r) == false) {
+					if (!completeRegion(r)) {
 						recycleRegion(r);
 					}
 				}
@@ -752,7 +765,7 @@ public class WhistleToneConnectProcess extends PamProcess {
 			
 //			if (region.getFirstSlice() == 44647) {
 //				System.out.println("Defrag big one");
-			if (whistleMoanControl.getWhistleToneParameters().keepShapeStubs == false) {
+			if (!whistleMoanControl.getWhistleToneParameters().keepShapeStubs) {
 				stubRemover.removeStubs(region);
 			}
 //			}
@@ -813,6 +826,7 @@ public class WhistleToneConnectProcess extends PamProcess {
 				//					BearingLocAnnotation bla = new BearingLocAnnotation(bearingLocAnnotationType, anglesAndErrors);
 				//					newData.addDataAnnotation(bla);
 				//				}
+				int hydrophoneMap = PamUtils.makeChannelMap(hydrophoneList);
 				WhistleBearingInfo newLoc = new WhistleBearingInfo(newData, bearingLocaliser, 
 						hydrophoneMap, anglesAndErrors);
 				if (bearingLocaliser != null) {
@@ -1086,6 +1100,25 @@ public class WhistleToneConnectProcess extends PamProcess {
 			clearSummaryData();
 		}
 		return sumText;
+	}
+
+
+	/**
+	 * Get info on current localisation algorithm. Grab the BL from the
+	 * first group that has one. 
+	 * @return
+	 */
+	public LocalisationAlgorithmInfo getLocAlgorithmInfo() {
+		if (shapeConnectors == null) {
+			return null;
+		}
+		for (int i = 0; i < shapeConnectors.length; i++) {
+			BearingLocaliser bl = shapeConnectors[i].bearingLocaliser;
+			if (bl != null && bl.getAlgorithmInfo() != null) {
+				return bl.getAlgorithmInfo();
+			}
+		}
+		return null;
 	}
 
 }

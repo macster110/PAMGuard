@@ -13,16 +13,10 @@ import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.border.TitledBorder;
 
-import KernelSmoothing.KernelSmoothingProcess;
-import PamController.PamController;
-import fftManager.FFTDataUnit;
-import spectrogramNoiseReduction.SpecNoiseMethod;
-import spectrogramNoiseReduction.kernelSmoothing.KernelSmoothing;
 import PamView.dialog.PamDialog;
 import PamView.dialog.PamGridBagContraints;
 import PamView.dialog.SourcePanel;
-import PamguardMVC.PamDataBlock;
-import PamguardMVC.ProcessAnnotation;
+import fftManager.FFTDataUnit;
 
 public class RWEDialog extends PamDialog {
 
@@ -104,6 +98,8 @@ public class RWEDialog extends PamDialog {
 		
 		panel.add(BorderLayout.CENTER, tabbedPane);
 		setDialogComponent(panel);
+		
+		setHelpPoint("detectors.rwedge.docs.rwedgedetector");
 	}
 	
 	public static RWEParameters showDialog(Window frame, RWEControl rweControl) {

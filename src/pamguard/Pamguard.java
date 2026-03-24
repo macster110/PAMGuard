@@ -20,32 +20,6 @@ package pamguard;
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
-
-import Acquisition.FolderInputSystem;
-import PamController.PamController;
-import PamController.PamGUIManager;
-import PamController.PamSettingManager;
-import PamController.PamguardVersionInfo;
-import PamController.pamBuoyGlobals;
-import PamController.fileprocessing.ReprocessStoreChoice;
-import PamModel.SMRUEnable;
-import PamUtils.FileFunctions;
-import PamUtils.PamExceptionHandler;
-import PamUtils.PlatformInfo;
-import PamUtils.Splash;
-import PamUtils.PlatformInfo.OSType;
-import PamView.FullScreen;
-import PamView.ScreenSize;
-import PamView.dialog.warn.WarnOnce;
-import PamguardMVC.debug.Debug;
-import binaryFileStorage.BinaryStore;
-import dataPlotsFX.JamieDev;
-import generalDatabase.DBControl;
-import networkTransfer.send.NetworkSender;
-import rocca.RoccaDev;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -54,12 +28,48 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 //import com.sun.java.swing.plaf.windows.WindowsLookAndFeel;
+
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
+
+import com.formdev.flatlaf.FlatLightLaf;
+
+import Acquisition.FolderInputSystem;
+import Acquisition.SoundCardSystem;
+import PamController.PamController;
+import PamController.PamFolders;
+import PamController.PamGUIManager;
+import PamController.PamRunModeDialog;
+import PamController.PamRunModeParams;
+import PamController.PamSettingManager;
+import PamController.PamguardVersionInfo;
+import PamController.pamBuoyGlobals;
+import PamController.fileprocessing.ReprocessStoreChoice;
+import PamModel.SMRUEnable;
+import PamUtils.FileFunctions;
+import PamUtils.PamExceptionHandler;
+import PamUtils.PlatformInfo;
+import PamUtils.PlatformInfo.OSType;
+import PamUtils.Splash;
+import PamView.FullScreen;
+import PamView.ScreenSize;
+import PamView.dialog.warn.WarnOnce;
+import PamguardMVC.debug.Debug;
+import SoundRecorder.RecorderControl;
+import binaryFileStorage.BinaryStore;
+import dataPlotsFX.JamieDev;
+import generalDatabase.DBControl;
+import networkTransfer.send.NetworkSender;
+import offlineProcessing.OfflineTaskManager;
+import rocca.RoccaDev;
 
 /**
  * Pamguard main class. 
@@ -90,7 +100,7 @@ public class Pamguard {
 	 * @param args
 	 */
 	public static void main(String[] args) {
-
+		
 		Debug.setPrintDebug(false); // make sure the class instantiates static members. 
 		try {			
 			if (PlatformInfo.calculateOS() == OSType.WINDOWS) {
@@ -99,8 +109,8 @@ public class Pamguard {
 			else {
 				//do not use the mac version...it's awful
 				//UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+			    UIManager.setLookAndFeel(new FlatLightLaf() );	
 
-				UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
 			}
 			//		    for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
 			//		        if ("Nimbus".equals(info.getName())) {
@@ -119,17 +129,27 @@ public class Pamguard {
 			//			  System.out.println(keys.nextElement() + ": " + ui.get(nxt));
 			//			}
 			//			PamColors.getInstance().setColors();
-		} catch (Exception e) { }
+		} catch (Exception e) { 
+			System.out.println("Unable to load lookAndFeel: " + e.getMessage());
+//			e.printStackTrace();
+			try {
+				UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+			} catch (ClassNotFoundException | InstantiationException | IllegalAccessException
+					| UnsupportedLookAndFeelException e1) {
+				// TODO Auto-generated catch block
+//				e1.printStackTrace();
+			}
+		}
 
 		int runMode = PamController.RUN_NORMAL;
 		String InputPsf = "NULL";
-		
-
 
 		// set up the system to output to both a log file and the console window.  Also
 		// set up a monitor to check for the size of the folder every hour - if it gets
 		// too big, just stop logging the messages
-		String logFile = getSettingsFolder() + File.separator + "PamguardLog";
+//		LogFileUtils.checkLogFileErrors(Pamguard.getSettingsFolder());
+		
+		String logFile = getSettingsFolder() + File.separator + LogFileUtils.LogFileRootName;
 		System.setOut(new ProxyPrintStream(System.out, logFile));
 		System.setErr(new ProxyPrintStream(System.err, logFile));   
 		FolderSizeMonitor folderSizeMon = new FolderSizeMonitor();
@@ -138,7 +158,7 @@ public class Pamguard {
 
 //		TimeZone.setDefault(PamCalendar.defaultTimeZone);
 
-		System.out.println("**********************************************************");
+		System.out.println("\n**********************************************************");
 		// print out the entire command line
 		if (args != null && args.length > 0) {
 			System.out.printf("Command line options: ");
@@ -150,16 +170,32 @@ public class Pamguard {
 		try {
 			// get the java runnable file name. 
 			//	    	http://stackoverflow.com/questions/4294522/jar-file-name-form-java-code
-			System.out.println(Pamguard.class.getProtectionDomain().getCodeSource().getLocation());
+			URL javaFile = Pamguard.class.getProtectionDomain().getCodeSource().getLocation();
+			System.out.println(javaFile);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+		boolean showSplash = true;
 		if (args != null) {
 			int nArgs = args.length;
 			int iArg = 0;
 			String anArg;
 			while (iArg < nArgs) {
 				anArg = args[iArg++];
+				
+				if (anArg.equalsIgnoreCase("-c")) {
+					//the user chooses which run mode
+					PamRunModeParams runbModeParams = PamRunModeDialog.showDialog(null, true);
+					if (runbModeParams==null || runbModeParams.runMode<0) {
+						//use cancelled
+						System.exit(0);
+					}
+					else {
+						//set anArg to whatever the user chose
+						anArg = runbModeParams.getRunString();
+					}
+				}
+				
 				if (anArg.equalsIgnoreCase("-v")) {
 					runMode = PamController.RUN_PAMVIEW;
 					System.out.println("PAMGUARD Viewer");
@@ -167,10 +203,27 @@ public class Pamguard {
 				else if (anArg.equalsIgnoreCase("-m")) {
 					runMode = PamController.RUN_MIXEDMODE;
 					System.out.println("PAMGUARD Offline mixed mode");
+				}				
+				else if (anArg.equalsIgnoreCase(GlobalArguments.BATCHVIEW)) {
+					/**
+					 * Used with batch processor when it launches the configuration to make it clear that
+					 * it's really working in viewer mode, and viewer mode settings should be available, but
+					 * settings will be read and written using psfx files, not the databsae. 
+					 */
+					GlobalArguments.setParam(GlobalArguments.BATCHVIEW, "true");
+//					runMode = PamController.RUN_PAMVIEW;
 				}
 				else if (anArg.equalsIgnoreCase("-nr")) {
 					runMode = PamController.RUN_NETWORKRECEIVER;
 					System.out.println("PAMGUARD Network Reciever Mode");
+				}
+				else if (anArg.equalsIgnoreCase("-nosplash")) {
+					showSplash = false;
+				}
+				else if (anArg.equalsIgnoreCase(GlobalArguments.BATCHFLAG)) {
+					// flag to say we're in batch processing mode. Can be used
+					// to avoid one or two dialogs that pop up in Viewer mode. 
+					GlobalArguments.setParam(GlobalArguments.BATCHFLAG, Boolean.TRUE.toString());
 				}
 
 				//	removed SEICHE switch when the two SEICHE modules were converted to plugins				
@@ -197,6 +250,10 @@ public class Pamguard {
 				}
 				else if (anArg.equalsIgnoreCase("-jamie")) {
 					JamieDev.setEnabled(true);
+					System.out.println("Enabling Jamie Macaulay modifications.");
+				}
+				else if (anArg.equalsIgnoreCase("-smrudev")) {
+					SMRUEnable.setDevEnable(true);
 					System.out.println("Enabling Jamie Macaulay modifications.");
 				}
 				else if (anArg.equalsIgnoreCase("-rocca")) {
@@ -240,6 +297,10 @@ public class Pamguard {
 					pamBuoyGlobals.setMultiportConfig(mAddr, mPort);
 					System.out.printf("Setting multicast control addr %s port %d\n", mAddr, mPort);
 				}
+				else if (anArg.equalsIgnoreCase(OfflineTaskManager.commandFlag)) {
+					String taskName = args[iArg++];
+					OfflineTaskManager.getManager().addCommandLineTask(taskName);
+				}
 				else if (anArg.equalsIgnoreCase("-nolog")) {
 					System.out.println("Disabling log file from command line switch...");
 					ProxyPrintStream.disableLogFile();
@@ -261,6 +322,12 @@ public class Pamguard {
 					String wavFolder = args[iArg++];
 					GlobalArguments.setParam(FolderInputSystem.GlobalWavFolderArg, wavFolder);
 					System.out.println("Setting input wav file folder to " + wavFolder);
+				}
+				else if (anArg.equalsIgnoreCase(RecorderControl.GlobalWavPrefixArg)) {
+					// source folder for wav files (or other supported sound files)
+					String wavPrefix = args[iArg++];
+					GlobalArguments.setParam(RecorderControl.GlobalWavPrefixArg, wavPrefix);
+					System.out.println("Setting recording prefix to " + wavPrefix);
 				}
 				else if (anArg.equalsIgnoreCase(PamController.AUTOSTART)) {
 					// auto start processing. 
@@ -287,6 +354,14 @@ public class Pamguard {
 				else if (anArg.equalsIgnoreCase(NetworkSender.PORT)) {
 					// auto exit at end of processing. 
 					GlobalArguments.setParam(NetworkSender.PORT, args[iArg++]);
+				}
+				else if (anArg.equalsIgnoreCase(SoundCardSystem.SETDEVNAME)) {
+					// sound card name
+					GlobalArguments.setParam(SoundCardSystem.SETDEVNAME, args[iArg++]);
+				}
+				else if (anArg.equalsIgnoreCase(SoundCardSystem.SETDEVNUMBER)) {
+//					soundcard number
+					GlobalArguments.setParam(SoundCardSystem.SETDEVNUMBER, args[iArg++]);
 				}
 				else if (anArg.equalsIgnoreCase(ReprocessStoreChoice.paramName)) {
 					String arg = args[iArg++];
@@ -354,7 +429,8 @@ public class Pamguard {
 //		System.out.println("Revision " + PamguardVersionInfo.getRevision());
 		System.out.println("Build Date " + PamguardVersionInfo.date);
 		writePropertyString("user.dir");
-		writePropertyString("java.home");
+		writePropertyString("user.home"); // where launched from. 
+		writePropertyString("java.home"); // something in users, e.g. users/dg50
 		writePropertyString("java.name");
 		String javaV = writePropertyString("java.version");
 		writePropertyString("java.vendor");
@@ -372,9 +448,9 @@ public class Pamguard {
 		System.out.println("(Windows users right click on window title bar for edit / copy options)");
 		System.out.println("");
 
-		if (checkJavaVersion(javaV) == false) {
+		if (!checkJavaVersion(javaV)) {
 			System.exit(0);
-		};
+		}
 
 		int spashTime = 5000;
 		if (SMRUEnable.isEnable()) {
@@ -383,11 +459,12 @@ public class Pamguard {
 		if(runMode == PamController.RUN_REMOTE) {
 			spashTime = 0;
 		}
-		if (spashTime > 0 && (PamGUIManager.getGUIType() != PamGUIManager.NOGUI)) {
+		if (showSplash && spashTime > 0 && (PamGUIManager.getGUIType() != PamGUIManager.NOGUI)) {
 			new Splash(spashTime, chosenRunMode);
 		}
 		//		
 		final Runnable createPamguard = new Runnable() {
+			@Override
 			public void run() {
 				PamController.create(chosenRunMode);
 			}
@@ -580,6 +657,7 @@ public class Pamguard {
 		/**
 		 * Print to both the console and the file
 		 */
+		@Override
 		public synchronized void print(final String str) {
 			if (str.contains("WARN org.docx4j") || str.contains("INFO org.docx4j")) return;	// don't bother printing these messages out
 			origPrintStream.print(str);
@@ -593,6 +671,7 @@ public class Pamguard {
 		/**
 		 * Print to both the console and the file
 		 */
+		@Override
 		public synchronized void println(final String str) {
 			if (str == null) {
 				println("null");
@@ -613,6 +692,7 @@ public class Pamguard {
 		 * the string.  Instead, compile it all into a single string first
 		 * and then call print
 		 */
+		@Override
 		public synchronized PrintStream printf(String format, Object... args) {
 			String theString = String.format(format, args);
 			print(theString);
@@ -685,6 +765,12 @@ public class Pamguard {
 	private static class FolderSizeMonitor implements Runnable {
 		@Override
 		public void run() {
+			
+			PamFolders.deleteTempFiles(".x86_64.dll");
+			PamFolders.deleteTempFiles(".dll.lck");
+			PamFolders.deleteTempFiles(".tmp");
+			PamFolders.deleteTempFiles("-sqlitejdbc.dll");
+			
 			while(true) {
 				long length = 0;
 				File dir = new File(getSettingsFolder());
@@ -717,6 +803,47 @@ public class Pamguard {
 			}
 		}
 	}
+	/*
+	 * Some bits that need added to Maven POM. 
+	 * 
+<!-- From NilusXMLGenerator POM at https://bitbucket.org/tethysacousticmetadata/nilusxmlgenerator/src/master/-->
+    <dependency>
+        <groupId>org.eclipse.persistence</groupId>
+        <artifactId>org.eclipse.persistence.moxy</artifactId>
+        <version>2.5.0</version>
+    </dependency>
+	<dependency>
+	    <groupId>javax.xml.bind</groupId>
+	    <artifactId>jaxb-api</artifactId>
+	    <version>2.4.0-b180830.0359</version> 
+	</dependency>
+	<dependency>
+	    <groupId>org.glassfish.jaxb</groupId>
+	    <artifactId>jaxb-runtime</artifactId>
+	    <version>2.4.0-b180830.0438</version> 
+	</dependency>
+	<dependency>
+        <groupId>org.glassfish.jaxb</groupId>
+        <artifactId>jaxb-xjc</artifactId>
+        <version>2.4.0-b180830.0438</version>
+    </dependency>
+	 
+	 <!-- Also not in Maven, so you may need to copy the javaclient and nilus folders from 
+e.g. C:\Users\dg50\source\repos\**your projectfolder**\repo\tethys\org
+to C:\Users\dg50\.m2\repository\tethys\org
+
+ 	<dependency>
+	    <groupId>tethys.org</groupId>
+	    <artifactId>nilus</artifactId>
+	    <version>3.0</version>
+	</dependency>
+
+ 	<dependency>
+	    <groupId>tethys.org</groupId>
+	    <artifactId>javaclient</artifactId>
+	    <version>3.0</version>
+	</dependency>-->
+	 */
 
 
 }

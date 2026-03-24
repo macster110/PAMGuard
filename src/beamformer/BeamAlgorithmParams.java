@@ -4,6 +4,7 @@ import java.io.Serializable;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import beamformer.algorithms.basicFreqDomain.BasicFreqDomParams;
 
 /*
@@ -275,6 +276,7 @@ public abstract class BeamAlgorithmParams implements Serializable, Cloneable, Ma
 	 * Extended classes must override this method to ensure the params get saved properly.  See
 	 * the {@link BasicFreqDomParams#clone BasicFreqDomParams.clone} method for an example;
 	 */
+	@Override
 	public abstract BeamAlgorithmParams clone();
 
 	/**
@@ -336,7 +338,7 @@ public abstract class BeamAlgorithmParams implements Serializable, Cloneable, Ma
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 

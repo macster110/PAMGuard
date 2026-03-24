@@ -3,11 +3,15 @@ package Acquisition.pamAudio;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.UnsupportedAudioFileException;
 
 import org.codehaus.plexus.util.FileUtils;
+
+import Acquisition.sud.SudAudioFile;
+import PamUtils.worker.filelist.WavLoadListener;
 
 /**
  * Central class for opening sound files.
@@ -56,7 +60,7 @@ public class PamAudioFileManager {
 	 * @param soundFile - the sound file
 	 * @return the audio file loader.
 	 */
-	public PamAudioFileLoader getAudioLoader(File soundFile) {
+	public PamAudioFileLoader getAudioFileLoader(File soundFile) {
 		for (int i = 0; i < pamAudioFileTypes.size(); i++) {
 			if (isExtension(soundFile, pamAudioFileTypes.get(i))) {
 				return pamAudioFileTypes.get(i);
@@ -94,7 +98,8 @@ public class PamAudioFileManager {
 		//System.out.println("Sound Extension: " + soundExtension + " File extension: " + extension);
 		return (soundExtension.equals(extension) || soundExtension.equals("." + extension));
 	}
-
+	
+	
 	/**
 	 * Open an audio input stream. If the file is a Wav file, then it will attempt
 	 * to read the file with PAMGuards bespoke audio stream reader. This includes
@@ -109,6 +114,23 @@ public class PamAudioFileManager {
 	 * @throws IOException
 	 */
 	public AudioInputStream getAudioInputStream(File file) throws UnsupportedAudioFileException, IOException {
+		return getAudioInputStream(file, null);
+	}
+
+	/**
+	 * Open an audio input stream. If the file is a Wav file, then it will attempt
+	 * to read the file with PAMGuards bespoke audio stream reader. This includes
+	 * support for wav files which are > 2GByte in size and also works for floating
+	 * point 32 bit files (which the Java one doesn't). If that fails, or if its not
+	 * a wav file, then the standard java AudioInputStream is used.
+	 * 
+	 * @param file file to open
+	 * @return a new audio input stream
+	 * @throws UnsupportedAudioFileException thrown if it can't understand the audio
+	 *                                       format.
+	 * @throws IOException
+	 */
+	public AudioInputStream getAudioInputStream(File file, WavLoadListener loadListener) throws UnsupportedAudioFileException, IOException {
 		// if (file != null && isWavFile(file) && file.length() > largeFileSize) {
 		if (file.exists() == false) {
 			System.err.println("PamAudioFileManager: the input file was null");
@@ -120,7 +142,7 @@ public class PamAudioFileManager {
 //			System.out.println(file.getName() + "   " + pamAudioFileTypes.get(i).getName()); 
 			if (isExtension(file, pamAudioFileTypes.get(i))) {
 				//System.out.println("Get stream for: " +pamAudioFileTypes.get(i).getName()); 
-				stream = pamAudioFileTypes.get(i).getAudioStream(file);
+				stream = pamAudioFileTypes.get(i).getAudioStream(file, loadListener);
 				if (pamAudioFileTypes != null) {
 					break;
 				}
@@ -130,12 +152,11 @@ public class PamAudioFileManager {
 		if (stream == null) {
 			// have a punt at opening as a default audiostream
 			//System.out.println("Try default stream for: " +file.getName() ); 
-
-			stream = new WavAudioFile().getAudioStream(file);
+			stream = new WavAudioFile().getAudioStream(file, loadListener);
 		}
 
 		if (stream == null) {
-			System.err.println("PamAudioFileManager: unable to open an AudioStream for " + file.getName());
+			System.err.println("PamAudioFileManager: unable to open an AudioStream for " + file.getName() + " size: " + file.length());
 		}
 
 		return stream;
@@ -153,7 +174,7 @@ public class PamAudioFileManager {
 	}
 
 	/**
-	 * Get the audio file filter
+	 * Get the audio file filter.
 	 * 
 	 * @return the audio file filter.
 	 */
@@ -164,10 +185,27 @@ public class PamAudioFileManager {
 	/**
 	 * Get the current audio file
 	 * 
-	 * @return a list oif the current audio loaders.
+	 * @return a list of the current audio loaders.
 	 */
 	public ArrayList<PamAudioFileLoader> getAudioFileLoaders() {
 		return this.pamAudioFileTypes;
+	}
+	
+	/**
+	 * Get the loaders which are needed to open a list of files
+	 * @param  files - the files to find audio loaders for. 
+	 * @return a list of the  audio loaders required for the file list
+	 */
+	public ArrayList<PamAudioFileLoader> getAudioFileLoaders(List<? extends File> files) {
+		ArrayList<PamAudioFileLoader> audioLoaders = new ArrayList<PamAudioFileLoader>(); 
+		PamAudioFileLoader loader;
+		for (int i=0; i<files.size(); i++) {
+			 loader =  getAudioFileLoader(files.get(i)); 
+			 if (!audioLoaders.contains(loader)) {
+				 audioLoaders.add(loader); 
+			 }
+		}
+		return audioLoaders;
 	}
 
 	/**
@@ -177,5 +215,6 @@ public class PamAudioFileManager {
 	public WavAudioFile getRawFileLoader() {
 		return rawFileLoader; 
 	}
+
 
 }

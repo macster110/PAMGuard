@@ -7,23 +7,22 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 
-import clickDetector.ClickDetector.ChannelGroupDetector;
-import dataMap.DataMapDrawing;
 import Acquisition.AcquisitionProcess;
 import Array.ArrayManager;
 import Localiser.algorithms.timeDelayLocalisers.bearingLoc.BearingLocaliser;
 import Localiser.algorithms.timeDelayLocalisers.bearingLoc.BearingLocaliserSelector;
 import Localiser.algorithms.timeDelayLocalisers.bearingLoc.OldAngleConverter;
-import PamUtils.PamCalendar;
 import PamUtils.PamUtils;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
+import PamguardMVC.PamProcess;
 import binaryFileStorage.BinaryDataSource;
 import binaryFileStorage.BinaryHeader;
 import binaryFileStorage.BinaryObjectData;
 import binaryFileStorage.ModuleFooter;
 import binaryFileStorage.ModuleHeader;
-import binaryFileStorage.PackedBinaryObject;
+import clickDetector.ClickDetector.ChannelGroupDetector;
+import dataMap.DataMapDrawing;
 
 /**
  * Class for storing clicks to binary store. 
@@ -183,7 +182,7 @@ public class ClickBinaryDataSource extends BinaryDataSource {
 	@Override
 	public ModuleHeader sinkModuleHeader(BinaryObjectData binaryObjectData, BinaryHeader bh) {
 		ClickBinaryModuleHeader mh = new ClickBinaryModuleHeader(binaryObjectData.getVersionNumber());
-		if (mh.createHeader(binaryObjectData, bh) == false) {
+		if (!mh.createHeader(binaryObjectData, bh)) {
 			return null;
 		}
 		return mh;
@@ -193,7 +192,7 @@ public class ClickBinaryDataSource extends BinaryDataSource {
 	public ModuleFooter sinkModuleFooter(BinaryObjectData binaryObjectData,
 			BinaryHeader bh, ModuleHeader mh) {
 		ClickBinaryModuleFooter mf = new ClickBinaryModuleFooter(clickDetector);
-		if (mf.createFooter(binaryObjectData, bh, mh) == false) {
+		if (!mf.createFooter(binaryObjectData, bh, mh)) {
 			return null;
 		}
 		return mf;
@@ -388,7 +387,10 @@ public class ClickBinaryDataSource extends BinaryDataSource {
 //			newClick.setMeasuredAmplitude(allMax/nChan);
 //			newClick.setMeasuredAmplitudeType(AcousticDataUnit.AMPLITUDE_SCALE_LINREFSD);
 			if (acquisitionProcess == null) {
-				acquisitionProcess = (AcquisitionProcess) clickDetector.getSourceProcess();
+				PamProcess sourceProcess = clickDetector.getSourceProcess();
+				if (sourceProcess instanceof AcquisitionProcess) {
+					acquisitionProcess = (AcquisitionProcess) clickDetector.getSourceProcess();
+				}
 			}
 			if (acquisitionProcess != null) {
 				newClick.setCalculatedAmlitudeDB(acquisitionProcess.
@@ -407,7 +409,9 @@ public class ClickBinaryDataSource extends BinaryDataSource {
 				}
 				if (bearingLocaliser == null) {
 					// this should be called with hydrophone map, not channel map. 
-					bearingLocaliser = BearingLocaliserSelector.createBearingLocaliser(channelMap, 0);
+					// this should never happen, since handles in 
+					int[] simpleMap = PamUtils.getChannelArray(channelMap);
+					bearingLocaliser = BearingLocaliserSelector.createBearingLocaliser(simpleMap, 0);
 				}
 				clickLocalisation.setSubArrayType(bearingLocaliser.getArrayType());
 				clickLocalisation.setArrayAxis(bearingLocaliser.getArrayAxis());
@@ -427,7 +431,8 @@ public class ClickBinaryDataSource extends BinaryDataSource {
 			System.out.println("IOException in Click binary file: " + e1.getMessage());
 			return null;
 		} catch (Exception e) {
-			System.out.println("Error in Click binary file: " + e.getMessage());
+			System.out.println("Error in ClickBinaryDataSource: " + e.getMessage());
+//			e.printStackTrace();
 //			return null;
 		}
 		

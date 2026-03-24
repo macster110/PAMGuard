@@ -38,7 +38,8 @@ import org.pamguard.x3.sud.SUDClickDetectorInfo;
 
 import Acquisition.AcquisitionControl;
 import PamController.PamControlledUnitSettings;
-import PamController.PamController;
+import PamController.PamControllerInterface;
+import PamController.PamSensor;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamguardMVC.PamRawDataBlock;
@@ -54,7 +55,7 @@ import soundtrap.sud.SudFileDWVHandler;
  * @author mo55
  *
  */
-public class STClickControl extends ClickControl {
+public class STClickControl extends ClickControl implements PamSensor {
 	
 	private SUDClickDetectorInfo sudClickDetectorInfo;
 	
@@ -81,6 +82,8 @@ public class STClickControl extends ClickControl {
 		sudFileDWVHandler.subscribeSUD();
 		
 		PamSettingManager.getInstance().registerSettings(new SUDSettings());
+		
+
 	}
 
 	@Override
@@ -112,7 +115,7 @@ public class STClickControl extends ClickControl {
 			String thisName = thisItem.getText();
 			
 			if (thisName == "Detection Parameters ...") {
-				newMenu.remove(i);
+//				newMenu.remove(i);
 			}
 			else if (thisName == "Digital pre filter ...") {
 				newMenu.remove(i);
@@ -163,7 +166,16 @@ public class STClickControl extends ClickControl {
 	@Override
 	public void notifyModelChanged(int changeType) {
 		super.notifyModelChanged(changeType);
-		if (changeType == PamController.INITIALIZATION_COMPLETE) {
+		if (changeType == PamControllerInterface.INITIALIZATION_COMPLETE) {		
+			// do a check on the sample rate since this seems a bit **ed in some configs. 
+			if (sudClickDetectorInfo != null) {
+				float fsSud = sudClickDetectorInfo.sampleRate;
+				float currFS = getClickDetector().getSampleRate();
+				if (currFS != fsSud) {
+					getSTAcquisition().getAcquisitionProcess().setSampleRate(fsSud, true);
+					getClickDetector().setSampleRate(fsSud, true);
+				}
+			}
 			sudFileDWVHandler.subscribeSUD();
 		}
 	}
@@ -228,6 +240,17 @@ public class STClickControl extends ClickControl {
 	 */
 	public void setSudClickDetectorInfo(SUDClickDetectorInfo sudClickDetectorInfo) {
 		this.sudClickDetectorInfo = sudClickDetectorInfo;
+	}
+
+	@Override
+	public String getSensorDescription() {
+		String desc = String.format("SoundTrap Click Detector at %dHz", (int) getClickDataBlock().getSampleRate());
+		return desc;
+	}
+
+	@Override
+	public String getSensorId() {
+		return null;
 	}
 	
 	/**

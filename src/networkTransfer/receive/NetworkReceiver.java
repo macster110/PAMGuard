@@ -5,7 +5,6 @@ import networkTransfer.receive.swing.NetworkRXTabPanel;
 import networkTransfer.receive.swing.NetworkReceiveDialog;
 import networkTransfer.receive.swing.NetworkReceiveSidePanel;
 import networkTransfer.receive.swing.RXTableMouseListener;
-import nidaqdev.networkdaq.NetworkAudioInterpreter;
 
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
@@ -45,6 +44,7 @@ import PamController.PamControllerInterface;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamUtils.PamCalendar;
+import PamUtils.PamUtils;
 import PamView.PamSidePanel;
 import PamView.PamTabPanel;
 import PamView.symbol.StandardSymbolManager;
@@ -492,6 +492,7 @@ public class NetworkReceiver extends PamControlledUnit implements PamSettings, N
 	}
 	
 	private NetworkAudioInterpreter networkAudioInterpreter;
+
 	@Override
 	public synchronized NetworkObject interpretData(NetworkObject receivedObject) {
 		
@@ -541,7 +542,8 @@ public class NetworkReceiver extends PamControlledUnit implements PamSettings, N
 			break;
 		case NET_AUDIO_DATA:
 			if (networkAudioInterpreter == null) {
-				networkAudioInterpreter = new NetworkAudioInterpreter(this);
+//				networkAudioInterpreter = new CRioAudioInterpreter(this);
+				return null;
 			}
 			networkAudioInterpreter.interpretData(receivedObject, buoyStatusDataUnit);
 		}
@@ -907,7 +909,8 @@ public class NetworkReceiver extends PamControlledUnit implements PamSettings, N
 		}
 		checkHydrophoneArray(buoyStatusDataUnit);
 		int phones = ArrayManager.getArrayManager().getCurrentArray().getPhonesForStreamer(buoyStatusDataUnit.getHydrophoneStreamer());
-		BearingLocaliser bearingLocaliser = BearingLocaliserSelector.createBearingLocaliser(phones, 1e-5);
+		int[] phonesList = PamUtils.getChannelArray(phones);
+		BearingLocaliser bearingLocaliser = BearingLocaliserSelector.createBearingLocaliser(phonesList, 1e-5);
 	}
 
 	/**
@@ -1074,4 +1077,11 @@ public class NetworkReceiver extends PamControlledUnit implements PamSettings, N
 		
 	}
 
+	public NetworkAudioInterpreter getNetworkAudioInterpreter() {
+		return networkAudioInterpreter;
+	}
+
+	public void setNetworkAudioInterpreter(NetworkAudioInterpreter networkAudioInterpreter) {
+		this.networkAudioInterpreter = networkAudioInterpreter;
+	}
 }

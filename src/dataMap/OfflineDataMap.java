@@ -7,8 +7,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 
+import Acquisition.offlineFuncs.WavFileDataMap;
 import PamController.OfflineDataStore;
-import PamUtils.PamCalendar;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 
@@ -84,6 +84,8 @@ abstract public class OfflineDataMap<TmapPoint extends OfflineDataMapPoint> {
 	public static final int POINT_END = 0x8;      // 8
 	public static final int IN_DATA = 0x10;       // 16
 	public static final int NO_DATA = 0x20;       // 32
+	
+	private static final long oneDayInMillis = 3600L*24L*1000L;
 
 	public OfflineDataMap(OfflineDataStore offlineDataStore, PamDataBlock parentDataBlock) {
 		super();
@@ -144,11 +146,14 @@ abstract public class OfflineDataMap<TmapPoint extends OfflineDataMapPoint> {
 	 * @param mapPoint new map point to add
 	 */
 	synchronized public void addDataPoint(TmapPoint mapPoint) {
+//		if (this instanceof WavFileDataMap) {
+//			System.out.println(mapPoint);
+//		}
 		boolean first = (mapPoints.size() == 0);
-		if (mapPoint.getStartTime() > 0) {
+		if (mapPoint.getStartTime() > oneDayInMillis) {
 			firstDataTime = Math.min(firstDataTime, mapPoint.getStartTime());
 		}
-		if (mapPoint.getEndTime() > 0) {
+		if (mapPoint.getEndTime() > oneDayInMillis) {
 			lastDataTime = Math.max(lastDataTime, mapPoint.getEndTime());
 //			if (mapPoint.getEndTime() > System.currentTimeMillis()) {
 //				System.out.println("Stupid large data time in " + mapPoint.getName());
@@ -273,10 +278,10 @@ abstract public class OfflineDataMap<TmapPoint extends OfflineDataMapPoint> {
 
 		while (it.hasNext()) {
 			aPoint = it.next();
-			if (aPoint.getStartTime() > 0) {
+			if (aPoint.getStartTime() > oneDayInMillis) {
 				firstDataTime = Math.min(firstDataTime, aPoint.getStartTime());
 			}
-			if (aPoint.getEndTime() > 0) {
+			if (aPoint.getEndTime() > oneDayInMillis) {
 				lastDataTime = Math.max(lastDataTime, aPoint.getEndTime());
 			}
 			n = aPoint.getNDatas();
@@ -359,6 +364,28 @@ abstract public class OfflineDataMap<TmapPoint extends OfflineDataMapPoint> {
 				return hp;
 			}
 		}
+	}
+	
+	/**
+	 * Get the start time of the first datamap point or Long.minval
+	 * @return
+	 */
+	public long getMapStartTime() {
+		if (mapPoints == null || mapPoints.size() == 0) {
+			return Long.MIN_VALUE;
+		}
+		return mapPoints.get(0).getStartTime();
+	}
+	
+	/**
+	 * Get the start time of the first datamap point or Long.minval
+	 * @return
+	 */
+	public long getMapEndTime() {
+		if (mapPoints == null || mapPoints.size() == 0) {
+			return Long.MIN_VALUE;
+		}
+		return mapPoints.get(mapPoints.size()-1).getEndTime();
 	}
 	
 	/**
@@ -541,10 +568,10 @@ abstract public class OfflineDataMap<TmapPoint extends OfflineDataMapPoint> {
 
 	private void warnDoubleFind(long timeMillis, TmapPoint foundPoint,
 			TmapPoint mapPoint) {
-		System.out.println(String.format("Warning - data unit at time %s found in two map points %s - %s and %s - %s in %s ",
-				PamCalendar.formatDateTime(timeMillis), PamCalendar.formatDateTime(foundPoint.getStartTime()),
-				PamCalendar.formatDateTime(foundPoint.getEndTime()),PamCalendar.formatDateTime(mapPoint.getStartTime()),
-				PamCalendar.formatDateTime(mapPoint.getEndTime()), this.parentDataBlock.getDataName()));
+//		System.out.println(String.format("Warning - data unit at time %s found in two map points %s - %s and %s - %s in %s ",
+//				PamCalendar.formatDateTime(timeMillis), PamCalendar.formatDateTime(foundPoint.getStartTime()),
+//				PamCalendar.formatDateTime(foundPoint.getEndTime()),PamCalendar.formatDateTime(mapPoint.getStartTime()),
+//				PamCalendar.formatDateTime(mapPoint.getEndTime()), this.parentDataBlock.getDataName()));
 	}
 
 	/**
@@ -819,5 +846,48 @@ abstract public class OfflineDataMap<TmapPoint extends OfflineDataMapPoint> {
 		for (DataMapObserver obs : dataMapObservers) {
 			obs.updateDataMap(this, mapPoint);
 		}
+	}
+
+	/**
+	 * Check to see if any data maps overlap in time. 
+	 * @return list of overlaps. 
+	 */
+	public ArrayList<MapOverlap> checkOverlaps() {
+		long bigLap = Long.MIN_VALUE;
+		TmapPoint prevPoint = null;
+		ArrayList<MapOverlap> overlaps = new ArrayList<>();
+		for (TmapPoint mapPoint : mapPoints) {
+			if (prevPoint != null) {
+				long olap = prevPoint.getEndTime() - mapPoint.getStartTime();
+				 // allow a 1s overlap due to tiny issues in sud and other files, which sometimes have a tiny overlap
+				if (mapPoint.getStartTime() < prevPoint.getEndTime() - 1000) {
+					bigLap = Math.max(olap, bigLap);
+					overlaps.add(new MapOverlap(prevPoint.getEndTime(), mapPoint.getStartTime()));
+				}
+			}
+			prevPoint = mapPoint;
+		}
+		return overlaps;
+	}
+
+	/**
+	 * Get start and end times for all points in a datamap as a 2xn array. 
+	 * @return
+	 */
+	public long[][] getAllStartsAndEnds() {
+		if (mapPoints == null) {
+			return null;
+		}
+		int n = mapPoints.size();
+		long[][] se = new long[2][n];
+		Iterator<TmapPoint> it = mapPoints.iterator();
+		int i = 0;
+		while (it.hasNext()) {
+			TmapPoint p = it.next();
+			se[0][i] = p.getStartTime();
+			se[1][i] = p.getEndTime();
+			i++;
+		}
+		return se;
 	}
 }

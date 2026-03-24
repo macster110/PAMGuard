@@ -6,6 +6,7 @@ import java.util.ArrayList;
 
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
+
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitGUI;
 import PamController.PamControlledUnitSettings;
@@ -130,6 +131,7 @@ public class MTClassifierControl extends PamControlledUnit implements PamSetting
 			SettingsPane<MatchedTemplateParams> setPane = (SettingsPane<MatchedTemplateParams>) getSettingsPane();
 			setPane.setParams(this.matchedTemplateParams);
 			settingsDialog = new PamDialogFX2AWT<MatchedTemplateParams>(parentFrame, setPane, false);
+			settingsDialog.setHelpPoint("classifiers.matchedtemplate.mathchedtemplate"); //spelling mistake in path - careful
 			settingsDialog.setResizable(true);
 		}
 		MatchedTemplateParams newParams = settingsDialog.showDialog(matchedTemplateParams);
@@ -405,6 +407,7 @@ public class MTClassifierControl extends PamControlledUnit implements PamSetting
 	 * @param flag. The GUI type flag defined in PAMGuiManager.
 	 * @return the GUI for the PamControlledUnit unit.
 	 */
+	@Override
 	public PamControlledUnitGUI getGUI(int flag) {
 		if (flag == PamGUIManager.FX) {
 			if (matchedClickGUIFX == null) {

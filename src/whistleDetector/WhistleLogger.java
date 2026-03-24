@@ -1,15 +1,14 @@
 package whistleDetector;
 
-import generalDatabase.PamDetectionLogging;
-import generalDatabase.PamTableDefinition;
-import generalDatabase.PamTableItem;
-import generalDatabase.SQLLogging;
-import generalDatabase.SQLTypes;
-
 import java.sql.Types;
 
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
+import generalDatabase.EmptyTableDefinition;
+import generalDatabase.PamDetectionLogging;
+import generalDatabase.PamTableItem;
+import generalDatabase.SQLLogging;
+import generalDatabase.SQLTypes;
 
 public class WhistleLogger extends PamDetectionLogging {
 	
@@ -24,7 +23,7 @@ public class WhistleLogger extends PamDetectionLogging {
 		
 		this.whistleControl = whistleControl;
 		
-		PamTableDefinition tableDefinition = getTableDefinition();
+		EmptyTableDefinition tableDefinition = getTableDefinition();
 		tableDefinition.addTableItem(sliceCount = new PamTableItem("SliceCount", Types.INTEGER));
 		tableDefinition.addTableItem(length = new PamTableItem("WhistleLength", Types.DOUBLE));
 		tableDefinition.addTableItem(minFreq = new PamTableItem("MinFreq", Types.DOUBLE));

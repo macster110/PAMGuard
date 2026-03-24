@@ -1,5 +1,8 @@
 package PamguardMVC;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+
 import PamController.PamControllerInterface;
 import PamguardMVC.nanotime.NanosFromSamples;
 
@@ -59,7 +62,7 @@ abstract public class AcousticDataBlock <Tunit extends PamDataUnit> extends PamD
 			parentSourceData = (AcousticDataBlock) parentData;
 		}
 		else {
-			System.out.println("Cannot assign " + parentData.getDataName() + " as AcousticData");
+//			System.out.println("Cannot assign " + parentData.getDataName() + " as AcousticData");
 		}
 	}
 
@@ -88,6 +91,13 @@ abstract public class AcousticDataBlock <Tunit extends PamDataUnit> extends PamD
 			prepareAmplitudeCalculations();
 		}
 		return parentSourceData;
+	}
+
+	@Override
+	public Element getDataBlockXML(Document doc) {
+		Element el = super.getDataBlockXML(doc);
+		el.setAttribute("SampleRate", String.format("%3.1f", getSampleRate()));
+		return el;
 	}
 
 

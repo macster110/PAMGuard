@@ -26,6 +26,7 @@ import Filters.FilterBand;
 import Filters.FilterParams;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 
 public class DecimatorParams implements Serializable, Cloneable, ManagedParameters {
 
@@ -85,7 +86,7 @@ public class DecimatorParams implements Serializable, Cloneable, ManagedParamete
 	 * @see java.lang.Object#clone()
 	 */
 	@Override
-	protected DecimatorParams clone() {
+	public DecimatorParams clone() {
 		try {
 			DecimatorParams dp = (DecimatorParams) super.clone();
 			dp.filterParams = filterParams.clone();
@@ -102,7 +103,7 @@ public class DecimatorParams implements Serializable, Cloneable, ManagedParamete
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 }

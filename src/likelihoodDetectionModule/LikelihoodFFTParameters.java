@@ -5,9 +5,10 @@ import java.lang.reflect.Field;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
-import fftManager.FFTParameters;
 import Spectrogram.WindowFunction;
+import fftManager.FFTParameters;
 
 /**
  * The LikelihoodFFTParameters class represents Likelihood Detector-specific FFT
@@ -270,7 +271,7 @@ public class LikelihoodFFTParameters implements Serializable, ManagedParameters 
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("sourceNumber");
 			ps.put(new PrivatePamParameterData(this, field) {

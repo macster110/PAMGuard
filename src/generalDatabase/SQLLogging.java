@@ -29,11 +29,6 @@
 
 package generalDatabase;
 
-import generalDatabase.clauses.FixedClause;
-import generalDatabase.clauses.PAMSelectClause;
-import generalDatabase.clauses.UIDViewParameters;
-import generalDatabase.pamCursor.CursorFinder;
-import generalDatabase.pamCursor.PamCursor;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -42,12 +37,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.ListIterator;
 
-import pamScrollSystem.LoadQueueProgressData;
-import pamScrollSystem.ViewLoadObserver;
-import qa.QASoundDataUnit;
 import PamController.PamController;
 import PamController.PamViewParameters;
 import PamUtils.PamCalendar;
@@ -55,10 +46,18 @@ import PamguardMVC.DataUnitFinder;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.SaveRequirements;
-import PamguardMVC.debug.Debug;
 import PamguardMVC.superdet.SubdetectionInfo;
 import PamguardMVC.superdet.SuperDetection;
 import binaryFileStorage.DataUnitFileInformation;
+import generalDatabase.clauses.FixedClause;
+import generalDatabase.clauses.PAMSelectClause;
+import generalDatabase.pamCursor.CursorFinder;
+import generalDatabase.pamCursor.PamCursor;
+import pamScrollSystem.LoadQueueProgressData;
+import pamScrollSystem.ViewLoadObserver;
+import qa.QASoundDataUnit;
+import warnings.PamWarning;
+import warnings.RepeatWarning;
 
 /**
  * 
@@ -142,6 +141,8 @@ public abstract class SQLLogging {
 	private boolean canView = false;
 
 	private boolean loadViewData = false;
+	
+	private RepeatWarning repeatWarning;
 
 	protected SuperDetLogging superDetLogging;
 
@@ -190,7 +191,7 @@ public abstract class SQLLogging {
 		ArrayList<PamDataBlock> blockList = PamController.getInstance()
 				.getDataBlocks();
 		SQLLogging logger;
-		PamTableDefinition tableDef;
+		EmptyTableDefinition tableDef;
 		for (int i = 0; i < blockList.size(); i++) {
 			if ((logger = blockList.get(i).getLogging()) != null) {
 				tableDef = logger.getTableDefinition();
@@ -293,37 +294,42 @@ public abstract class SQLLogging {
 	 * @param superDetection 
 	 */
 	protected void fillTableData(SQLTypes sqlTypes, PamDataUnit pamDataUnit, PamDataUnit superDetection) {
+		
+		EmptyTableDefinition emptyTableDef = getTableDefinition();
 
-		PamTableDefinition tableDef = getTableDefinition();
 		PamTableItem tableItem;
 
-		tableDef.getIndexItem().setValue(pamDataUnit.getDatabaseIndex());
-		/*
-		 * All tables have a timestamp near the front of the table. And all data
-		 * units have a time in milliseconds, so always fill this in !
-		 */
-		tableDef.getTimeStampItem().setValue(
-				sqlTypes.getTimeStamp(pamDataUnit.getTimeMilliseconds()));
+		emptyTableDef.getIndexItem().setValue(pamDataUnit.getDatabaseIndex());
+		
+		if (emptyTableDef instanceof PamTableDefinition) {
+			PamTableDefinition tableDef = (PamTableDefinition) emptyTableDef;
+			/*
+			 * All tables have a timestamp near the front of the table. And all data
+			 * units have a time in milliseconds, so always fill this in !
+			 */
+			tableDef.getTimeStampItem().setValue(
+					sqlTypes.getTimeStamp(pamDataUnit.getTimeMilliseconds()));
 
-		tableDef.getTimeStampMillis().setValue((int) (pamDataUnit.getTimeMilliseconds()%1000));
+			tableDef.getTimeStampMillis().setValue((int) (pamDataUnit.getTimeMilliseconds()%1000));
 
-		tableDef.getLocalTimeItem().setValue(sqlTypes.getLocalTimeStamp(pamDataUnit.getTimeMilliseconds()));
+			tableDef.getLocalTimeItem().setValue(sqlTypes.getLocalTimeStamp(pamDataUnit.getTimeMilliseconds()));
 
-		tableDef.getPCTimeItem().setValue(sqlTypes.getTimeStamp(System.currentTimeMillis()));
+			tableDef.getPCTimeItem().setValue(sqlTypes.getTimeStamp(System.currentTimeMillis()));
 
-		tableDef.getUidItem().setValue(pamDataUnit.getUID());
+			tableDef.getUidItem().setValue(pamDataUnit.getUID());
 
-		tableDef.getChannelBitmap().setValue(pamDataUnit.getChannelBitmap());
+			tableDef.getChannelBitmap().setValue(pamDataUnit.getChannelBitmap());
 
-		tableDef.getSequenceBitmap().setValue(pamDataUnit.getSequenceBitmapObject());
+			tableDef.getSequenceBitmap().setValue(pamDataUnit.getSequenceBitmapObject());
 
-		if (tableDef.getUpdateReference() != null) {
-			tableDef.getUpdateReference().setValue(pamDataUnit.getDatabaseIndex());
+			if (tableDef.getUpdateReference() != null) {
+				tableDef.getUpdateReference().setValue(pamDataUnit.getDatabaseIndex());
+			}
 		}
 
-		for (int i = 0; i < tableDef.getTableItemCount(); i++) {
+		for (int i = 0; i < emptyTableDef.getTableItemCount(); i++) {
 
-			tableItem = tableDef.getTableItem(i);
+			tableItem = emptyTableDef.getTableItem(i);
 			// if (tableItem.isCounter()) {
 			// tableItem.setValue(1);
 			// }
@@ -333,8 +339,8 @@ public abstract class SQLLogging {
 			}
 		}
 
-		if (tableDef instanceof PamSubtableDefinition) {
-			PamSubtableDefinition subTableDef = (PamSubtableDefinition) tableDef;
+		if (emptyTableDef instanceof PamSubtableDefinition) {
+			PamSubtableDefinition subTableDef = (PamSubtableDefinition) emptyTableDef;
 			fillSubTableData(subTableDef, pamDataUnit, superDetection);
 		}
 
@@ -378,6 +384,7 @@ public abstract class SQLLogging {
 	public synchronized boolean logData(PamConnection con, PamDataUnit dataUnit, PamDataUnit superDetection) {
 
 		if (con == null) {
+			showWarning("LogData: No database connection");
 			return false;
 		}
 		//		if (dataUnit instanceof QASoundDataUnit && superDetection == null) {
@@ -389,6 +396,7 @@ public abstract class SQLLogging {
 
 		PamCursor pamCursor = loggingCursorFinder.getCursor(con, pamTableDefinition);
 		if (pamCursor == null) {// null for oodb
+			showWarning("Database cursor error");
 			return false;
 		}
 
@@ -403,9 +411,11 @@ public abstract class SQLLogging {
 		
 		if (newIndex > 0) { // logging was OK
 			dataUnit.clearUpdateCount();
+			clearWarning();
 			return true;
 		}
 		else {
+			showWarning("Error logging data " + dataUnit.toString());
 			return false;
 		}
 
@@ -445,6 +455,7 @@ public abstract class SQLLogging {
 		//		System.out.printf("ReLog data unit %s with super det %s\n", dataUnit, superDetection);
 
 		if (con == null) {
+			showWarning("reLogData: No database connection");
 			return false;
 		}
 		if (dataUnit.getDatabaseIndex() <= 0) {
@@ -479,6 +490,10 @@ public abstract class SQLLogging {
 
 		if (logOK) {
 			dataUnit.clearUpdateCount();
+			clearWarning();
+		}
+		else {
+			showWarning("Error logging data");
 		}
 		
 		return logOK;
@@ -525,7 +540,7 @@ public abstract class SQLLogging {
 		}
 		// now put some sql into the statement
 		//		if (resultSet == null) {
-		PamTableDefinition tableDef = getTableDefinition();
+		EmptyTableDefinition tableDef = getTableDefinition();
 		String sqlString = tableDef.getSQLSelectString(con.getSqlTypes());
 		// sqlString = "select \"comment\" from userinput";
 		try {
@@ -545,6 +560,71 @@ public abstract class SQLLogging {
 		//		}
 		//		}
 		return resultSet;
+	}
+	
+	/**
+	 * Find the data point which is closest in time to that given, or null 
+	 * returning whatever type of data unit this deals with. 
+	 * @param timeMillis
+	 * @return
+	 */
+	public PamDataUnit findClosestDataPoint(PamConnection con, long timeMillis) {
+
+		PamCursor pamCursor = loggingCursorFinder.getCursor(con, pamTableDefinition);
+
+		// can't really do any math with the string based dates, so will have to query from 
+		// a few s before the time we want. 
+		PamDataUnit[] beforeNafter = new PamDataUnit[2];
+		
+		SQLTypes sqlTypes = con.getSqlTypes();
+		
+		for (int i = 0; i < 2; i++) {
+			String clause;
+		
+			if (i == 0) {
+				clause = String.format("WHERE UTC <= %s ORDER BY UTC DESC", sqlTypes.formatDBDateTimeQueryString(timeMillis));
+			}
+			else {
+				clause = String.format("WHERE UTC >= %s ORDER BY UTC ASC", sqlTypes.formatDBDateTimeQueryString(timeMillis));
+			}
+
+			ResultSet result = pamCursor.openReadOnlyCursor(con, clause);
+			if (result==null) {
+				return null;
+			}
+
+			PamTableItem tableItem;
+			try {
+				if (result.next()) {
+					//				for (int i = 0; i < pamTableDefinition.getTableItemCount(); i++) {
+					//					tableItem = pamTableDefinition.getTableItem(i);
+					//					tableItem.setValue(result.getObject(i + 1));
+					//				}
+					//				return true;
+					boolean ok = transferDataFromResult(con.getSqlTypes(), result);
+					result.close();
+					beforeNafter[i] = createDataUnit(sqlTypes, lastTime, lastLoadIndex);
+				}
+			} catch (SQLException ex) {
+				ex.printStackTrace();
+				continue;
+			}
+		}
+		// now pick the closest
+		if (beforeNafter[0] == null) {
+			return beforeNafter[1];
+		}
+		if (beforeNafter[1] == null) {
+			return beforeNafter[0];
+		}
+		long t1 = timeMillis-beforeNafter[0].getTimeMilliseconds();
+		long t2 = beforeNafter[1].getTimeMilliseconds()-timeMillis;
+		if (t1 < t2) {
+			return beforeNafter[0];
+		}
+		else {
+			return beforeNafter[1];
+		}
 	}
 
 	/**
@@ -594,7 +674,7 @@ public abstract class SQLLogging {
 			return null;
 		}
 		boolean readOk = readLastData(con);
-		if (readOk == false) {
+		if (!readOk) {
 			return null;
 		}
 		PamDataUnit du = createDataUnit(con.getSqlTypes(), lastTime, lastLoadIndex);
@@ -899,7 +979,7 @@ public abstract class SQLLogging {
 		if (clause == null) {
 			clause = " ORDER BY UTC, UTCMilliseconds";
 		}
-		else if (clause.toUpperCase().contains("ORDER BY") == false) {
+		else if (!clause.toUpperCase().contains("ORDER BY")) {
 			clause +=  " ORDER BY UTC, UTCMilliseconds";
 		}
 		return clause;
@@ -1079,7 +1159,7 @@ public abstract class SQLLogging {
 
 	public boolean transferDataFromResult(SQLTypes sqlTypes, ResultSet resultSet) {
 
-		PamTableDefinition tableDef = getTableDefinition();
+		EmptyTableDefinition tableDef = getTableDefinition();
 		PamTableItem tableItem;
 		try {
 			for (int i = 0; i < tableDef.getTableItemCount(); i++) {
@@ -1090,17 +1170,20 @@ public abstract class SQLLogging {
 			//			Timestamp ts = (Timestamp) getTableDefinition().getTimeStampItem().getValue();
 			//			Timestamp ts = getTableDefinition().getTimeStampItem().getTimestampValue();
 			//			lastTime = sqlTypes.millisFromTimeStamp(ts);
-			lastTime = sqlTypes.millisFromTimeStamp(getTableDefinition().getTimeStampItem().getValue());
-			if (lastTime%1000 == 0) {
-				// some databases may have stored the milliseconds, in which 
-				// case this next bit is redundant. 
-				lastTime += getTableDefinition().getTimeStampMillis().getIntegerValue();
-			}
-			
 			lastLoadIndex = getTableDefinition().getIndexItem().getIntegerValue();
-			lastLoadUID = getTableDefinition().getUidItem().getLongObject();
-			lastChannelBitmap = getTableDefinition().getChannelBitmap().getIntegerValue();
-			lastSequenceBitmap = getTableDefinition().getSequenceBitmap().getIntegerObject();
+			if (tableDef instanceof PamTableDefinition) {
+				PamTableDefinition pamTableDef = (PamTableDefinition) tableDef;
+				lastTime = SQLTypes.millisFromTimeStamp(pamTableDef.getTimeStampItem().getValue());
+				if (lastTime%1000 == 0) {
+					// some databases may have stored the milliseconds, in which 
+					// case this next bit is redundant. 
+					lastTime += pamTableDef.getTimeStampMillis().getIntegerValue();
+				}
+
+				lastLoadUID = pamTableDef.getUidItem().getLongObject();
+				lastChannelBitmap = pamTableDef.getChannelBitmap().getIntegerValue();
+				lastSequenceBitmap = pamTableDef.getSequenceBitmap().getIntegerObject();
+			}
 			return true;
 
 		} catch (SQLException ex) {
@@ -1160,7 +1243,7 @@ public abstract class SQLLogging {
 		boolean ans;
 		try {
 			ans = mixedModeResult.next();
-			if (ans == false) {
+			if (!ans) {
 				return false;
 			}
 			return transferDataFromResult(sqlTypes, mixedModeResult);
@@ -1222,7 +1305,7 @@ public abstract class SQLLogging {
 						}
 					}
 				}
-				if (mixedModeResult.next() == false) {
+				if (!mixedModeResult.next()) {
 					mixedDataWaiting = false;
 					break;
 				}
@@ -1388,7 +1471,7 @@ public abstract class SQLLogging {
 					clause = "WHERE Id < 0"; // generate a null set. 
 				}
 				pamCursor = dbControlUnit.createPamCursor(getTableDefinition());
-				if (pamCursor.openScrollableCursor(connection, true, true, clause) == false) {
+				if (!pamCursor.openScrollableCursor(connection, true, true, clause)) {
 					System.out.println("Error opening update cursor " + pamDataBlock.getDataName());
 				}
 				if (sr.getNumUpdates() > 0) while(pamCursor.next()) {
@@ -1929,7 +2012,7 @@ public abstract class SQLLogging {
 	 * 
 	 * @param con database connection
 	 * @param parentLogging super detection logging instance.
-	 * @param uidList list of UID's in the parent data that have been loaded. 
+	 * @param idList list of ID's in the parent data that have been loaded. Note Id, NOT UID 
 	 * @return list of all PamSubtableData items
 	 */
 	public ArrayList<PamSubtableData> loadSubtableData(PamConnection con, SQLLogging parentLogging, String idList, ViewLoadObserver loadObserver) {
@@ -1961,6 +2044,13 @@ public abstract class SQLLogging {
 		return loadSubtableData(con, subtableResults, loadObserver);
 	}
 
+	/**
+	 * Get a sub table result set. Note that this is based on ID, not UID
+	 * @param con connection
+	 * @param parentLogging parent logging system
+	 * @param parentIdList ParentID list. Note that this is ID, not UID, <br>i.e. the query is  WHERE ParentID IN ...
+	 * @return child table result set
+	 */
 	private ResultSet createSubTableResultSet(PamConnection con, SQLLogging parentLogging,
 			String parentIdList) {
 		String clause = String.format(" WHERE ParentID IN %s ORDER BY UTC, UTCMilliseconds", parentIdList);
@@ -1997,8 +2087,9 @@ public abstract class SQLLogging {
 		ArrayList<PamSubtableData> tableList = new ArrayList<PamSubtableData>();
 		int n = 0;
 		try {
+			PamSubtableDefinition subtableTableDef = (PamSubtableDefinition) getTableDefinition();
+			PamTableItem clickNoItem = subtableTableDef.findTableItem("ClickNo");
 			while (subtableResults.next()) {
-				PamSubtableDefinition subtableTableDef = (PamSubtableDefinition) getTableDefinition();
 				PamTableItem tableItem;
 //				transferDataFromResult(con.getSqlTypes(), subtableResults);
 				for (int i = 0; i < subtableTableDef.getTableItemCount(); i++) {
@@ -2022,6 +2113,9 @@ public abstract class SQLLogging {
 				subtableData.setLongName(subtableTableDef.getLongName().getStringValue());
 				subtableData.setBinaryFilename(subtableTableDef.getBinaryfile().getStringValue());
 				subtableData.setDbIndex(subtableTableDef.getIndexItem().getIntegerValue());
+				if (clickNoItem != null) {
+					subtableData.setClickNumber(clickNoItem.getIntegerValue());
+				}
 				try {
 					subtableData.setChildUID(subtableTableDef.getUidItem().getLongObject());
 				}
@@ -2151,10 +2245,11 @@ public abstract class SQLLogging {
 			s.execute(sqlString);
 			s.close();
 		} catch (SQLException e) {
-			System.out.println("Delete sub detection failed with " + sqlString);
+			showWarning(sqlString + " failed: " + e.getMessage());
 //			e.printStackTrace();
 			return false;
 		}
+		clearWarning();
 		return true;
 	}
 
@@ -2174,13 +2269,32 @@ public abstract class SQLLogging {
 			s.execute(sqlString);
 			s.close();
 		} catch (SQLException e) {
-			System.out.println("Delete failed with " + sqlString);
-			e.printStackTrace();
+			showWarning(sqlString + " failed: " + e.getMessage());
 			return false;
 		}
+		clearWarning();
 		return true;
 	}
 
+	/**
+	 * show a warning in the warning system part of the status bar
+	 * Try to do something clever to count up similar types of warning. 
+	 * @param title
+	 * @param message
+	 */
+	private void showWarning(String message) {
+		if (repeatWarning == null) {
+			String tit = String.format("Database error table %s", getTableDefinition().tableName);
+			repeatWarning = new RepeatWarning(tit, 50, 5);
+		}
+		repeatWarning.showWarning(message, 2);
+	}
+	
+	private void clearWarning() {
+		if (repeatWarning != null) {
+			repeatWarning.clearWarning();
+		}
+	}
 
 	/**
 	 * find the super detection for this sub detection. 

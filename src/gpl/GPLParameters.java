@@ -1,11 +1,11 @@
 package gpl;
 
-import java.io.File;
 import java.io.Serializable;
 
 import PamModel.parametermanager.FieldNotFoundException;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamguardMVC.blockprocess.PamBlockParams;
 import gpl.contour.ContourMerge;
 
@@ -13,7 +13,7 @@ public class GPLParameters implements Serializable, Cloneable, ManagedParameters
 
 	public static final long serialVersionUID = 1L;
 	
-	public enum ConnectType  {CONNECT4, CONNECT8};
+	public enum ConnectType  {CONNECT4, CONNECT8}
 
 	/**
 	 * Generic description for this parameter set used
@@ -198,7 +198,7 @@ public class GPLParameters implements Serializable, Cloneable, ManagedParameters
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			ps.findParameterData("minPeakGap").setInfo("Minimum gap", "bins", "Minimum gap between peaks (FFT time bins)");
 			ps.findParameterData("minCallLengthSeconds").setInfo("Minimum length", "bins", "Minimum length of a detection in seconds");

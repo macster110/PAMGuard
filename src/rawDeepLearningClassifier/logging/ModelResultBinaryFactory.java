@@ -7,8 +7,7 @@ import java.io.IOException;
 import PamUtils.PamArrayUtils;
 import rawDeepLearningClassifier.dlClassification.PredictionResult;
 import rawDeepLearningClassifier.dlClassification.animalSpot.SoundSpotResult;
-import rawDeepLearningClassifier.dlClassification.dummyClassifier.DummyModelResult;
-import rawDeepLearningClassifier.dlClassification.genericModel.GenericPrediction;
+import rawDeepLearningClassifier.dlClassification.genericModel.StandardPrediction;
 import rawDeepLearningClassifier.dlClassification.ketos.KetosResult;
 
 /**
@@ -115,7 +114,6 @@ public class ModelResultBinaryFactory {
 		try {
 
 			//System.out.println("Make model result: "); 
-
 			int type = dis.readByte(); 
 			boolean isBinary = dis.readBoolean(); 
 			double scale = dis.readFloat();
@@ -139,20 +137,18 @@ public class ModelResultBinaryFactory {
 			case SOUND_SPOT:
 				result = new SoundSpotResult(data, classID, isBinary);  
 				break; 
-			case DUMMY_RESULT:
-				result = new DummyModelResult(data);  
-				break; 
+//			case DUMMY_RESULT:
+//				result = new DummyModelResult(data);  
+//				break; 
 			case KETOS:
 				result = new KetosResult(data);  
 				break; 
 			default:
 				//ideally should never be used. 
-				result = new GenericPrediction(data, isBinary); 
+				result = new StandardPrediction(data, isBinary); 
 				break; 
 			}
-
 			//System.out.println("New model result: "+ type); 
-
 			return result; 
 
 		} catch (IOException e) {
@@ -160,6 +156,37 @@ public class ModelResultBinaryFactory {
 			e.printStackTrace();
 			return null; 
 		}
+	}
+	
+	/**
+	 * Create a prediction result object from data. 
+	 * @param type - flag indicating the type of prediction result. 
+	 * @param predictions - the predictions. 
+	 * @param classID - the classIDs associated with the predictions
+	 * @param isBinary - whether the predictions was classified as being a true positive. 
+	 * @return the prediction result object. 
+	 */
+	public static PredictionResult makePredictionResult(int type, float[] data, short[] classID, boolean isBinary) {
+		//TODO - not sure why some parameters like isBinary and classID are not passed to Ketos or StandardPrediction...
+		
+		PredictionResult result; 
+		//specific settings for different modules 
+		switch (type) {
+		case SOUND_SPOT:
+			result = new SoundSpotResult(data, classID, isBinary);  
+			break; 
+//		case DUMMY_RESULT:
+//			result = new DummyModelResult(data);  
+//			break; 
+		case KETOS:
+			result = new KetosResult(data);  
+			break; 
+		default:
+			//ideally should never be used. 
+			result = new StandardPrediction(data, classID, isBinary); 
+			break; 
+		}
+		return result;
 	}
 
 	/**
@@ -176,12 +203,12 @@ public class ModelResultBinaryFactory {
 			return KETOS; 
 		}
 		//must be last because this is often sub classed
-		if (modelResult instanceof GenericPrediction) {
+		if (modelResult instanceof StandardPrediction) {
 			return GENERIC; 
 		}
-		if (modelResult instanceof DummyModelResult) {
-			return DUMMY_RESULT; 
-		}
+//		if (modelResult instanceof DummyModelResult) {
+//			return DUMMY_RESULT; 
+//		}
 
 		return type;
 	}

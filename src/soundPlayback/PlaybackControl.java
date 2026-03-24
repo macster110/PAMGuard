@@ -20,7 +20,6 @@ import PamController.PamControllerInterface;
 import PamController.PamGUIManager;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
-import PamUtils.PamCalendar;
 import PamView.MenuItemEnabler;
 import PamView.TopToolBar;
 import PamguardMVC.LoadObserver;
@@ -41,6 +40,8 @@ import soundPlayback.swing.PlaybackSidePanel;
 public class PlaybackControl extends PamControlledUnit implements PamSettings {
 
 	public static final int DEFAULT_OUTPUT_RATE = 48000;
+	
+	public static final String PLAYBACK_TYPE_STRING = "Sound Playback";
 
 	protected PlaybackParameters playbackParameters = new PlaybackParameters();
 	
@@ -73,7 +74,7 @@ public class PlaybackControl extends PamControlledUnit implements PamSettings {
 	
 	public PlaybackControl(String unitName) {
 		
-		super("Sound Playback", unitName);
+		super(PLAYBACK_TYPE_STRING, unitName);
 		
 		filePlayback = new FilePlayback(this);
 		
@@ -123,14 +124,17 @@ public class PlaybackControl extends PamControlledUnit implements PamSettings {
 		stopButtonEnabler.addMenuItem(button);
 	}
 
+	@Override
 	public Serializable getSettingsReference() {
 		return playbackParameters;
 	}
 
+	@Override
 	public long getSettingsVersion() {
 		return PlaybackParameters.serialVersionUID;
 	}
 
+	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 
 		playbackParameters = ((PlaybackParameters) pamControlledUnitSettings.getSettings()).clone();
@@ -144,7 +148,7 @@ public class PlaybackControl extends PamControlledUnit implements PamSettings {
 		playbackSystem = findPlaybackSystem(sourceDataBlock);
 		playbackProcess.noteNewSettings();
 		playbackSidePanel.newSettings();
-		if (playBackGUI!=null) playBackGUI.notifyGUIChange(PamController.CHANGED_PROCESS_SETTINGS);
+		if (playBackGUI!=null) playBackGUI.notifyGUIChange(PamControllerInterface.CHANGED_PROCESS_SETTINGS);
 //		if (this.getSidePanel() != null){
 //			this.getSidePanel().getPanel().setVisible(!isRealTimePlayback());
 //		}
@@ -182,7 +186,7 @@ public class PlaybackControl extends PamControlledUnit implements PamSettings {
 		if (daqProcess == null) return null;
 		DaqSystem daqSystem = daqProcess.getAcquisitionControl().findDaqSystem(null);
 		if (daqSystem == null) return null;
-		if (daqSystem.isRealTime() == false || isViewer || isMixed){
+		if (!daqSystem.isRealTime() || isViewer || isMixed){
 			realTimePlayback = false;
 			return filePlayback;
 		}
@@ -231,6 +235,7 @@ public class PlaybackControl extends PamControlledUnit implements PamSettings {
 			this.parentFrame = parentFrame;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 
 			PlaybackParameters newParams = PlaybackDialog.showDialog(parentFrame, playbackParameters, playbackControl);

@@ -14,19 +14,20 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 import javax.swing.border.TitledBorder;
 
 import PamController.PamController;
-import spectrogramNoiseReduction.SpectrogramNoiseDialogPanel;
-import spectrogramNoiseReduction.SpectrogramNoiseSettings;
-import fftManager.FFTDataBlock;
-import fftManager.FFTDataUnit;
 import PamView.dialog.GroupedSourcePanel;
 import PamView.dialog.PamDialog;
 import PamView.dialog.PamGridBagContraints;
+import PamguardMVC.DataBlock2D;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamProcess;
 import cepstrum.CepstrumProcess;
+import fftManager.FFTDataUnit;
+import spectrogramNoiseReduction.SpectrogramNoiseDialogPanel;
+import spectrogramNoiseReduction.SpectrogramNoiseSettings;
 
 public class WhistleToneDialog extends PamDialog {
 
@@ -57,6 +58,12 @@ public class WhistleToneDialog extends PamDialog {
 		JPanel p = new JPanel(new BorderLayout());
 		sourcePanel = new GroupedSourcePanel(this, "Source of FFT data", FFTDataUnit.class, true, true, true);
 		p.add(BorderLayout.NORTH, sourcePanel.getPanel());
+		sourcePanel.addSelectionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				sourceSelection();
+			}
+		});
 		
 		JPanel d = new JPanel();
 		d.setBorder(new TitledBorder("Connections"));
@@ -104,7 +111,7 @@ public class WhistleToneDialog extends PamDialog {
 		addComponent(e, new JLabel(" pixels"), c);
 		c.gridy++;
 		c.gridx=0;
-		addComponent(e, new JLabel(" Shape 'stubs' ", JLabel.RIGHT), c);
+		addComponent(e, new JLabel(" Shape 'stubs' ", SwingConstants.RIGHT), c);
 		c.gridx++;
 		addComponent(e, removeStubs = new JCheckBox("Remove small stubs"), c);
 		c.gridy++;
@@ -171,12 +178,16 @@ public class WhistleToneDialog extends PamDialog {
 		whistleToneParameters = null;
 	}
 
+	protected void sourceSelection() {
+		checkFrequencyRange();
+	}
+
 	private void setParams() {
 //		sourcePanel.setSource(whistleToneParameters.dataSource);
 //		sourcePanel.setChannelList(whistleToneParameters.channelList);
 		sourcePanel.setParams(whistleToneParameters);
-		minFreq.setText(String.format("%.0f", whistleToneParameters.getMinFrequency()));
-		maxFreq.setText(String.format("%.0f", whistleToneParameters.
+		minFreq.setText(String.format("%.1f", whistleToneParameters.getMinFrequency()));
+		maxFreq.setText(String.format("%.1f", whistleToneParameters.
 				getMaxFrequency(whistleMoanControl.getWhistleToneProcess().getSampleRate())));
 		if (whistleToneParameters.getConnectType() == 8) {
 			connectType.setSelectedIndex(1);
@@ -191,18 +202,47 @@ public class WhistleToneDialog extends PamDialog {
 		removeStubs.setSelected(!whistleToneParameters.keepShapeStubs);
 		spectrogramNoiseDialogPanel.setParams(whistleToneParameters.getSpecNoiseSettings());
 		
+		checkFrequencyRange();
 		enableControls();
+	}
+	
+	/**
+	 * Check frequency range and insert sensible values if the current ones
+	 * are outside the range. 
+	 */
+	private void checkFrequencyRange() {
+		PamDataBlock dataBlock = sourcePanel.getSource();
+		if (dataBlock instanceof DataBlock2D == false) {
+			return;
+		}
+		DataBlock2D db2d = (DataBlock2D) dataBlock;
+		double minF = db2d.getMinDataValue();
+		double maxF = db2d.getMaxDataValue();
+		double minV = 0, maxV = 0;
+		try {
+			 minV = Double.valueOf(minFreq.getText());
+		}
+		catch (NumberFormatException ex) {}try {
+			 maxV = Double.valueOf(maxFreq.getText());
+		}
+		catch (NumberFormatException ex) {}
+		if (minV < minF) {
+			minFreq.setText(String.format("%3.1f", minF));
+		}
+		if (maxV > maxF || maxV <= 0) {
+			maxFreq.setText(String.format("%3.1f", maxF));
+		}
 	}
 	
 	@Override
 	public boolean getParams() {
-		if (sourcePanel.getParams(whistleToneParameters) == false) {
+		if (!sourcePanel.getParams(whistleToneParameters)) {
 			return false;
 		}
 		if (whistleToneParameters.getChanOrSeqBitmap() == 0) {
 			return showWarning("You must select at least one detection channel");
 		}
-		try {
+		try {			
 			whistleToneParameters.setMinFrequency(Double.valueOf(minFreq.getText()));
 			whistleToneParameters.setMaxFrequency(Double.valueOf(maxFreq.getText()));
 			whistleToneParameters.minLength = Integer.valueOf(minLength.getText());
@@ -212,7 +252,7 @@ public class WhistleToneDialog extends PamDialog {
 		catch (NumberFormatException e) {
 			return false;
 		}
-		whistleToneParameters.keepShapeStubs = (removeStubs.isSelected() == false);
+		whistleToneParameters.keepShapeStubs = !removeStubs.isSelected();
 		if (connectType.getSelectedIndex() == 1) {
 			whistleToneParameters.setConnectType(8);
 		}
@@ -220,7 +260,7 @@ public class WhistleToneDialog extends PamDialog {
 			whistleToneParameters.setConnectType(4);
 		}
 		whistleToneParameters.fragmentationMethod = fragmentation.getSelectedIndex();
-		if (spectrogramNoiseDialogPanel.getParams(whistleToneParameters.getSpecNoiseSettings()) == false) {
+		if (!spectrogramNoiseDialogPanel.getParams(whistleToneParameters.getSpecNoiseSettings())) {
 			return false;
 		}
 //		PamDataBlock dataSource = sourcePanel.getSource();
@@ -229,7 +269,7 @@ public class WhistleToneDialog extends PamDialog {
 //			whistleToneParameters.channelList = dataSource.getChannelMap();
 //		}
 		boolean ok = checkMethods();
-		if (ok == false) {
+		if (!ok) {
 			String msg = "For the Whistle and tone detector to work, you must use \n" +
 					"the following spectrogram noise reduction methods:\n" +
 					"Median filter\n" +
@@ -257,7 +297,7 @@ public class WhistleToneDialog extends PamDialog {
 		// the Gaussian smoothing is optional. 
 		int[] required = {0, 1, 3};
 		for (int i = 0; i < required.length; i++) {
-			if (spectrogramNoiseDialogPanel.hasProcessed(required[i]) == false) {
+			if (!spectrogramNoiseDialogPanel.hasProcessed(required[i])) {
 				return false;
 			}
 		}

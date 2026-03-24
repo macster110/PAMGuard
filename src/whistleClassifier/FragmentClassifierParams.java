@@ -3,13 +3,13 @@ package whistleClassifier;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 
-import classifier.ClassifierParams;
-import classifier.ClassifierTypes;
-
 import Jama.Matrix;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
+import classifier.ClassifierParams;
+import classifier.ClassifierTypes;
 
 /**
  * Parameters class for fragmented whistle classification. 
@@ -35,11 +35,11 @@ public class FragmentClassifierParams implements Serializable, Cloneable, Manage
 
 	public static final long serialVersionUID = 0;
 	
-	protected int classifierType = ClassifierTypes.CLASSIFIER_LINEAR;
+	public int classifierType = ClassifierTypes.CLASSIFIER_LINEAR;
 	
-	protected int fftLength, fftHop;
+	public int fftLength, fftHop;
 	
-	protected int fragmentLength, sectionLength;
+	public int fragmentLength, sectionLength;
 	
 	/**
 	 * Min probability for classification. 
@@ -50,23 +50,23 @@ public class FragmentClassifierParams implements Serializable, Cloneable, Manage
 	 * <p>With the quadratic classifier, output for each species is an absolute 
 	 * probability so setting a minimum will easily generate an unknown class. 
 	 */
-	protected double minimumProbability;
+	public double minimumProbability;
 	
-	protected double[] frequencyRange;
+	public double[] frequencyRange;
 	
-	protected float sampleRate;
+	public float sampleRate;
 	
-	protected int nBootstrap;
+	public int nBootstrap;
 	
-	protected Matrix confusionMatrix;
+	public Matrix confusionMatrix;
 	
-	protected Matrix stdConfusion;
+	public Matrix stdConfusion;
 		
-	protected ClassifierParams classifierParams;
+	public ClassifierParams classifierParams;
 	
 	private String[] speciesList;
 	
-	protected String fileName; // file name these parameters were stored in. 
+	public String fileName; // file name these parameters were stored in. 
 	
 	public boolean dumpTextFile; // text file output of all bootstrap data.
 	
@@ -250,7 +250,7 @@ public class FragmentClassifierParams implements Serializable, Cloneable, Manage
 	 */
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("confusionMatrix");
 			ps.put(new PrivatePamParameterData(this, field) {

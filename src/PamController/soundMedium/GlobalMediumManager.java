@@ -27,7 +27,7 @@ public class GlobalMediumManager implements PamSettings {
 	
 	private GlobalMediumParams globalMediumParams = new GlobalMediumParams(); 
 	
-	private String warning =  "	Changing to between air and water requires a PAMGuard restart\n"
+	public String warning =  "	Changing to between air and water requires a PAMGuard restart\n"
 							+ "	for some display changes to take effect. Settings such as\n"
 							+ " sound speed, reciever sensitivity values and data unit amplitudes\n"
 							+ " will be recalculated or set to new default values.\n"
@@ -74,6 +74,7 @@ public class GlobalMediumManager implements PamSettings {
 			subMenu.add(rbMenuItem); 
 		}
 	}
+	
 
 
 	/**
@@ -135,6 +136,21 @@ public class GlobalMediumManager implements PamSettings {
 		return GlobalMedium.getdBRefString(globalMediumParams.currentMedium); 
 	}
 
+	/**
+	 * Get the string for the default dB reference unit for power spectral density e.g. dB re 1uPa^2/Hz.
+	 * @return the string for dB values.
+	 */
+	public String getdBPSDString() {
+		return GlobalMedium.getdBPSDString(globalMediumParams.currentMedium);
+	}
+
+	/**
+	 * Get the string for the default dB reference unit for power spectral density e.g. dB re 1uPa^2/Hz.
+	 * @return the string for dB values.
+	 */
+	public String getdBSELString() {
+		return GlobalMedium.getdBSELString(globalMediumParams.currentMedium);
+	}
 
 	/**
 	 * Get the height coefficient value for displays. Heights are always stored so

@@ -228,7 +228,7 @@ public class PamTableItem implements Cloneable {
 //		if (sqlType != Types.CHAR || value == null) {
 //			return null;
 //		}
-		if (value instanceof String == false) {
+		if (!(value instanceof String)) {
 			return null;
 		}
 		return ((String) value).trim();
@@ -377,7 +377,7 @@ public class PamTableItem implements Cloneable {
 	 * column for use in cross referencing. 
 	 */
 	public static PamTableItem findTableItem(String tableName, String columnName) {
-		PamTableDefinition tableDef = EmptyTableDefinition.
+		EmptyTableDefinition tableDef = EmptyTableDefinition.
 			findTableDefinition(EmptyTableDefinition.deblankString(tableName));
 		if (tableDef == null) return null;
 		return tableDef.findTableItem(EmptyTableDefinition.deblankString(columnName));
@@ -431,12 +431,19 @@ public class PamTableItem implements Cloneable {
 			return null;
 		}
 		try {
-		return (Integer) value;
+		if (value instanceof Integer) {
+			return (Integer) value;
+		}
+		else if (value instanceof Long) {
+			long longVal = (long) value;
+			return (int) longVal;
+		}
 		}
 		catch (ClassCastException e) {
 			e.printStackTrace();
 			return -1;
 		}
+		return null;
 	}
 	
 	
@@ -475,6 +482,18 @@ public class PamTableItem implements Cloneable {
 	public double getDoubleValue() {
 		if (value == null) {
 			return Double.NaN;
+		}
+		if (value.getClass() == Integer.class) {
+			int iv = (Integer) value;
+			return iv;
+		}
+		if (value.getClass() == Long.class) {
+			long iv = (Long) value;
+			return iv;
+		}
+		if (value.getClass() == Float.class) {
+			float iv = (Float) value;
+			return iv;
 		}
 		return (Double) value;
 	}

@@ -1,8 +1,5 @@
 package detectiongrouplocaliser;
 
-import java.awt.MouseInfo;
-import java.awt.Point;
-import java.awt.PointerInfo;
 import java.awt.Window;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +7,7 @@ import java.util.ListIterator;
 
 import javax.swing.JPopupMenu;
 
-import PamController.PamController;
+import PamController.PamControllerInterface;
 import PamUtils.PamCalendar;
 import PamView.GeneralProjector.ParameterType;
 import PamView.paneloverlay.OverlayMarkSwingPanel;
@@ -58,7 +55,7 @@ public class DetectionGroupProcess extends PamProcess {
 	public DetectionGroupProcess(DetectionGroupControl detectionGroupControl) {
 		super(detectionGroupControl, null);
 		this.detectionGroupControl = detectionGroupControl;
-		detectionGroupDataBlock = new DetectionGroupDataBlock(detectionGroupControl.getUnitName(), this);
+		detectionGroupDataBlock = new DetectionGroupDataBlock(detectionGroupControl.getUnitName(), detectionGroupControl, this);
 		
 		detectionGroupLogging = new DetectionGroupLogging(detectionGroupControl, detectionGroupDataBlock);
 		detectionGroupDataBlock.SetLogging(detectionGroupLogging);
@@ -88,7 +85,7 @@ public class DetectionGroupProcess extends PamProcess {
 	public void notifyModelChanged(int changeType) {
 		super.notifyModelChanged(changeType);
 		switch (changeType) {
-		case PamController.INITIALIZATION_COMPLETE:
+		case PamControllerInterface.INITIALIZATION_COMPLETE:
 			subscribeMarkObserver();
 			annotationHandler.loadAnnotationChoices();
 			sortSQLLogging();
@@ -413,7 +410,7 @@ public class DetectionGroupProcess extends PamProcess {
 			}
 		}
 		for (PamDataUnit superData:groupSummary.getSuperDetections()) {
-			if (DetectionGroupDataUnit.class.isAssignableFrom(superData.getClass()) == false) {
+			if (!DetectionGroupDataUnit.class.isAssignableFrom(superData.getClass())) {
 				continue;
 			}
 			DetectionGroupDataUnit dgdu = (DetectionGroupDataUnit) superData;
@@ -458,6 +455,7 @@ public class DetectionGroupProcess extends PamProcess {
 		detectionGroupDataBlock.saveViewerData();
 		int nUpdates = 0;
 		int nOK = 0;
+		int consecutiveOK = 0;
 		System.out.printf("Checking %d data units in %s ", detectionGroupDataBlock.getUnitsCount(), detectionGroupDataBlock.getDataName());
 		synchronized (detectionGroupDataBlock.getSynchLock()) {
 			ListIterator<DetectionGroupDataUnit> it = detectionGroupDataBlock.getListIterator(0);
@@ -466,11 +464,16 @@ public class DetectionGroupProcess extends PamProcess {
 				boolean ok = checkDataIntegrity(du, false);
 				if (ok) {
 					nUpdates++;
+					consecutiveOK = 0;
 				}
 				else {
 					nOK++;
+					consecutiveOK++;
 				}
 				System.out.printf(".");
+				if (consecutiveOK % 80 == 0) {
+					System.out.printf("\n");
+				}
 			}
 		}
 		System.out.printf("\n%s: %d out of %d data units required corrections\n", detectionGroupDataBlock.getDataName(), nUpdates, nUpdates+nOK);
@@ -486,7 +489,7 @@ public class DetectionGroupProcess extends PamProcess {
 		subTabLogging = detectionGroupLogging.getSubLogging();
 		PamConnection con = DBControlUnit.findConnection();
 		String desc = String.format("Detection group UID %d at %s", du.getUID(), PamCalendar.formatDBDateTime(du.getTimeMilliseconds()));
-		String idList = "( " + du.getUID() + " )";
+		String idList = "( " + du.getDatabaseIndex() + " )";
 		ArrayList<PamSubtableData> stData = subTabLogging.loadSubtableData(con, detectionGroupLogging, idList, null);
 		if (stData == null) {
 			System.out.println("Error loading sub table data for event uid " + du.getUID());

@@ -4,12 +4,13 @@ import PamUtils.PamCalendar;
 
 public class InputStoreInfo {
 
-	private DataInputStore dataInputStore;
+	private DataStoreInfoHolder dataInputStore;
 	private int nFiles;
 	private long firstFileStart, lastFileStart, lastFileEnd;
 	private long[] fileStartTimes;
+	private long[] allFileEnds;
 	
-	public InputStoreInfo(DataInputStore dataInputStore, int nFiles, long firstFileStart, long lastFileStart, long lastFileEnd) {
+	public InputStoreInfo(DataStoreInfoHolder dataInputStore, int nFiles, long firstFileStart, long lastFileStart, long lastFileEnd) {
 		super();
 		this.dataInputStore = dataInputStore;
 		this.nFiles = nFiles;
@@ -56,7 +57,7 @@ public class InputStoreInfo {
 	/**
 	 * @return the dataInputStore
 	 */
-	public DataInputStore getDataInputStore() {
+	public DataStoreInfoHolder getDataInputStore() {
 		return dataInputStore;
 	}
 
@@ -95,6 +96,21 @@ public class InputStoreInfo {
 	 */
 	public void setLastFileEnd(long lastFileEnd) {
 		this.lastFileEnd = lastFileEnd;
+	}
+
+	/**
+	 * Set all file end times. 
+	 * @param allFileEnds
+	 */
+	public void setFileEndTimes(long[] allFileEnds) {
+		this.allFileEnds = allFileEnds;
+	}
+
+	/**
+	 * @return the allFileEnds
+	 */
+	public long[] getAllFileEnds() {
+		return allFileEnds;
 	}
 	
 

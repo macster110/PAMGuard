@@ -1,8 +1,9 @@
 package clickDetector;
 
-import generalDatabase.SQLTypes;
 import PamguardMVC.PamDataUnit;
 import clickDetector.offlineFuncs.OfflineEventDataUnit;
+import generalDatabase.PamTableDefinition;
+import generalDatabase.SQLTypes;
 
 public class TrackedClickGroupLogging extends ClickGroupLogging {
 	
@@ -30,7 +31,8 @@ public class TrackedClickGroupLogging extends ClickGroupLogging {
 		boolean isUpdate = true;
 //		Timestamp ts = (Timestamp) getTableDefinition().getTimeStampItem().getValue();
 //		long t = PamCalendar.millisFromTimeStamp(ts);
-		int updateIndex = (Integer) getTableDefinition().getUpdateReference().getValue();
+		PamTableDefinition tableDef = (PamTableDefinition) getTableDefinition();
+		int updateIndex = (Integer) tableDef.getUpdateReference().getValue();
 		if (updateIndex > 0) {
 			tcg = this.clickGroupDataBlock.findByDatabaseIndex(updateIndex);
 		}

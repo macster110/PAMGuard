@@ -12,6 +12,7 @@ import org.w3c.dom.NodeList;
 //import com.sun.org.apache.xerces.internal.dom.DocumentImpl;
 import PamController.PamSettings;
 import PamUtils.XMLUtils;
+import PamUtils.worker.filelist.WavFileType;
 
 public class DCL5System extends FolderInputSystem implements PamSettings {
 
@@ -21,7 +22,7 @@ public class DCL5System extends FolderInputSystem implements PamSettings {
 //		PamSettingManager.getInstance().registerSettings(this);
 //	}
 	String xmlDocName = "C:\\DCL_5_2011\\Matlab\\SpeciesFiletimes2.xml";
-	
+
 
 	Document doc;
 
@@ -82,11 +83,11 @@ public class DCL5System extends FolderInputSystem implements PamSettings {
 			return 0;
 		}
 		String timeString = e.getAttribute("time");
-		return super.getFileStartTime(new File(timeString));
+		return super.getFileStartTime(file);
 		/*
-		 * Get the file time from the XML document. 
+		 * Get the file time from the XML document.
 		 */
 //		return super.getFileStartTime(file);
 	}
-	
+
 }

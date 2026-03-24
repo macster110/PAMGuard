@@ -20,14 +20,19 @@
  */
 package Map;
 
+import java.awt.Point;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.geom.AffineTransform;
+import java.util.ListIterator;
 
+import GPS.GPSControl;
+import GPS.GPSDataBlock;
+import GPS.GpsDataUnit;
 import PamUtils.Coordinate3d;
 import PamUtils.LatLong;
 import PamUtils.PamCoordinate;
 import PamUtils.PamUtils;
-import PamguardMVC.debug.Debug;
+import effort.EffortDataUnit;
 
 /**
  * The Map Rectangle Projector.
@@ -383,6 +388,54 @@ public class MapRectProjector extends MapProjector {
 //		xTrans.translate(0, 100);
 //		xTrans.translate(0, panelHeight/4/Math.cos(Math.toRadians(rx)));
 		return xTrans;
+	}
+
+	@Override
+	public String getHoverText(Point mousePoint, int ploNumberMatch) {
+		String text = super.getHoverText(mousePoint, ploNumberMatch);
+		if (text == null) {
+			return findGpsTrackText(mousePoint, ploNumberMatch);
+		}
+		else {
+			return text;
+		}
+	}
+
+	private String findGpsTrackText(Point mousePoint, int ploNumberMatch) {
+		GPSControl gpsControl = GPSControl.getGpsControl();
+		if (gpsControl == null || mousePoint == null) {
+			return null;
+		}
+		LatLong currentPos = getDataPosition(new Coordinate3d(mousePoint.x, mousePoint.y));
+		GPSDataBlock gpsDataBlock = gpsControl.getGpsDataBlock();
+		// 2025-09-03 change to using synchronized search in gps data block. 
+		GpsDataUnit closest = gpsDataBlock.findClosestGPS(currentPos);
+//		ListIterator<GpsDataUnit> it = gpsDataBlock.getListIterator(0);
+//		while (it.hasNext()) {
+//			GpsDataUnit gpsUnit = it.next();
+//			double r = gpsUnit.getGpsData().distanceToMetres(currentPos);
+//			if (r < dist) {
+//				dist = r;
+//				closest = gpsUnit;
+//			}
+//		}
+		if (closest == null) {
+			return null;
+		}
+		double dist = closest.getGpsData().distanceToMetres(currentPos);
+		double rPix = dist*this.pixelsPerMetre;
+		if (rPix > 20) {
+			return null;
+		}
+		EffortDataUnit effortData = mapPanelRef.findEffortThing(closest.getTimeMilliseconds());
+		if (effortData == null) {
+			return closest.getSummaryString();
+		}
+		else {
+			String effSummary = effortData.toString();
+			String str = closest.getSummaryString() + "Effort: " + effSummary;
+			return str;
+		}
 	}
 
 

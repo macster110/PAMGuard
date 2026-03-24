@@ -28,10 +28,11 @@ import java.util.Arrays;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
-import pamMaths.PamVector;
 import PamView.PamSymbol;
 import PamView.PamSymbolType;
+import pamMaths.PamVector;
 
 /**
  * 
@@ -158,7 +159,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 		return sensitivity;
 	}
 
-	protected void setSensitivity(double sensitivity) {
+	public void setSensitivity(double sensitivity) {
 		this.sensitivity = sensitivity;
 	}
 	
@@ -202,7 +203,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 	/**
 	 * @return error on the hydrophone x coordinate. 
 	 */
-	protected double getdX() {
+	public double getdX() {
 		return getCoordinateError(0);
 	}
 
@@ -210,7 +211,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 	 * Set the error on the hydrophone x coordinate
 	 * @param error error in metres. 
 	 */
-	protected void setdX(double error) {
+	public void setdX(double error) {
 		setCoordinateError(0, error);
 	}
 
@@ -218,7 +219,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 	/**
 	 * @return error on the hydrophone y coordinate. 
 	 */
-	protected double getdY() {
+	public double getdY() {
 		return getCoordinateError(1);
 	}
 
@@ -226,14 +227,14 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 	 * Set the error on the hydrophone y coordinate
 	 * @param error error in metres. 
 	 */
-	protected void setdY(double error) {
+	public void setdY(double error) {
 		setCoordinateError(1, error);
 	}
 
 	/**
 	 * @return error on the hydrophone depth coordinate. 
 	 */
-	protected double getdZ(){
+	public double getdZ(){
 		return getCoordinateError(2);
 	}
 
@@ -241,19 +242,19 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 	 * Set the error on the hydrophone z coordinate
 	 * @param error error in metres. 
 	 */
-	protected void setdZ(double error) {
+	public void setdZ(double error) {
 		setCoordinateError(2, error);
 	}
 
-	protected double getX() {
+	public double getX() {
 		return coordinate[0];
 	}
 
-	protected void setX(double x) {
+	public void setX(double x) {
 		this.coordinate[0] = x;
 	}
 
-	protected double getY() {
+	public double getY() {
 		return coordinate[1];
 	}
 	
@@ -288,7 +289,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 		return y2;
 	}
 
-	protected void setY(double y) {
+	public void setY(double y) {
 		this.coordinate[1] = y;
 	}
 
@@ -296,7 +297,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 		return coordinate[2];
 	}
 
-	protected void setZ(double z) {
+	public void setZ(double z) {
 		this.coordinate[2] = z;
 	}
 
@@ -315,7 +316,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 			// need to explicity create a new copy of the double[3] coordinate 
 			// and the double[2] bandwidth
 			Hydrophone h = (Hydrophone) super.clone();
-			h.setBandwidth(Arrays.copyOf(getBandwidth(), h.getBandwidth().length));
+			h.setBandwidth(getBandwidth() == null ? null : Arrays.copyOf(getBandwidth(), h.getBandwidth().length));
 			h.setCoordinate(Arrays.copyOf(getCoordinates(), 3));
 			h.setCoordinateErrors(Arrays.copyOf(getCoordinateErrors(), 3));
 			h.checkDepthInversion();
@@ -333,7 +334,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 	/**
 	 * @return Returns the coordinate.
 	 */
-	protected double[] getCoordinates() {
+	public double[] getCoordinates() {
 		return Arrays.copyOf(coordinate,3);
 	}
 	
@@ -364,7 +365,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 	/**
 	 * @param preampGain The preampGain to set.
 	 */
-	protected void setPreampGain(double preampGain) {
+	public void setPreampGain(double preampGain) {
 		this.preampGain = preampGain;
 	}
 
@@ -378,14 +379,14 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 	/**
 	 * @return Returns the iD.
 	 */
-	protected int getID() {
+	public int getID() {
 		return iD;
 	}
 
 	/**
 	 * @param id The iD to set.
 	 */
-	protected void setID(int id) {
+	public void setID(int id) {
 		iD = id;
 	}
 //
@@ -426,11 +427,11 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 		this.symbol = symbol;
 	}
 
-	protected int getStreamerId() {
+	public int getStreamerId() {
 		return streamerId;
 	}
 
-	protected void setStreamerId(int streamerId) {
+	public void setStreamerId(int streamerId) {
 		this.streamerId = streamerId;
 	}
 
@@ -478,7 +479,7 @@ public class Hydrophone implements Serializable, Cloneable, ManagedParameters {
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet pps = PamParameterSet.autoGenerate(this);
+		PamParameterSet pps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		Field f;
 		try {
 			f = this.getClass().getDeclaredField("coordinate");

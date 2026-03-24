@@ -11,8 +11,8 @@ import dataPlotsFX.layout.TDGraphFX;
 import dataPlotsFX.layout.TDGraphFX.TDPlotPane;
 import dataPlotsFX.overlaymark.menuOptions.OverlayMenuItem;
 import dataPlotsFX.overlaymark.menuOptions.OverlayMenuManager;
-import dataPlotsFX.overlaymark.menuOptions.wavExport.WavFileExportManager;
 import detectiongrouplocaliser.DetectionGroupSummary;
+import export.wavExport.WavDetExport;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
@@ -38,6 +38,7 @@ import pamViewFX.fxNodes.PamTilePane;
 import pamViewFX.fxNodes.PamVBox;
 import pamViewFX.fxNodes.flipPane.FlipPane;
 import pamViewFX.fxNodes.hidingPane.HidingPane;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import pamViewFX.fxNodes.utilsFX.PamUtilsFX;
 import pamViewFX.fxStyles.PamStylesManagerFX;
 
@@ -149,6 +150,7 @@ public class TDMenuPane extends PamBorderPane {
 		this.setCenter(holder);
 
 		groupDetectionDisplay = new OverlayGroupDisplay(); 
+		
 		groupDetectionDisplay.addDisplayListener((oldDataUnit, newDataUnit)->{
 			//listener for changing data units 
 			setCurrentDataUnit(newDataUnit);
@@ -219,8 +221,6 @@ public class TDMenuPane extends PamBorderPane {
 			closeButtonLeft.setVisible(true);
 			topHolder.setLeft(closeButtonLeft);
 
-			holder.setLeft(hidingPaneLeft);
-
 			holder.setCenter(groupDetectionDisplay);
 			holder.setLeft(hidingPaneLeft);
 
@@ -233,22 +233,27 @@ public class TDMenuPane extends PamBorderPane {
 	/**
 	 * Set the summary text for the data unit in the menu. 
 	 */
-	private void setSummaryText() {
-		
-		//System.out.println(""); 
-		if (currentDataUnit==null || detectionSummary==null) return; 
+	private void setSummaryText() {		
+		if (currentDataUnit==null || detectionSummary==null) {
+			this.infoTextLabel.setText("No data units selected");
+			return; 
+		}
 
 		String text; 
 		if (detectionSummary.getDataList().size()>=1){
 //			text= currentDataUnit.getSummaryString();
-			
+						
 			text=currentDataUnit.getParentDataBlock().
 					getHoverText(tdGraphFX.getGraphProjector(), currentDataUnit, 0);
+			
+			
+			if (text==null) return; //do not clear as usually this is because a super unit has been set
 		}
 		else {
 			//selected an area with no data units. 
 			text= new String("No data units selected"); 
 		}
+
 		this.infoTextLabel.setText(PamUtilsFX.htmlToNormal(text));
 	}
 
@@ -267,7 +272,7 @@ public class TDMenuPane extends PamBorderPane {
 	private Pane createMenuPane(){
 
 		PamVBox menuPane = new PamVBox(); 
-		menuPane.getStylesheets().add(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getSlidingDialogCSS());
+		menuPane.getStylesheets().addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getSlidingDialogCSS());
 		menuPane.setStyle("-fx-background-color: -fx-darkbackground");
 
 		//create info and toggle detection buttons that always sit at the top of the display
@@ -279,25 +284,27 @@ public class TDMenuPane extends PamBorderPane {
 		infoButton.setGraphic(PamGlyphDude.createPamIcon("mdi2i-information", PamGuiManagerFX.iconSize));
 		//infoButton.setStyle(" -fx-background-radius: 0 0 0 0;");
 
-		toggle= new ToggleSwitch(); 
+		toggle= new ToggleSwitch();
+		toggle.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chart-bell-curve", PamGuiManagerFX.iconSize));
 		toggle.setSelected(true);
 		toggle.setAlignment(Pos.CENTER);
 		toggle.setTooltip(new Tooltip("Show a preview of the detection"));
-		toggle.setMaxWidth(20);
+		toggle.setMaxWidth(30);
 		toggle.selectedProperty().addListener((obsVal, oldVal, newVal)->{
 			this.layoutPane(newVal);
 			this.getParent().layout(); //make sure the pop up actually lays out properly. 
 		});
+		
+		PamHBox toggleBox = new PamHBox(); 
+		toggleBox.setPadding(new Insets(5,5,5,5));
+		toggleBox.setSpacing(5);
+		toggleBox.getChildren().addAll(new Label("",PamGlyphDude.createPamIcon("mdi2c-chart-bell-curve", PamGuiManagerFX.iconSize)), toggle); 
 
-		PamBorderPane toggleHolder = new PamBorderPane(toggle);
-		toggleHolder.getStyleClass().add("square-button-trans");
-
-		toggleHolder.setPadding(new Insets(0,10,0,0));
-		toggleHolder.prefWidthProperty().bind(menuPane.widthProperty());
-
-		PamHBox topMenu = new PamHBox();
-		topMenu.getChildren().addAll(infoButton, toggleHolder);
-		topMenu.setAlignment(Pos.CENTER);
+		
+		PamBorderPane topMenu = new PamBorderPane();
+		topMenu.setLeft(infoButton);
+		topMenu.setRight(toggleBox);
+		//topMenu.setAlignment(Pos.CENTER);
 
 		menuPane.getChildren().add(topMenu);
 
@@ -491,6 +498,7 @@ public class TDMenuPane extends PamBorderPane {
 	 * @param pamDataUnit - the current data unit. 
 	 */
 	private void setCurrentDataUnit(PamDataUnit pamDataUnit) {
+		
 		currentDataUnit = pamDataUnit; 
 		setSummaryText();
 	}
@@ -501,11 +509,19 @@ public class TDMenuPane extends PamBorderPane {
 	 */
 	public void prepareDisplay(){
 
-		if (detectionSummary==null || detectionSummary.getDataList()==null) {
-			currentDataUnit=null; 
+		if (detectionSummary==null || detectionSummary.getDataList()==null || detectionSummary.getDataList().size()==0) {
+			setCurrentDataUnit(null); 
 		}
-		else{ //show the first data unit;
-			setCurrentDataUnit(currentDataUnit); 
+		else{ 
+			/**
+			 * It's important to set the data unit explicitly here. This is because the listener 
+			 * in the group display will return both the super detection and currently selected click
+			 * which can confuse the display, especially if the super detection has no associated data information
+			 * So when a new data unit is selected set it here so that it's defintely the selected data unit which 
+			 * is showing in the menu pane. 
+			 */
+			//show the first data unit;
+			setCurrentDataUnit(this.detectionSummary.getDataList().get(0)); 
 			this.detectionSummary.setFocusedIndex(0); //set focused to highlight data unit. 
 		}
 
@@ -519,8 +535,8 @@ public class TDMenuPane extends PamBorderPane {
 	/**
 	 * Set the data unit list. 
 	 */
-	public void setDataUnitList(DetectionGroupSummary detectionGroupSummary, OverlayMarker overlayMarker, MouseEvent e){		
-
+	public void setDataUnitList(DetectionGroupSummary detectionGroupSummary, OverlayMarker overlayMarker, MouseEvent e){	
+		
 		this.detectionSummary=detectionGroupSummary;
 		this.overlayMarker=overlayMarker; 
 		this.currentMouseEvent = e; 
@@ -528,9 +544,7 @@ public class TDMenuPane extends PamBorderPane {
 		this.groupDetectionDisplay.clearDisplay();
 		this.infoTextLabel.setText("");
 
-
 		this.groupDetectionDisplay.setDetectionGroup(detectionSummary!=null ? detectionSummary.getDataList() : null); 
-
 
 		//show the detection display. 
 		boolean showDetDisplay = toggle.isSelected(); 
@@ -545,12 +559,9 @@ public class TDMenuPane extends PamBorderPane {
 			PamRawDataBlock pamRawBlock =  findRawSourceBlock(); 
 			//			System.out.println("Pam raw data block: " +  pamRawBlock); 
 			
-			
-			if (WavFileExportManager.haveRawData(pamRawBlock, (long) overlayMarker.getCurrentMark().getLimits()[0], (long) overlayMarker.getCurrentMark().getLimits()[1])) {
-	
+			if (WavDetExport.haveRawData(pamRawBlock, (long) overlayMarker.getCurrentMark().getLimits()[0], (long) overlayMarker.getCurrentMark().getLimits()[1])) {
 				//System.out.println("Overaly Marker start X: " +  overlayMarker.getCurrentMark().getLimits()[0] + "  end: " +  overlayMarker.getCurrentMark().getLimits()[1]);
 				//System.out.println("Overlay Marker start Y: " +  overlayMarker.getCurrentMark().getLimits()[2] + "  end: " +  overlayMarker.getCurrentMark().getLimits()[3]);
-
 				groupDetectionDisplay.showRawData(pamRawBlock, overlayMarker.getCurrentMark().getLimits(), overlayMarker.getCurrentMark().getMarkChannels());
 			}
 			else {

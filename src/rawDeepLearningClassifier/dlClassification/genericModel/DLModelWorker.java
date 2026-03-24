@@ -11,17 +11,17 @@ import org.jamdev.jdl4pam.transforms.DLTransformsFactory;
 import org.jamdev.jdl4pam.utils.DLUtils;
 import org.jamdev.jpamutils.wavFiles.AudioData;
 
-import PamUtils.PamArrayUtils;
+import PamguardMVC.PamDataUnit;
 import rawDeepLearningClassifier.DLControl;
+import rawDeepLearningClassifier.DLStatus;
 import rawDeepLearningClassifier.dlClassification.animalSpot.StandardModelParams;
-import rawDeepLearningClassifier.segmenter.SegmenterProcess.GroupedRawData;
+import rawDeepLearningClassifier.segmenter.GroupedRawData;
 
 
 /**
  * 
  * Runs the deep learning model and performs feature extraction.
  * <p>
- *  
  * 
  * @author Jamie Macaulay 
  *
@@ -31,7 +31,7 @@ public abstract class DLModelWorker<T> {
 	/**
 	 * The maximum allowed queue size;
 	 */
-	public final static int MAX_QUEUE_SIZE = 10 ; 
+	public final static int MAX_QUEUE_SIZE = 10; 
 
 	/**
 	 * The model transforms for the data. 
@@ -42,77 +42,97 @@ public abstract class DLModelWorker<T> {
 	 * True to enable normalisation of results using softmax; 
 	 */
 	private boolean enableSoftMax = true;
+	
+	
+	/**
+	 * Convert a list of data units to a stack if images. 
+	 * @param dataUnits - the data units. 
+	 * @param sampleRate - the sample rate
+	 * @param iChan - the channels
+	 * @return a stack of images for input into a deep learning model. 
+	 */
+	public float[][][] dataUnits2ModelInput(ArrayList<? extends PamDataUnit> dataUnits, float sampleRate, int iChan){
+		
+		@SuppressWarnings("unchecked")
+		ArrayList<GroupedRawData> rawDataUnits = (ArrayList<GroupedRawData>) dataUnits;
+		 
+		//the number of chunks. 
+		int numChunks = rawDataUnits.size(); 
+
+		//data input into the model - a stack of spectrogram images. 
+		float[][][] transformedDataStack = new float[numChunks][][]; 
+		
+		//generate the spectrogram stack. 
+		AudioData soundData; 
+		double[][] transformedData2; //spec data
+		double[] transformedData1;  //waveform data
+		for (int j=0; j<numChunks; j++) {
+		
+			soundData  = new AudioData(rawDataUnits.get(j).getRawData()[iChan], sampleRate); 
+			
+			//			for (int i=0; i<modelTransforms.size(); i++) {
+			//				System.out.println("Transfrom type: " + modelTransforms.get(i).getDLTransformType()); 
+			//			}
+			//set the sound in the first transform. 
+			((WaveTransform) modelTransforms.get(0)).setWaveData(soundData); 
+
+//			System.out.println("Model transforms:no. " + modelTransforms.size()+ "  input sounds len: " + soundData.getLengthInSeconds() 
+//			+ " Decimate Params: " + ((WaveTransform) modelTransforms.get(0)).getParams()[0] + "max amplitude sound: " + PamArrayUtils.max(soundData.samples));
+
+			DLTransform transform = modelTransforms.get(0); 
+			for (int i =0; i<modelTransforms.size(); i++) {
+				transform = modelTransforms.get(i).transformData(transform); 
+
+//				//TEMP
+//				if (transform instanceof FreqTransform) {
+//					transformedData = ((FreqTransform) transform).getSpecTransfrom().getTransformedData(); 
+//					System.out.println("DLModelWorker: transform : " + modelTransforms.get(i).getDLTransformType() + " "+ i + transformedData.length + "  " + transformedData[0].length + " minmax: " + PamArrayUtils.minmax(transformedData)[0] + " " + PamArrayUtils.minmax(transformedData)[1]);
+//				}
+				
+//				//TEMP
+//				if (transform instanceof WaveTransform) {
+//					transformedData1 = ((WaveTransform) transform).getWaveData().getScaledSampleAmplitudes();
+//					System.out.println("DLModelWorker: transform : " + modelTransforms.get(i).getDLTransformType() + " "+ i + "  " + transformedData1.length + "  " +  PamArrayUtils.minmax(transformedData1)[0] + " " + PamArrayUtils.minmax(transformedData1)[1]);
+//				}
+			}
+
+			if (transform instanceof FreqTransform) {
+				//add a spectrogram to the stacl
+				transformedData2 = ((FreqTransform) transform).getSpecTransfrom().getTransformedData(); 
+				transformedDataStack[j] = DLUtils.toFloatArray(transformedData2); 
+			}
+			else {
+				//add wavefrom to the stack = we make the 2nd dimesnion 1. 
+				transformedData1 = ((WaveTransform) transform).getWaveData().getScaledSampleAmplitudes(); 
+				transformedDataStack[j] = new float[1][transformedData1.length];
+				transformedDataStack[j][0] = DLUtils.toFloatArray(transformedData1); 
+			}
+		}
+		return transformedDataStack;
+	} 
 
 
 	/**
 	 * Run the initial data feature extraction and the model
-	 * @param rawDataUnit - the raw data unit. 
+	 * @param rawDataUnit - the raw data unit. This is a stack of data units to be classified either together or separately.  
 	 * @param iChan - the channel to run the data on. 
 	 * @return the model to run. 
 	 */
-	public synchronized ArrayList<T> runModel(ArrayList<GroupedRawData> rawDataUnits, float sampleRate, int iChan) {
+	public synchronized ArrayList<T> runModel(ArrayList<? extends PamDataUnit> dataUnits, float sampleRate, int iChan) {
 
 		try {
-			//the number of chunks. 
-			int numChunks = rawDataUnits.size(); 
-
 			//PamCalendar.isSoundFile(); 
 			//create an audio data object from the raw data chunk
 			long timeStart = System.nanoTime(); 
-
-			//data input into the model - a stack of spectrogram images. 
-			float[][][] transformedDataStack = new float[numChunks][][]; 
-
-			//generate the spectrogram stack. 
-			AudioData soundData; 
-			double[][] transformedData2; //spec data
-			double[] transformedData1;  //waveform data
-			for (int j=0; j<numChunks; j++) {
 			
-				
-				soundData  = new AudioData(rawDataUnits.get(j).getRawData()[iChan], sampleRate); 
-				
-				
-				
-				//			for (int i=0; i<modelTransforms.size(); i++) {
-				//				System.out.println("Transfrom type: " + modelTransforms.get(i).getDLTransformType()); 
-				//			}
-
-				//set the sound in the first transform. 
-				((WaveTransform) modelTransforms.get(0)).setWaveData(soundData); 
-
-//				System.out.println("Model transforms:no. " + modelTransforms.size()+ "  input sounds len: " + soundData.getLengthInSeconds() 
-//				+ " Decimate Params: " + ((WaveTransform) modelTransforms.get(0)).getParams()[0] + "max amplitude sound: " + PamArrayUtils.max(soundData.samples));
-
-				DLTransform transform = modelTransforms.get(0); 
-				for (int i =0; i<modelTransforms.size(); i++) {
-					transform = modelTransforms.get(i).transformData(transform); 
-//					//TEMP
-//					if (transform instanceof FreqTransform) {
-//						transformedData = ((FreqTransform) transform).getSpecTransfrom().getTransformedData(); 
-//						System.out.println("DLModelWorker: transform : " + modelTransforms.get(i).getDLTransformType() + " "+ i + transformedData.length + "  " + transformedData[0].length + " minmax: " + PamArrayUtils.minmax(transformedData)[0] + " " + PamArrayUtils.minmax(transformedData)[1]);
-//					}
-				}
-
-				if (transform instanceof FreqTransform) {
-					//add a spectrogram to the stacl
-					transformedData2 = ((FreqTransform) transform).getSpecTransfrom().getTransformedData(); 
-					transformedDataStack[j] = DLUtils.toFloatArray(transformedData2); 
-
-				}
-				else {
-					//add wavefrom to the stack = we make the 2nd dimesnion 1. 
-					transformedData1 = ((WaveTransform) transform).getWaveData().getScaledSampleAmpliudes(); 
-					transformedDataStack[j] = new float[1][transformedData1.length];
-					transformedDataStack[j][0] = DLUtils.toFloatArray(transformedData1); 
-				}
-			}
+			float[][][] transformedDataStack  = dataUnits2ModelInput(dataUnits,  sampleRate,  iChan);
 
 			//run the model. 
 			float[] output = null; 
 			long time1 = System.currentTimeMillis();
+			
 			output = runModel(transformedDataStack); 
-			//System.out.println("Model out: " + PamArrayUtils.array2String(output, 2, ","));
+//			System.out.println("Model out: " + PamArrayUtils.array2String(output, 2, ","));
 			long time2 = System.currentTimeMillis();
 
 			int numclasses = (int) (output.length/transformedDataStack.length); 
@@ -125,14 +145,15 @@ public abstract class DLModelWorker<T> {
 			float[] prob; 
 			float[] classOut; 
 			for (int i=0; i<transformedDataStack.length; i++) {
+				
 				/**
-				 * This is super weird. Reading the documentation for copeOfRange the index from and index to are enclusive. So 
+				 * This is super weird. Reading the documentation for copyOfRange the index from and index to are inclusive. So 
 				 * to copy the first two elements indexfrom =0 and indexto = 1. But actually it seems that this should be indexfrom =0 and indexto =2. 
 				 * So do not minus one form (i+1)*numclasses. This works but I'm confused as to why?
 				 */
 				classOut = Arrays.copyOfRange(output, i*numclasses, (i+1)*numclasses); 
 
-				//				System.out.println("The copyOfRange is: " + i*numclasses + " to " + ((i+1)*numclasses-1) + " class out len: " + classOut.length); 
+//								System.out.println("The copyOfRange is: " + i*numclasses + " to " + ((i+1)*numclasses-1) + " class out len: " + classOut.length); 
 
 				if (enableSoftMax) {
 					prob = new float[classOut.length]; 
@@ -168,11 +189,34 @@ public abstract class DLModelWorker<T> {
 		}
 	}
 
+	/**
+	 * Run the model on a stack of transformed data.
+	 * @param transformedDataStack - the input data for the model where the outer array is the number of input images or wavforms.
+	 * @return the prediction as a flattened array of probabilities for each class.
+	 */
 	public abstract float[] runModel(float[][][] transformedDataStack);
+	
+	/**
+	 * Check whether a model is null or not. 
+	 * @return true of the model is null. 
+	 */
+	public abstract boolean isModelNull();
 
+	/**
+	 * Make a model result from the probabilities and the time it took to run the model.
+	 * @param prob - the probabilities for each class.
+	 * @param time - the time taken to run the model.
+	 * @return a model result object. 
+	 */
 	public abstract T makeModelResult(float[] prob, double time);
 
-	public abstract void prepModel(StandardModelParams soundSpotParams, DLControl dlControl);
+	/**
+	 * Prepare the model for running. 
+	 * @param standardModelParams - the parameters for the sound spot model.
+	 * @param dlControl - the control object for the deep learning process.
+	 * @return a status of the preparation of the model. 
+	 */
+	public abstract DLStatus prepModel(StandardModelParams standardModelParams, DLControl dlControl);
 
 
 	/**
@@ -200,16 +244,21 @@ public abstract class DLModelWorker<T> {
 	//		return soundSpotResult; 
 	//	}
 
-
+	/**
+	 * Get the model transforms for the data. These are the transforms that are applied to the data before it is input into the model.
+	 * @return the model transforms.
+	 */
 	public ArrayList<DLTransform> getModelTransforms() {
 		return modelTransforms;
 	}
 
+	/**
+	 * Set the model transforms for the data. These are the transforms that are applied to the data before it is input into the model.
+	 * @param modelTransforms - the model transforms.
+	 */
 	public void setModelTransforms(ArrayList<DLTransform> modelTransforms) {
 		this.modelTransforms = modelTransforms;
 	}
-
-
 
 	/**
 	 * Convert the parameters saved in the sound spot model to DLtransform parameters. 

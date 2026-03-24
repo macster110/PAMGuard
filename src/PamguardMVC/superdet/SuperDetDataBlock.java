@@ -1,5 +1,6 @@
 package PamguardMVC.superdet;
 
+import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,6 +16,7 @@ import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamProcess;
 import PamguardMVC.debug.Debug;
+import binaryFileStorage.DataUnitFileInformation;
 import clickDetector.offlineFuncs.OfflineEventDataUnit;
 import generalDatabase.PamSubtableData;
 import generalDatabase.SQLLogging;
@@ -427,6 +429,18 @@ public class SuperDetDataBlock<Tunit extends SuperDetection, TSubDet extends Pam
 	}
 
 	/**
+	 * Global static call that will reattach all sub detections after a data load. 
+	 */
+	public static void reattachAllSubDetections() {				
+		ArrayList<PamDataBlock> dataBlocks = PamController.getInstance().getDataBlocks();
+		for (PamDataBlock dataBlock:dataBlocks) {
+			// may no longer be needed depending on how reloading data goes.  
+			if (dataBlock instanceof SuperDetDataBlock) {
+				((SuperDetDataBlock) dataBlock).reattachSubdetections(null);
+			}
+		}
+	}
+	/**
 	 * New version of this call that only has to link data units into their sub detections
 	 * since the SubdetectionInfo lists are already in place in the SuperDetections.
 	 * @param viewLoadObserver
@@ -448,8 +462,8 @@ public class SuperDetDataBlock<Tunit extends SuperDetection, TSubDet extends Pam
 			int iDone = 0;
 			while (duIt.hasNext()) {
 				Tunit aData = duIt.next(); // looping through superdetections.
-//				if (aData.getDatabaseIndex() == 131) {
-//					System.out.println("On event 131");
+//				if (aData.getDatabaseIndex() == 566) {
+//					System.out.println("On event 566");
 //				}
 				if (viewLoadObserver != null) {
 					viewLoadObserver.sayProgress(1, aData.getTimeMilliseconds(), firstTime, lastTime, iDone++);
@@ -471,7 +485,10 @@ public class SuperDetDataBlock<Tunit extends SuperDetection, TSubDet extends Pam
 						}
 					}
 					if (subDetectionFinder != null && subDetectionFinder.inUTCRange(sdInfo.getChildUTC())) {
-						PamDataUnit subDet = subDetectionFinder.findDataUnit(sdInfo);
+						PamDataUnit subDet = subDetectionFinder.findDataUnit(sdInfo, true);
+						if (subDet == null) {
+							subDet = subDetectionFinder.findDataUnit(sdInfo, false);
+						}
 						sdInfo.setSubDetection(subDet);
 						if (subDet != null) {
 							aData.addSubDetection(subDet);
@@ -509,12 +526,60 @@ public class SuperDetDataBlock<Tunit extends SuperDetection, TSubDet extends Pam
 		@Override
 		public int match(PamDataUnit dataUnit, Object... criteria) {
 			SubdetectionInfo subTableData = (SubdetectionInfo) criteria[0];
+			boolean strict = true;
+			if (criteria.length >= 2 && criteria[1] instanceof Boolean) {
+				strict = (boolean) criteria[1];
+			}
+			
 			long comp = subTableData.getChildUTC() - dataUnit.getTimeMilliseconds();
 			if (comp != 0) {
 				return Long.signum(comp);
 			}
 			comp = subTableData.getChildUID() - dataUnit.getUID();
-			return Long.signum(comp);
+			if (comp == 0) {
+				return 0; 
+			}
+			if (strict) {
+				return Long.signum(comp);
+			}
+			
+			/**
+			 * Some problems in some datasets where the uid is corrupt. So also check 
+			 * on binary file information. This is slower, but since we've already matched on 
+			 * time, it doesn't get called very often. 
+			 */
+			String dbBin = subTableData.getBinaryFilename();
+			DataUnitFileInformation duFileInfo = dataUnit.getDataUnitFileInformation();
+			if (dbBin == null || duFileInfo == null) {
+				return Long.signum(comp);
+			}
+//			String duBin = duFileInfo.get
+			/*
+			 * Note that some bin names are truncated, so need to match on startswith. 
+			 */
+			File binFile = duFileInfo.getFile();
+			if (binFile == null) {
+				return Long.signum(comp);
+			}
+			String fName = binFile.getName();
+			if (fName.startsWith(dbBin) == false) {
+				return Long.signum(comp);
+			}
+			/*
+			 *  hope for a non null click number. If there isn't onw, then we'll just have to
+			 *  go with the bin file being the same and the millis being the same. It's important
+			 *  for clicks though since there can be >1 in a millisecond.  
+			 */
+			Integer clickNo = subTableData.getClickNumber();
+			if (clickNo == null) {
+				return 0;
+			}
+			else {
+				subTableData.setChildUID(dataUnit.getUID());
+				dataUnit.updateDataUnit(System.currentTimeMillis());
+				return (int) (clickNo - duFileInfo.getIndexInFile());
+			}
+			
 		}
 		
 	}

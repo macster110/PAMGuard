@@ -5,6 +5,7 @@ import java.awt.Component;
 import java.awt.Dialog;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.MouseInfo;
@@ -42,6 +43,7 @@ import PamView.ClipboardCopier;
 import PamView.PamColors;
 import PamView.ScreenSize;
 import PamView.help.PamHelp;
+import PamView.PamIcon;
 import gpl.GPLParameters;
 
 /**
@@ -121,7 +123,7 @@ abstract public class PamDialog extends JDialog {
 		contentPane.add(BorderLayout.SOUTH, buttonPanel);
 
 		getRootPane().setDefaultButton(okButton);
-
+		
 		addWindowListener(new DialogWindowAdapter());
 
 		setLocation(300, 200);
@@ -132,9 +134,14 @@ abstract public class PamDialog extends JDialog {
 
 		this.setResizable(false);
 		setAlwaysOnTop(parentFrame == null);
+		
+		
+		String icon = PamIcon.getPAMGuardIconPath(PamIcon.SMALL);
+//		
+//		System.out.println("Get icon: " + ClassLoader
+//				.getSystemResource(PamIcon.getPAMGuardIconPath(PamIcon.SMALL)));
 
-		setIconImage(new ImageIcon(ClassLoader
-				.getSystemResource("Resources/pamguardIcon.png")).getImage());
+		setIconImage(PamIcon.getPAMGuardImageIcon(PamIcon.SMALL).getImage());
 
 		setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 
@@ -146,6 +153,21 @@ abstract public class PamDialog extends JDialog {
 		positionInFrame(parentFrame);
 
 	}
+
+	/**
+	 * Copied from JPopup menu. Finds the frame of any component. 
+	 * @param c Swing component.
+	 * @return parent frame or null
+	 */
+    public static Frame getFrame(Component c) {
+        Component w = c;
+
+        while(!(w instanceof Frame) && (w!=null)) {
+            w = w.getParent();
+        }
+        return (Frame)w;
+    }
+
 	private static Window checkParentFrame(Window parentFrame) {
 		if (parentFrame != null) {
 			return parentFrame;
@@ -306,6 +328,9 @@ abstract public class PamDialog extends JDialog {
 	 * put the dialog near the mouse location. 
 	 */
 	public void moveToMouseLocation() {
+		if (MouseInfo.getPointerInfo() == null) {
+			return;
+		}
 		Point mouse = MouseInfo.getPointerInfo().getLocation();
 		moveToLocation(mouse);
 	}
@@ -595,6 +620,13 @@ abstract public class PamDialog extends JDialog {
 		return showWarning(warningTitle, warningText);
 	}
 
+	/**
+	 * Display a warning text. 
+	 * @param owner
+	 * @param warningTitle
+	 * @param warningText
+	 * @return
+	 */
 	public static boolean showWarning(Window owner, String warningTitle, String warningText) {
 		JOptionPane.showMessageDialog(owner, warningText, warningTitle, JOptionPane.ERROR_MESSAGE);
 		return false;

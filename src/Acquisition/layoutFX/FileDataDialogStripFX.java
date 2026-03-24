@@ -7,6 +7,7 @@ import org.controlsfx.control.PopOver;
 
 import Acquisition.filedate.FileDate;
 import Acquisition.filedate.FileDateObserver;
+import Acquisition.filedate.FileTimeData;
 import PamUtils.PamCalendar;
 import PamUtils.worker.filelist.WavFileType;
 import javafx.collections.ObservableList;
@@ -215,7 +216,7 @@ public class FileDataDialogStripFX extends PamBorderPane {
 		popOver.show(advSettingsButton);
 
 		((Parent) popOver.getSkin().getNode()).getStylesheets()
-		.add(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getSlidingDialogCSS());
+		.addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getSlidingDialogCSS());
 
 		advDatePane.setParams();
 	}
@@ -258,7 +259,11 @@ public class FileDataDialogStripFX extends PamBorderPane {
 		if (index<0) index = 0; 
 		else if (index>currentFileList.size()-1) index = currentFileList.size()-1; 
 
-		long timeMillis = fileDate.getTimeFromFile(currentFileList.get(i));
+		long timeMillis = 0;
+		FileTimeData fileTimeData = fileDate.getTimeFromFile(currentFileList.get(i));
+		if (fileTimeData != null) {
+			timeMillis = fileTimeData.getFileStart();
+		}
 
 		String dateTime = PamCalendar.formatDBDateTime(timeMillis, true); 
 

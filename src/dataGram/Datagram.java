@@ -8,8 +8,8 @@ import java.util.ArrayList;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import binaryFileStorage.BinaryTypes;
-
 import dataMap.OfflineDataMapPoint;
 
 /**
@@ -175,7 +175,7 @@ public class Datagram implements Serializable, ManagedParameters {
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DISPLAY);
 		return ps;
 	}
 

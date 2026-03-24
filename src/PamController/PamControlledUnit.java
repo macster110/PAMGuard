@@ -23,6 +23,7 @@ package PamController;
 import java.awt.Component;
 import java.awt.Frame;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.JFrame;
 import javax.swing.JMenu;
@@ -30,25 +31,23 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 
-import offlineProcessing.OfflineTask;
-import offlineProcessing.OfflineTaskGroup;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
 import PamController.status.ModuleStatus;
 import PamController.status.ModuleStatusManager;
 import PamController.status.ProcessCheck;
+import PamModel.CommonPluginInterface;
+import PamModel.PamModel;
 import PamModel.PamModuleInfo;
+import PamModel.PamPluginInterface;
 import PamView.ClipboardCopier;
 import PamView.PamGui;
 import PamView.PamSidePanel;
 import PamView.PamTabPanel;
 import PamView.PamView;
 import PamguardMVC.PamConstants;
-import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamProcess;
 import backupmanager.BackupInformation;
+import offlineProcessing.OfflineTaskGroup;
+import offlineProcessing.UnitTaskManager;
 
 /**
  * @author Doug Gillespie
@@ -93,7 +92,7 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 	 */
 	private ArrayList<PamProcess> pamProcesses;
 	
-	private ArrayList<OfflineTaskGroup> offlineTaskGroups;
+	private UnitTaskManager unitTaskManager;
 
 	/**
 	 * Reference to a PamTabPanel containing informaton on how to set up a
@@ -172,7 +171,6 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 		
 		isViewer = PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW;
 		isMixed = PamController.getInstance().getRunMode() == PamController.RUN_MIXEDMODE;
-		offlineTaskGroups = new ArrayList<OfflineTaskGroup>();
 		
 		if(isViewer){
 			//
@@ -471,6 +469,7 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 	 * 
 	 * @return the name of the unit
 	 */
+	@Override
 	public String getUnitName() {
 		return unitName;
 	}
@@ -684,6 +683,33 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 	 */
 	public void pamClose() {		
 	}
+
+	/**
+	 * Get the units task manager, option to create
+	 * @param create will create a standard manager if one not existing. 
+	 * @return units task manager
+	 */
+	public UnitTaskManager getUnitTaskManager(boolean create) {
+		if (create && unitTaskManager == null) {
+			unitTaskManager = new UnitTaskManager();
+		}
+		return unitTaskManager;
+	}
+	
+	/**
+	 * Get the units task manager. Don't create if it doesn't exist. 
+	 * @return unit task manager. 
+	 */
+	public UnitTaskManager getUnitTaskManager() {
+		return getUnitTaskManager(false);
+	}
+
+	/**
+	 * @param unitTaskManager the unitTaskManager to set
+	 */
+	public void setUnitTaskManager(UnitTaskManager unitTaskManager) {
+		this.unitTaskManager = unitTaskManager;
+	}
 	
 	/**
 	 * Registers the offlineTaskGroup with the PamControlledUnit on instantiation.
@@ -692,7 +718,7 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 	 */
 	public void addOfflineTaskGroup(OfflineTaskGroup offlineTaskGroup) {
 //		if (isViewer){
-			offlineTaskGroups.add(offlineTaskGroup);
+			getUnitTaskManager(true).add(offlineTaskGroup);
 //		}else{
 //			System.out.println("OfflineTaskGroup cannot be added as is not viewer mode");
 //		}
@@ -703,14 +729,20 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 	 * @return the number of offlineTaskGroups
 	 */
 	public int getNumOfflineTaskGroups() {
-		return offlineTaskGroups.size();
+		if (unitTaskManager == null) {
+			return 0;
+		}
+		return unitTaskManager.size();
 	}
 	
 	/**
 	 * @return the iTH offlineTaskGroup
 	 */
 	public OfflineTaskGroup getOfflineTaskGroup(int i) {
-		return offlineTaskGroups.get(i);
+		if (unitTaskManager == null) {
+			return null;
+		}
+		return unitTaskManager.get(i);
 	}
 
 	/**
@@ -845,6 +877,16 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 		}
 		return worstStatus;
 	}
+	
+	/**
+	 * Get the offline state of this module. This can generally
+	 * be idle, but can be a higher state when map making at startup
+	 * and when running an offline task. 
+	 * @return
+	 */
+	public int getOfflineState() {
+		return PamController.PAM_IDLE;
+	}
 
 //	/**
 //	 * Get a list of available offline tasks for this module. This is mostly used for tasks that 
@@ -880,6 +922,24 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 	public int getInstanceIndex() {
 		return instanceIndex;
 	}
+	
+	/**
+	 * Get detail if this is a plugin. 
+	 * @return plugin detail, or null if it's not a plugin. 
+	 */
+	public PamPluginInterface getPlugin() {
+		List<CommonPluginInterface> pluginList = ((PamModel) PamController.getInstance().getModelInterface()).getPluginType(PamPluginInterface.class);
+		if (pluginList == null) {
+			return null;
+		}
+		for (CommonPluginInterface plugin : pluginList) {
+			PamPluginInterface pf = (PamPluginInterface) plugin;
+			if (pf.getClassName().equals(this.getClass().getName())) {
+				return pf;
+			}
+		}
+		return null;
+	}
 
 	/**
 	 * The PamConfiguration holds the master list of modules which form part of a
@@ -910,5 +970,6 @@ public abstract class PamControlledUnit implements SettingsNameProvider {
 	public void setPamConfiguration(PamConfiguration pamConfiguration) {
 		this.pamConfiguration = pamConfiguration;
 	}
+
 
 }

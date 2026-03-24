@@ -45,6 +45,7 @@ public class MHTClickTrainAlgorithm implements ClickTrainAlgorithm, PamSettings 
 	
 	public static final String MHT_NAME = "MHT detector"; 
 	
+	
 	/**
 	 * Reference to the click train control. 
 	 */
@@ -113,7 +114,15 @@ public class MHTClickTrainAlgorithm implements ClickTrainAlgorithm, PamSettings 
 		mhtAlgorithmInfoJSON = new MHTAlgorithmInfoJSON(this);
 
 		//register saved settings
-		PamSettingManager.getInstance().registerSettings(this);
+		boolean foundNew = PamSettingManager.getInstance().registerSettings(this);
+		if (mhtParams == null || foundNew == false) {
+			// not found since settings name has changed ? 
+			OldSettingsName oldWay = new OldSettingsName();
+			// calling this once will load the old settings, then we're done. 
+			PamSettingManager.getInstance().registerSettings(oldWay);
+			// so remove it so they aren't saved the old way any more. 
+			PamSettingManager.getInstance().unRegisterSettings(oldWay);
+		}
 
 		//setup the algorithm 
 		setupAlgorithm(); 
@@ -354,6 +363,7 @@ public class MHTClickTrainAlgorithm implements ClickTrainAlgorithm, PamSettings 
 		TrackBitSet trackBitSet;
 		TrackDataUnits trackUnits;
 		if (nTracks>0) Debug.out.println("-------------------Grab Done Trains---------------");
+		try {
 		for (int i =0; i<nTracks; i++) {
 			trackBitSet=mhtKernal.getConfirmedTrack(i);
 			Debug.out.println("MHTAlgorithm: Confirmed Track Grab: No. " + MHTKernel.getTrueBitCount(trackBitSet.trackBitSet)  + " flag: " + trackBitSet.flag + "  chi2: " +trackBitSet.chi2Track.getChi2()); 
@@ -378,6 +388,10 @@ public class MHTClickTrainAlgorithm implements ClickTrainAlgorithm, PamSettings 
 			//save the click train
 			trackCount++;
 			saveClickTrain(trackUnits, trackBitSet.chi2Track.getMHTChi2Info());
+		}
+		}
+		catch (Exception e) {
+			System.out.printf("Handled MHTClickTrainAlgorithm Exception %s in grabDoneTrains: %s\n", e.getClass().getSimpleName(), e.getMessage());
 		}
 		
 		if (nTracks>0) Debug.out.println("-------------------------------------------------");
@@ -415,12 +429,19 @@ public class MHTClickTrainAlgorithm implements ClickTrainAlgorithm, PamSettings 
 		return mhtGUI;
 	}
 
+	Thread previousThread = null;
 	/**
 	 * Update the algorithm
 	 * @param flag- flag indicating the update type. 
 	 */
-	public void update(int flag, Object info) {
+	public synchronized void update(int flag, Object info) {
 
+		if (Thread.currentThread() != previousThread) {
+			// see flag id constants in ClickTrianControl
+			System.out.printf("Thread change to %s in MHTClicktrainAlgorithm.update flag %d, object %s\n", 
+					Thread.currentThread().toString(), flag, info);
+			previousThread = Thread.currentThread();
+		}
 		switch (flag) {
 		case ClickTrainControl.PROCESSING_START:
 			//make sure the kernel is cleared before processing
@@ -625,12 +646,53 @@ public class MHTClickTrainAlgorithm implements ClickTrainAlgorithm, PamSettings 
 
 	@Override
 	public String getUnitName() {
-		return getName() + "_" + this.clickTrainControl.getUnitName();
+		return this.clickTrainControl.getUnitName();
 	}
 
 	@Override
 	public String getUnitType() {
 		return getName() ;
+	}
+	
+	/**
+	 * Class to read old settings which were saved with a different name. 
+	 * For some of the offlien functions to work, latest PAMGuard needs
+	 * the getUnitName to be the same for all related settings, so this
+	 * must now be clickTRainControl.getUnitName();
+	 * @author dg50
+	 *
+	 */
+	private class OldSettingsName implements PamSettings {
+		@Override
+		public String getUnitName() {
+			return getName() + "_" + clickTrainControl.getUnitName();
+		}
+
+		@Override
+		public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
+			MHTParams oldSettings = (MHTParams) pamControlledUnitSettings.getSettings();
+			mhtParams = oldSettings;
+			setupAlgorithm();
+			//send a settings restore flag 
+			mhtParams.chi2Params.restoreSettings();
+			return true;
+		}
+
+		@Override
+		public String getUnitType() {
+			return getName() ;
+		}
+
+		@Override
+		public Serializable getSettingsReference() {
+			return mhtParams;
+		}
+
+		@Override
+		public long getSettingsVersion() {
+			return MHTParams.serialVersionUID;
+		}
+
 	}
 
 	@Override

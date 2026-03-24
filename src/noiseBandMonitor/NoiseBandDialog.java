@@ -15,34 +15,28 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.image.BandCombineOp;
 import java.util.ArrayList;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
-import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JRadioButton;
 import javax.swing.JSpinner;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
 import Filters.ANSIStandard;
-import Filters.ButterworthMethod;
-import Filters.FIRFilterMethod;
-import Filters.Filter;
-import Filters.FilterBand;
 import Filters.FilterMethod;
 import Filters.FilterParams;
 import Filters.FilterType;
-import Filters.IIRFilterMethod;
 import Layout.PamAxis;
 import Layout.PamAxisPanel;
 import PamDetection.RawDataUnit;
@@ -51,7 +45,6 @@ import PamView.dialog.PamGridBagContraints;
 import PamView.dialog.SourcePanel;
 import PamView.panel.JPanelWithPamKey;
 import PamView.panel.PamBorderPanel;
-import PamView.panel.PamPanel;
 import PamguardMVC.PamDataBlock;
 
 public class NoiseBandDialog extends PamDialog {
@@ -79,17 +72,19 @@ public class NoiseBandDialog extends PamDialog {
 	private PamDataBlock rawDatablock;
 
 	private JTextField topOctave, bottomOctave;
+	
+	private JTextField maxFrequency, minFrequency, refFrequency;;
 //
 //	private JRadioButton octave, thirdOctave;
 	private JComboBox<BandType> bandType;
 	
-	private SpinnerNumberModel topBandSpinner;
-
+//	private SpinnerNumberModel topBandSpinner;
+//
 	private SpinnerNumberModel filterOrder;
 
 	private JTextField filterGamma;
 
-	private SpinnerNumberModel nDecimators;
+//	private SpinnerNumberModel nDecimators;
 
 	private JComboBox filterType;
 	
@@ -100,7 +95,7 @@ public class NoiseBandDialog extends PamDialog {
 
 	private boolean setupComplete = false;
 
-	ArrayList<FilterMethod> decimationFilters = new ArrayList<FilterMethod>();
+	ArrayList<DecimatorMethod> decimationFilters = new ArrayList<DecimatorMethod>();
 	ArrayList<FilterMethod> bandFilters = new ArrayList<FilterMethod>();
 	int[] decimatorIndexes;
 
@@ -136,11 +131,11 @@ public class NoiseBandDialog extends PamDialog {
 		outputPanel.setBorder(new TitledBorder("Output"));
 		outputPanel.setLayout(new GridBagLayout());
 		GridBagConstraints c = new PamGridBagContraints();
-		addComponent(outputPanel, new JLabel("Output Interval ", JLabel.RIGHT), c);
+		addComponent(outputPanel, new JLabel("Output Interval ", SwingConstants.RIGHT), c);
 		c.gridx++;
 		addComponent(outputPanel, outputInterval = new JTextField(5), c);
 		c.gridx++;
-		addComponent(outputPanel, new JLabel(" s", JLabel.RIGHT), c);
+		addComponent(outputPanel, new JLabel(" s", SwingConstants.RIGHT), c);
 		optionsPanel.add(outputPanel);
 
 		JPanel bandPanel = new JPanel();
@@ -158,34 +153,78 @@ public class NoiseBandDialog extends PamDialog {
 //		bbGroup.add(thirdOctave);
 //		octave.addActionListener(bl);
 //		thirdOctave.addActionListener(bl);
-		addComponent(bandPanel, new JLabel("Band Type: ", JLabel.RIGHT), c);
+		addComponent(bandPanel, new JLabel("Band Type: ", SwingConstants.RIGHT), c);
 		c.gridx++;
-		c.gridwidth = 2;
-		addComponent(bandPanel, bandType = new JComboBox<BandType>(), c);
-		bandType.addItem(BandType.OCTAVE);
-		bandType.addItem(BandType.THIRDOCTAVE);
+		c.gridwidth = 3;
+		bandType = new JComboBox<BandType>() {
+			@Override
+			public String getToolTipText() {
+				BandType type = (BandType) bandType.getSelectedItem();
+				if (type == null) {
+					return super.getToolTipText();
+				}
+				else {
+					return type.description();
+				}
+			}
+			
+		};
+		bandType.setToolTipText("Frequency band type");
+		addComponent(bandPanel, bandType, c);
+		BandType[] bandTypes = BandType.values();
+		for (int i = 0; i < bandTypes.length; i++) {
+			bandType.addItem(bandTypes[i]);
+		}
+//		bandType.addItem(BandType.THIRDOCTAVE);
 //		bandType.addItem(BandType.TWELTHOCTAVE);
-		c.gridwidth = 1;
 		BandListener bl = new BandListener();
 		bandType.addActionListener(bl);
+		c.gridwidth = 1;
 		c.gridx = 0;
 		c.gridy++;
-		topBandSpinner = new SpinnerNumberModel(30, 0, 30, 1);
-		topBandSpinner.addChangeListener(new TopBandListener());
-		addComponent(bandPanel, new JLabel("Top band number "), c);
+//		topBandSpinner = new SpinnerNumberModel(30, 0, 30, 1);
+//		topBandSpinner.addChangeListener(new TopBandListener());
+		addComponent(bandPanel, new JLabel("Reference Frequency ", JLabel.RIGHT), c);
 		c.gridx++;
-		addComponent(bandPanel, new JSpinner(topBandSpinner) , c);
+		addComponent(bandPanel, refFrequency = new JTextField(5), c);
+		refFrequency.addActionListener(bl);
+		c.gridx++;
+		addComponent(bandPanel, new JLabel(" Hz ", JLabel.LEFT), c);
+		c.gridx++;
+//		addComponent(bandPanel, new JSpinner(topBandSpinner) , c);
+		JButton defRefButton = new JButton("Default");
+		defRefButton.addActionListener(new DefaultRef());
+		addComponent(bandPanel, defRefButton, c);
+
+		c.gridx = 0;
+		c.gridy++;
+//		topBandSpinner = new SpinnerNumberModel(30, 0, 30, 1);
+//		topBandSpinner.addChangeListener(new TopBandListener());
+		addComponent(bandPanel, new JLabel("Maximum Frequency ", JLabel.RIGHT), c);
+		c.gridx++;
+		addComponent(bandPanel, maxFrequency = new JTextField(7), c);
+		maxFrequency.addActionListener(bl);
+		c.gridx++;
+		addComponent(bandPanel, new JLabel(" Hz ", JLabel.LEFT), c);
+		c.gridx++;
+//		addComponent(bandPanel, new JSpinner(topBandSpinner) , c);
 		JButton maxButton = new JButton("Max");
 		maxButton.addActionListener(new MaxButton());
-		c.gridx++;
 		addComponent(bandPanel, maxButton, c);
+		
 		c.gridx = 0;
 		c.gridy++;
-		addComponent(bandPanel, new JLabel("Number of decimators ", JLabel.RIGHT), c);
+		addComponent(bandPanel, new JLabel("Minimum Frequency ", JLabel.RIGHT), c);
 		c.gridx++;
-		nDecimators = new SpinnerNumberModel(2, 0, 20, 1);
-		nDecimators.addChangeListener(new NDEcimatorsListener());
-		addComponent(bandPanel, new JSpinner(nDecimators), c);
+		addComponent(bandPanel, minFrequency = new JTextField(5), c);
+		minFrequency.addActionListener(bl);
+		c.gridx++;
+		addComponent(bandPanel, new JLabel(" Hz ", JLabel.LEFT), c);
+//		addComponent(bandPanel, new JLabel("Number of decimators ", SwingConstants.RIGHT), c);
+//		c.gridx++;
+//		nDecimators = new SpinnerNumberModel(2, 0, 20, 1);
+//		nDecimators.addChangeListener(new NDEcimatorsListener());
+//		addComponent(bandPanel, new JSpinner(nDecimators), c);
 		
 
 		JPanel filtPanel = new JPanel();
@@ -193,7 +232,7 @@ public class NoiseBandDialog extends PamDialog {
 		filtPanel.setLayout(new GridBagLayout());
 		filtPanel.setBorder(new TitledBorder("Filters"));
 		c = new PamGridBagContraints();
-		addComponent(filtPanel, new JLabel("Filter Type ", JLabel.RIGHT), c);
+		addComponent(filtPanel, new JLabel("Filter Type ", SwingConstants.RIGHT), c);
 		c.gridx++;
 		c.gridwidth = 2;
 		addComponent(filtPanel, filterType = new JComboBox(), c);
@@ -201,14 +240,14 @@ public class NoiseBandDialog extends PamDialog {
 		c.gridx = 0;
 		c.gridwidth = 1;
 		c.gridy++;
-		addComponent(filtPanel, new JLabel("Filter Order ", JLabel.RIGHT), c);
+		addComponent(filtPanel, new JLabel("Filter Order ", SwingConstants.RIGHT), c);
 		c.gridx++;
 		filterOrder = new SpinnerNumberModel(2, 2, 20, 1);
 		filterOrder.addChangeListener(new FilterOrderListener());
 		addComponent(filtPanel, new JSpinner(filterOrder), c);
 		c.gridx = 0;
 		c.gridy++;
-		addComponent(filtPanel, new JLabel("Filter Gamma ", JLabel.RIGHT), c);
+		addComponent(filtPanel, new JLabel("Filter Gamma ", SwingConstants.RIGHT), c);
 		c.gridx++;
 		addComponent(filtPanel, filterGamma = new JTextField(), c);
 		filterType.addItem("Butterworth");
@@ -221,16 +260,30 @@ public class NoiseBandDialog extends PamDialog {
 		setDialogComponent(mainPanel);
 		setResizable(true);
 		
-		setHelpPoint("sound_processing.NoiseBands.Docs.NoiseBands");
+		refFrequency.setToolTipText("Reference centre frequency: Other bands are calculated relative to this. Default 1000Hz");
+		minFrequency.setToolTipText("Minimum frequency of lower edge of lowest band");
+		maxFrequency.setToolTipText("Maximum Frequency of upper edge of highest band");
+		setHelpPoint("sound_processing.NoiseBands.Docs.NoiseBandsFilters");
+		
+		SwingUtilities.invokeLater(new Runnable() {
+			
+			@Override
+			public void run() {
+				repaintAll();
+			}
+		});
 	}
 
 	public static NoiseBandSettings showDialog(Window parentFrame, NoiseBandControl noiseBandControl) {
 
-		if (singleInstance == null || singleInstance.getOwner() != parentFrame || 
-				singleInstance.noiseBandControl != noiseBandControl) {
+//		if (singleInstance == null || singleInstance.getOwner() != parentFrame || 
+//				singleInstance.noiseBandControl != noiseBandControl) {
 			singleInstance = new NoiseBandDialog(parentFrame, noiseBandControl);
-		}
+//		}
 		singleInstance.setupComplete = false;
+//		System.out.println("********************************************************");
+//		System.out.println("NOISE BAND DIALOG: " + 	singleInstance.noiseBandSettings.rawDataSource);
+//		System.out.println("********************************************************");
 		singleInstance.noiseBandSettings = noiseBandControl.noiseBandSettings.clone();
 		singleInstance.setParams();
 		singleInstance.setVisible(true);
@@ -246,7 +299,7 @@ public class NoiseBandDialog extends PamDialog {
 			filterType.setSelectedIndex(1);
 			break;
 		}
-		sourcePanel.setSource(noiseBandControl.getNoiseBandProcess().getSourceDataBlock());
+		sourcePanel.setSource(noiseBandSettings.rawDataSource);
 		sourcePanel.setChannelList(noiseBandSettings.channelMap);
 		filterGamma.setText(Double.toString(noiseBandSettings.firGamma));
 		
@@ -255,9 +308,12 @@ public class NoiseBandDialog extends PamDialog {
 //		octave.setSelected(noiseBandSettings.bandType == BandType.OCTAVE);
 //		thirdOctave.setSelected(noiseBandSettings.bandType == BandType.THIRDOCTAVE);
 		bandType.setSelectedItem(noiseBandSettings.bandType);
-		topBandSpinner.setValue(noiseBandSettings.highBandNumber);
-		
-		nDecimators.setValue(noiseBandSettings.endDecimation);
+		refFrequency.setText(String.format("%.1f", noiseBandSettings.getReferenceFrequency()));
+		minFrequency.setText(String.format("%.1f", noiseBandSettings.getMinFrequency()));
+		maxFrequency.setText(String.format("%.1f", noiseBandSettings.getMaxFrequency()));
+//		topBandSpinner.setValue(noiseBandSettings.highBandNumber);
+//		
+//		nDecimators.setValue(noiseBandSettings.endDecimation);
 		setFilterParams(noiseBandSettings.filterType);
 		logFreqScale.setSelected(noiseBandSettings.logFreqScale);
 		showGrid.setSelected(noiseBandSettings.showGrid);
@@ -270,6 +326,7 @@ public class NoiseBandDialog extends PamDialog {
 
 		findDataSource();
 		repaintAll();
+		enableControls();
 	}
 
 	private void setFilterParams(FilterType ft) {
@@ -287,7 +344,7 @@ public class NoiseBandDialog extends PamDialog {
 		if (dataBlock == null) {
 			return showWarning("You must select a source of raw audio data");
 		}
-		noiseBandSettings.rawDataSource = dataBlock.getDataName();
+		noiseBandSettings.rawDataSource = dataBlock.getLongDataName();
 		noiseBandSettings.channelMap = sourcePanel.getChannelList();
 		if (noiseBandSettings.channelMap == 0) {
 			return showWarning("You must select at least one data channel");
@@ -315,7 +372,28 @@ public class NoiseBandDialog extends PamDialog {
 		default:
 			return showWarning("Invalid filter type selection");
 		}
-		noiseBandSettings.endDecimation = (Integer) nDecimators.getValue();
+		try {
+			noiseBandSettings.setReferenceFrequency(Double.valueOf(refFrequency.getText()));
+		}
+		catch (NumberFormatException e) {
+			return showWarning("Invalid reference frequency value");
+		}
+		try {
+			noiseBandSettings.setMinFrequency(Double.valueOf(minFrequency.getText()));
+		}
+		catch (NumberFormatException e) {
+			return showWarning("Invalid minimum frequency value");
+		}
+		try {
+			noiseBandSettings.setMaxFrequency(Double.valueOf(maxFrequency.getText()));
+		}
+		catch (NumberFormatException e) {
+			return showWarning("Invalid maximum frequency value");
+		}
+		if (noiseBandSettings.getMinFrequency() > noiseBandSettings.getMaxFrequency()) {
+			return showWarning("The minimum frequency must be lower than the maximum frequency");
+		}
+//		noiseBandSettings.endDecimation = (Integer) nDecimators.getValue();
 		noiseBandSettings.logFreqScale = logFreqScale.isSelected();
 		noiseBandSettings.showGrid = showGrid.isSelected();
 		noiseBandSettings.showDecimators = showDecimators.isSelected();
@@ -329,7 +407,7 @@ public class NoiseBandDialog extends PamDialog {
 //		else {
 //			noiseBandSettings.bandType = BandType.THIRDOCTAVE;
 //		}
-		noiseBandSettings.highBandNumber = (Integer) topBandSpinner.getValue();
+//		noiseBandSettings.highBandNumber = (Integer) topBandSpinner.getValue();
 		try {
 			noiseBandSettings.outputIntervalSeconds = Integer.valueOf(outputInterval.getText());
 		}
@@ -465,13 +543,17 @@ public class NoiseBandDialog extends PamDialog {
 				BandPerformance bandPerformance) {
 			double[] f = bandPerformance.getFrequencyList();
 			double[] gain = bandPerformance.getGainListdB();
-			int x1, x2, y1, y2;
+			int x1, x2;
+			double y1, y2;
 			for (int i = 1; i < f.length; i++) {
 				x1 = (int) bodePlotAxis.xAxis.getPosition(f[i-1]);
 				x2 = (int) bodePlotAxis.xAxis.getPosition(f[i]);
-				y1 = (int) bodePlotAxis.yAxis.getPosition(gain[i-1]);
-				y2 = (int) bodePlotAxis.yAxis.getPosition(gain[i]);
-				g.drawLine(x1, y1, x2, y2);
+				y1 = bodePlotAxis.yAxis.getPosition(gain[i-1]);
+				y2 = bodePlotAxis.yAxis.getPosition(gain[i]);
+				if (y1 > 10000 || y2 > 10000) {
+					continue;
+				}
+				g.drawLine(x1, (int) y1, x2, (int) y2);
 			}
 		}
 
@@ -483,15 +565,15 @@ public class NoiseBandDialog extends PamDialog {
 			g.setColor(Color.red);
 			Graphics2D g2d = (Graphics2D) g;
 			int iDecimator = 0;
-			for (FilterMethod aMethod:decimationFilters) {
+			for (DecimatorMethod aMethod:decimationFilters) {
 				if (iDecimator == selectedDecimator) {
 					g2d.setStroke(selBandStroke);
 				}
 				else {
 					g2d.setStroke(singleStroke);
 				}
-				paintFilter(g, aMethod);
-				int xPos = (int) bodePlotAxis.xAxis.getPosition(aMethod.getSampleRate()/4);
+				paintFilter(g, aMethod.getFilterMethod());
+				int xPos = (int) bodePlotAxis.xAxis.getPosition(aMethod.getOutputSampleRate()/2);
 				int yPos = (int) bodePlotAxis.yAxis.getPosition(0);
 				g.drawLine(xPos, yPos, xPos, yPos+getHeight()/20);
 				iDecimator++;
@@ -523,13 +605,24 @@ public class NoiseBandDialog extends PamDialog {
 			sampleRate = (float) aFilter.getSampleRate();
 			maxPixel = (int) xAxis.getPosition(sampleRate/2.);
 			filterConstant = aFilter.getFilterGainConstant();
+			FilterParams filterParams = aFilter.getFilterParams();
 			for (int iPix = 0; iPix <= maxPixel; iPix++) {
 				freqVal = xAxis.getDataValue(iPix);
+//				if (freqVal > filterParams.lowPassFreq) {
+//					break;
+//				}
 				gainVal = aFilter.getFilterGain(freqVal / sampleRate * Math.PI * 2) / filterConstant;
 				if (gainVal > 0) {
 					gainVal = 20.*Math.log10(gainVal);
 				}
-				gainPixel = (int) yAxis.getPosition(gainVal);
+//				if (gainVal < yAxis.getMinVal()) {
+//					continue;
+//				}
+				double pos = yAxis.getPosition(gainVal);
+				if (pos > Integer.MAX_VALUE) {
+					continue;
+				}
+				gainPixel = (int) pos;
 				if (prevGainPixel != null) {
 					g.drawLine(iPix-1, prevGainPixel, iPix, gainPixel);
 				}
@@ -578,7 +671,7 @@ public class NoiseBandDialog extends PamDialog {
 			PamAxis xAxis = bodePlotAxis.xAxis;
 			PamAxis yAxis = bodePlotAxis.yAxis;
 			for (int i = 0; i < 3; i++) {
-				if (showStandard[i].isSelected() == false) {
+				if (!showStandard[i].isSelected()) {
 					continue;
 				}
 				minAtten = ANSIStandard.getMinAttenuation(i);
@@ -641,7 +734,7 @@ public class NoiseBandDialog extends PamDialog {
 
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
-			if (setupComplete == false) {
+			if (!setupComplete) {
 				return;
 			}
 			findDataSource();
@@ -654,7 +747,7 @@ public class NoiseBandDialog extends PamDialog {
 	private class FilterTypeListener implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
-			if (setupComplete == false) {
+			if (!setupComplete) {
 				return;
 			}
 			FilterType ft = getFilterType();
@@ -667,7 +760,7 @@ public class NoiseBandDialog extends PamDialog {
 
 		@Override
 		public void stateChanged(ChangeEvent arg0) {
-			if (setupComplete == false) {
+			if (!setupComplete) {
 				return;
 			}
 			repaintAll();
@@ -675,31 +768,39 @@ public class NoiseBandDialog extends PamDialog {
 		}
 
 	}
-	private class NDEcimatorsListener implements ChangeListener {
-
+//	private class NDEcimatorsListener implements ChangeListener {
+//
+//		@Override
+//		public void stateChanged(ChangeEvent arg0) {
+//			if (!setupComplete) {
+//				return;
+//			}
+//			noiseBandSettings.endDecimation = (Integer) nDecimators.getValue();
+//			repaintAll();
+//		}
+//
+//	}
+//	private class TopBandListener implements ChangeListener {
+//
+//		@Override
+//		public void stateChanged(ChangeEvent arg0) {
+//			repaintAll();
+//		}
+//
+//	}
+//
+	private class DefaultRef implements ActionListener {
 		@Override
-		public void stateChanged(ChangeEvent arg0) {
-			if (setupComplete == false) {
-				return;
-			}
-			noiseBandSettings.endDecimation = (Integer) nDecimators.getValue();
-			repaintAll();
+		public void actionPerformed(ActionEvent arg0) {
+//			topBandSpinner.setValue(topBandSpinner.getMaximum());
+			setDefaultRefFrequency();
 		}
-
 	}
-	private class TopBandListener implements ChangeListener {
-
-		@Override
-		public void stateChanged(ChangeEvent arg0) {
-			repaintAll();
-		}
-
-	}
-
 	private class MaxButton implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
-			topBandSpinner.setValue(topBandSpinner.getMaximum());
+//			topBandSpinner.setValue(topBandSpinner.getMaximum());
+			setMaxFrequency();
 		}
 	}
 	private class BandListener implements ActionListener {
@@ -712,6 +813,19 @@ public class NoiseBandDialog extends PamDialog {
 
 	private void enableControls() {
 		filterGamma.setEnabled(getFilterType() == FilterType.FIRWINDOW);
+	}
+
+	public void setDefaultRefFrequency() {
+		refFrequency.setText("1000");
+		findDataSource();
+		repaintAll();
+	}
+
+	public void setMaxFrequency() {
+		double fs = getSampleRate();
+		maxFrequency.setText(String.format("%3.1f", fs/2));
+		findDataSource();
+		repaintAll();
 	}
 
 	/*
@@ -783,10 +897,10 @@ public class NoiseBandDialog extends PamDialog {
 	}
 
 	public void repaintAll() {
-		if (this.setupComplete == false) {
+		if (!this.setupComplete) {
 			return;
 		}
-		if (getParams() == false) {
+		if (!getParams()) {
 			return;
 		}
 		makeFilters();
@@ -810,7 +924,8 @@ public class NoiseBandDialog extends PamDialog {
 		bodePlotAxis.xAxis.setLogScale(logFreqScale.isSelected());
 		double minFreq = 0;
 		if (logFreqScale.isSelected()) {
-			minFreq = getSampleRate()/2/Math.pow(2,Math.max(noiseBandSettings.endDecimation+1,1));
+//			minFreq = getSampleRate()/2/Math.pow(2,Math.max(noiseBandSettings.endDecimation+1,1));
+			minFreq = noiseBandSettings.getMinFrequency();
 			minFreq = Math.floor(Math.log10(minFreq));
 			minFreq = Math.pow(10., minFreq);
 		}
@@ -831,7 +946,7 @@ public class NoiseBandDialog extends PamDialog {
 			// set up the top band listener.
 			BandType b = (BandType) bandType.getSelectedItem();
 			double bandRatio = b.getBandRatio();
-			int bandStep = b.getBandStep();
+//			int bandStep = b.getBandStep();
 			
 //			if (octave.isSelected()) {
 //				bandRatio = Math.pow(2,1./2.);
@@ -843,18 +958,18 @@ public class NoiseBandDialog extends PamDialog {
 //			}
 			double highestEdge = rawDatablock.getSampleRate() / 2 / bandRatio;
 			int highestBand = BandData.getLowBandNumber(highestEdge);
-			double highestCentre = BandData.calcFreq(highestBand);
-			highestBand -= highestBand%bandStep;
-			topBandSpinner.setMaximum(highestBand);
-			topBandSpinner.setStepSize(bandStep);
-			int currVal = (Integer) topBandSpinner.getValue();
-			if (currVal > highestBand) {
-				topBandSpinner.setValue(highestBand);
-			}
-			else if (currVal%bandStep != 0) {
-				topBandSpinner.setValue(currVal - currVal%bandStep);
-			}
-			
+			double highestCentre = BandData.calcCentreFreq(highestBand);
+//			highestBand -= highestBand%bandStep;
+//			topBandSpinner.setMaximum(highestBand);
+//			topBandSpinner.setStepSize(bandStep);
+//			int currVal = (Integer) topBandSpinner.getValue();
+//			if (currVal > highestBand) {
+//				topBandSpinner.setValue(highestBand);
+//			}
+//			else if (currVal%bandStep != 0) {
+//				topBandSpinner.setValue(currVal - currVal%bandStep);
+//			}
+//			
 
 //			System.out.println(String.format("HighestBand edge %3.1fHz, number %d, centre %3.1fHz", 
 //					highestEdge, highestBand, highestCentre));

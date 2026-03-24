@@ -1,21 +1,19 @@
 package clickDetector.offlineFuncs;
 
-import generalDatabase.DBControlUnit;
-import generalDatabase.PamConnection;
-import generalDatabase.PamSubtableData;
 import generalDatabase.external.crossreference.CrossReference;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Vector;
 
+import Localiser.LocalisationAlgorithm;
 import Localiser.detectionGroupLocaliser.GroupDetection;
 import PamController.PamController;
-import PamController.PamControllerInterface;
-import PamController.PamViewParameters;
-import PamUtils.PamCalendar;
 import PamView.symbol.StandardSymbolManager;
-import pamScrollSystem.ViewLoadObserver;
+import targetMotionOld.TargetMotionLocaliser;
+import tethys.TethysControl;
+import tethys.pamdata.TethysDataProvider;
+import tethys.species.DataBlockSpeciesManager;
+import clickDetector.ClickControl;
 //import staticLocaliser.StaticLocaliserControl;
 //import staticLocaliser.StaticLocaliserProvider;
 //import staticLocaliser.panels.AbstractLocaliserControl;
@@ -23,15 +21,14 @@ import pamScrollSystem.ViewLoadObserver;
 import clickDetector.ClickDetector;
 import clickDetector.ClickTrainDetection;
 import clickDetector.dataSelector.ClickTrainDataSelectorCreator;
-import dataMap.OfflineDataMap;
+import clickDetector.tethys.ClickEventSpeciesManager;
+import clickDetector.tethys.ClickEventTethysDataProvider;
+import PamguardMVC.DataAutomation;
+import PamguardMVC.DataAutomationInfo;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
-import PamguardMVC.dataOffline.OfflineDataLoadInfo;
-import PamguardMVC.dataSelector.DataSelector;
 import PamguardMVC.dataSelector.DataSelectorCreator;
-import PamguardMVC.debug.Debug;
 import PamguardMVC.superdet.SuperDetDataBlock;
-import autecPhones.AutecGraphics;
 
 /**
  * PamDataBlock for offline events. 
@@ -49,6 +46,8 @@ public class OfflineEventDataBlock extends SuperDetDataBlock<OfflineEventDataUni
 
 	private ClickDetector clickDetector;
 	private ClickTrainDataSelectorCreator clickTrainDataSelectorCreator;
+	private ClickEventSpeciesManager eventSpeciesManager;
+	private ClickEventTethysDataProvider eventTethysDataProvider;
 	
 	public OfflineEventDataBlock(String dataName,
 			ClickDetector parentProcess, int channelMap) {
@@ -284,17 +283,42 @@ public class OfflineEventDataBlock extends SuperDetDataBlock<OfflineEventDataUni
 		return (clickDetector.getClickDataBlock() == subDataBlock || clickDetector.getTrackedClicks() == subDataBlock);
 	}
 
-//	int nName = 0;
-//	@Override
-//	public String getDataName() {
-//		// TODO Auto-generated method stub
-//		System.out.println("Call into getDataName " + ++nName);
-//		if (nName == 58) {
-//
-//			System.out.println("Call into getDataName " + ++nName);
-//		}
-//		return super.getDataName();
-//	}
+
+	@Override
+	public DataBlockSpeciesManager<OfflineEventDataUnit> getDatablockSpeciesManager() {
+		if (eventSpeciesManager == null) {
+			eventSpeciesManager = new ClickEventSpeciesManager(clickDetector, this);
+		}
+		return eventSpeciesManager;
+	}
+	
+	@Override
+	public TethysDataProvider getTethysDataProvider(TethysControl tethysControl) {
+		if (eventTethysDataProvider == null) {
+			eventTethysDataProvider = new ClickEventTethysDataProvider(tethysControl, this);
+		}
+		return eventTethysDataProvider;
+	}
+
+	@Override
+	public DataAutomationInfo getDataAutomationInfo() {
+		return new DataAutomationInfo(DataAutomation.MANUALANDAUTOMATIC);
+	}
+
+	@Override
+	public LocalisationAlgorithm getLocalisationAlgorithm() {
+		/**
+		 * Need to override the default, which would have been finding the 
+		 * main click control. Here, we need to explicitly find the 
+		 * Target Motion Localiser 
+		 */
+		ClickControl clickControl = clickDetector.getClickControl();
+		ClicksOffline clicksOffline = clickControl.getClicksOffline();
+		TargetMotionLocaliser<GroupDetection> tml = clickControl.getTargetMotionLocaliser();
+		return tml;
+//		return super.getLocalisationAlgorithm();
+	}
+
 
 }
 	

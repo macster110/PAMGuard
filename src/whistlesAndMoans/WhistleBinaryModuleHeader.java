@@ -2,13 +2,13 @@ package whistlesAndMoans;
 
 import java.io.Serializable;
 
-import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import binaryFileStorage.BinaryHeader;
 import binaryFileStorage.BinaryObjectData;
 import binaryFileStorage.ModuleHeader;
 
-public class WhistleBinaryModuleHeader extends ModuleHeader implements Serializable, ManagedParameters {
+public class WhistleBinaryModuleHeader extends ModuleHeader implements Serializable {
 	
 	private static final long serialVersionUID = 1L;
 	
@@ -26,7 +26,7 @@ public class WhistleBinaryModuleHeader extends ModuleHeader implements Serializa
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 }

@@ -21,27 +21,28 @@
 
 package Array;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 
 import Acquisition.AcquisitionControl;
-import pamMaths.PamVector;
-import Array.streamerOrigin.HydrophoneOriginMethod;
 import Array.streamerOrigin.OriginSettings;
-import Array.streamerOrigin.StreamerDataIterator;
-import GPS.GpsData;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
-import PamUtils.LatLong;
 import PamUtils.PamArrayUtils;
 import PamView.PamSymbol;
 import PamguardMVC.ChannelIterator;
 import PamguardMVC.PamConstants;
 import PamguardMVC.PamDataBlock;
+import pamMaths.PamVector;
 
 /**
  * 
@@ -90,6 +91,33 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 	private String arrayName;
 
 	private String arrayFile;
+	
+	/**
+	 * Type, used for Tethys and other meta data control 
+	 */
+	private String instrumentType;
+	
+	/**
+	 * Array Id. Can be anything. Compulsory for Tethys. 
+	 */
+	private String instrumentId;
+	
+	public String getInstrumentType() {
+		return instrumentType;
+	}
+
+	public void setInstrumentType(String instrumentType) {
+		this.instrumentType = instrumentType;
+	}
+
+	public String getInstrumentId() {
+		return instrumentId;
+	}
+
+	public void setInstrumentId(String instrumentId) {
+		this.instrumentId = instrumentId;
+	}
+
 
 	//	private int originInterpolation = ORIGIN_USE_LATEST;
 	private int originInterpolation = ORIGIN_USE_PRECEEDING;
@@ -237,7 +265,9 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 	}
 
 	protected Hydrophone getHydrophone(int iPhone, long timeMilliseconds) {
-		//		Debug.println("PAMArray: Get hydrophone coords: " + timeMilliseconds + " iPhone: " + iPhone);
+//		System.out.println("PAMArray: Get hydrophone coords: " + PamCalendar.formatDateTime(timeMilliseconds) + " iPhone: " + iPhone);
+		
+
 		if (hydrophoneInterpolation == ORIGIN_USE_LATEST) {
 			return getHydrophone(iPhone);
 		}
@@ -247,12 +277,14 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 
 		//FIXME - for some reason the above lines were always returning the first hydrophone in the datablock ^
 		HydrophoneDataUnit hdu = ArrayManager.getArrayManager().getHydrophoneDataBlock().getClosestHydrophone(timeMilliseconds, iPhone); 
+		
+//		System.out.println("PAMArray: hdu: " + hdu + " " + (hdu==null? null: PamCalendar.formatDateTime(hdu.getTimeMilliseconds()) + " Z" + hdu.getHydrophone().getdZ()));
 
 		if (hdu != null) {
-			//			Debug.println("PAMArray: found unit: " + hdu.getTimeMilliseconds());
-			//			long firstTime = ArrayManager.getArrayManager().getHydrophoneDataBlock().getFirstUnit().getTimeMilliseconds();
-			//			long lastTime = ArrayManager.getArrayManager().getHydrophoneDataBlock().getLastUnit().getTimeMilliseconds(); 
-			//			Debug.println("PAMArray: found unit: " + firstTime + " " + lastTime + " no: units: " + ArrayManager.getArrayManager().getHydrophoneDataBlock().getUnitsCount()); 
+//						System.out.println("PAMArray: found unit: " + hdu.getTimeMilliseconds());
+//						long firstTime = ArrayManager.getArrayManager().getHydrophoneDataBlock().getFirstUnit().getTimeMilliseconds();
+//						long lastTime = ArrayManager.getArrayManager().getHydrophoneDataBlock().getLastUnit().getTimeMilliseconds(); 
+//						System.out.println("PAMArray: found unit: " + firstTime + " " + lastTime + " no: units: " + ArrayManager.getArrayManager().getHydrophoneDataBlock().getUnitsCount()); 
 			// TODO should maybe do something here to average out two hydrophones if interpolation option is selected. 
 			return hdu.getHydrophone();
 		}
@@ -733,6 +765,24 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 	@Override
 	public PamArray clone() {
 		try {
+			// do a deeeeep clone by serializing to a byte array and reading back out again
+			ByteArrayOutputStream bos = new ByteArrayOutputStream();
+			ObjectOutputStream oos;
+			oos = new ObjectOutputStream(bos);
+			oos.writeObject(this);
+			oos.close();
+			byte[] data = bos.toByteArray();
+			ByteArrayInputStream bis = new ByteArrayInputStream(data);
+			ObjectInputStream ois = new ObjectInputStream(bis);
+			PamArray cloned = (PamArray) ois.readObject();
+			ois.close();
+			return cloned;
+		} catch (IOException | ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		// if it gets here, the above failed, so do the old way
+		try {
 			PamArray pa = (PamArray) super.clone();
 			if (pa.arrayFile != null) {
 				pa.arrayFile = new String(pa.arrayFile);
@@ -778,7 +828,9 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 				h.setStreamerId(newIndexes[oldInd]);
 			}
 		}
-		masterLocator.setupLocators(this);
+		if (masterLocator != null) {
+			masterLocator.setupLocators(this);
+		}
 	}
 
 	/**
@@ -1248,7 +1300,7 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 				return preceeding.getStreamerData();
 			}
 			// otherwise, we also want the next one ...
-			if (streamerIterator.hasNext() == false) {
+			if (!streamerIterator.hasNext()) {
 				return preceeding.getStreamerData();
 			}
 			nextUnit = streamerIterator.next();
@@ -1260,7 +1312,7 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 		double w1 = nextUnit.getTimeMilliseconds()-timeMilliseconds;
 		double w2 = timeMilliseconds-preceeding.getTimeMilliseconds();
 		double wTot = w1+w2;
-		if (wTot == 0 || Double.isFinite(wTot) == false) {
+		if (wTot == 0 || !Double.isFinite(wTot)) {
 			w1 = w2 = 0.5;
 		}
 		else {
@@ -1277,7 +1329,6 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 	 * @return
 	 */
 	public int addStreamer(Streamer streamer) {
-
 		synchronized (streamers) {
 			streamers.add(streamer);
 			checkStreamerIndexes();
@@ -1492,7 +1543,9 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 	 * so it can get data out of the localisers, etc. 
 	 */
 	public void prepareToSerialize() {
-		masterLocator.getLocatorSettings();
+		if (masterLocator != null) {
+			masterLocator.getLocatorSettings();
+		}
 	}
 
 	/**
@@ -1500,8 +1553,10 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 	 * data can be loaded back into the Hydrophone localisers.  
 	 */
 	public void arrayDeserialized() {
-		masterLocator.setupLocators(this);
-		masterLocator.setLocatorSettings(null);
+		if (masterLocator != null) { 
+			masterLocator.setupLocators(this);
+			masterLocator.setLocatorSettings(null);
+		}
 	}
 
 	/**
@@ -1574,7 +1629,7 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("streamers");
 			ps.put(new PrivatePamParameterData(this, field) {

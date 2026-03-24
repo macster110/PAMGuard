@@ -7,12 +7,18 @@ import java.util.Hashtable;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
 import PamModel.parametermanager.PrivatePamParameterData;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 
 public class DataKeeperSettings implements Serializable, Cloneable, ManagedParameters {
 
 	public static final long serialVersionUID = 1L;
 	
 	private Hashtable<String, Integer> keepTimeData = new Hashtable<>();
+	
+	/**
+	 * Clear all data when PAMGuard starts.
+	 */
+	private Boolean clearAtStart = Boolean.TRUE;
 
 	/* (non-Javadoc)
 	 * @see java.lang.Object#clone()
@@ -51,7 +57,7 @@ public class DataKeeperSettings implements Serializable, Cloneable, ManagedParam
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("keepTimeData");
 			ps.put(new PrivatePamParameterData(this, field) {
@@ -75,6 +81,23 @@ public class DataKeeperSettings implements Serializable, Cloneable, ManagedParam
 			e.printStackTrace();
 		}
 		return ps;
+	}
+
+	/**
+	 * @return the clearAtStart
+	 */
+	public boolean isClearAtStart() {
+		if (clearAtStart == null) {
+			clearAtStart = true; // default behaviour for older configs
+		}
+		return clearAtStart;
+	}
+
+	/**
+	 * @param clearAtStart the clearAtStart to set
+	 */
+	public void setClearAtStart(boolean clearAtStart) {
+		this.clearAtStart = clearAtStart;
 	}
 
 }

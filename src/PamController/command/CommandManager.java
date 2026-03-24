@@ -30,6 +30,7 @@ public abstract class CommandManager extends PamControlledUnit {
 		commandsList.add(new StartCommand());
 		commandsList.add(new StopCommand());
 		commandsList.add(new PingCommand());
+		commandsList.add(new NotifyCommand());
 		commandsList.add(new StatusCommand());
 		commandsList.add(new SummaryCommand());
 		commandsList.add(new SummaryPeekCommand());
@@ -43,6 +44,7 @@ public abstract class CommandManager extends PamControlledUnit {
 		commandsList.add(new BatchStatusCommand());
 		commandsList.add(new BatchCommand(this));
 		commandsList.add(new FindGUICommand());
+//		commandsList.add(new SetSerializedSettingsCommand());
 		
 	}
 
@@ -61,12 +63,24 @@ public abstract class CommandManager extends PamControlledUnit {
 
 	/**
 	 * Interpret and act on a udp command string. 
+	 * @param commandBytes 
 	 * @param command command string
 	 * @return false if the command was to exit
 	 * the program (in which case this thread will
 	 * exit and close the port). True otherwise. 
 	 */
 	public boolean interpretCommand(String commandString) {
+		 return interpretCommand(commandString, null);
+	 }
+	/**
+	 * Interpret and act on a udp command string. 
+	 * @param commandBytes 
+	 * @param command command string
+	 * @return false if the command was to exit
+	 * the program (in which case this thread will
+	 * exit and close the port). True otherwise. 
+	 */
+	public boolean interpretCommand(String commandString, byte[] commandBytes) {
 		//System.out.println(String.format("New UDP Command %s", command));
 		if (commandString == null) {
 			return false;
@@ -92,10 +106,11 @@ public abstract class CommandManager extends PamControlledUnit {
 //			sendData("   Cmd return string = " + extCommand.getReturnString());
 			return false;
 		}
-		String output = extCommand.executeCommand(commandString);
+		String output = null;
+		output = extCommand.executeCommand(commandString);
+		
 		sendData(extCommand,output);
-		
-		
+				
 		return true;
 	}
 	

@@ -16,6 +16,7 @@ import targetMotionOld.TargetMotionModel;
  *
  * Result class for the a group localiser. Usually this will be a target motion localisation, however could also be a group of DIFAR buoys 
  * or other systems which uses a set of detections to localise animals. 
+ * 
  * @author Doug Gillespie
  *
  */
@@ -75,8 +76,6 @@ public class GroupLocResult implements Comparable<GroupLocResult>, LocalisationC
 	 */
 	private int dim=3;
 
-	private ArrayList<ArrayList<Point3f>> MCMCJumpResults;
-
 	/**
 	 * @param latLong
 	 * @param chi2 
@@ -107,10 +106,6 @@ public class GroupLocResult implements Comparable<GroupLocResult>, LocalisationC
 		this.chi2 = chi2;
 	}
 
-	public GroupLocResult(double[] result, double[] resultErrors, int side, double chi2) {
-		// TODO Auto-generated constructor stub
-	}
-
 	/**
 	 * @return the latLong
 	 */
@@ -132,16 +127,7 @@ public class GroupLocResult implements Comparable<GroupLocResult>, LocalisationC
 		return side;
 	}
 
-	/**Not the correct place to store**/
-	@Deprecated
-	public void setMCMCJumps(ArrayList<ArrayList<Point3f>> MCMCResults){
-		this.MCMCJumpResults=MCMCResults;
-	}
 
-	@Deprecated
-	public ArrayList<ArrayList<Point3f>> getMCMCJumps(){
-		return  MCMCJumpResults;
-	}
 
 
 	/**

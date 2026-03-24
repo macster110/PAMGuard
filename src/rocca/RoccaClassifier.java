@@ -23,9 +23,6 @@
 
 package rocca;
 
-import PamUtils.PamCalendar;
-import PamView.dialog.warn.WarnOnce;
-
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -35,6 +32,8 @@ import java.util.Locale;
 
 import javax.swing.ProgressMonitorInputStream;
 
+import PamUtils.PamCalendar;
+import PamView.dialog.warn.WarnOnce;
 import weka.classifiers.AbstractClassifier;
 import weka.core.DenseInstance;
 import weka.core.Instance;
@@ -250,7 +249,7 @@ public class RoccaClassifier {
 //                return;
 //            }
 //        }
-    	if (!roccaControl.roccaProcess.isClassifierLoaded()) {
+    	if (!roccaControl.getRoccaProcess().isClassifierLoaded()) {
     		double[] treeVotes = new double[] {0,1};
     		rcdb.setTreeVotes(treeVotes);
     		rcdb.setClassifiedAs(NOCLASS);
@@ -281,7 +280,7 @@ public class RoccaClassifier {
     public String classifySighting(String detectionHeader, String detectionStats) {
     	
         // if the model hasn't been loaded yet, do that now
-        if (!roccaControl.roccaProcess.isClassifierLoaded()) {
+        if (!roccaControl.getRoccaProcess().isClassifierLoaded()) {
         	
         	// since we're now allowing the user to run Rocca without a classifier, don't
         	// try and load it here.  Just return a "No Classifier" classification
@@ -414,7 +413,7 @@ public class RoccaClassifier {
     		else {
 		        String fname = roccaControl.roccaParameters.roccaClassifierModelFilename.getAbsolutePath();
 		        File f = new File(fname);
-		        if (f.exists() == false) {
+		        if (!f.exists()) {
 		        	WarnOnce.showWarning(roccaControl.getUnitName(), "Rocca whistle classifier file cannot be found at " + fname, WarnOnce.WARNING_MESSAGE);
 		            roccaControl.roccaParameters.setClassifyWhistles(false);
 		        }
@@ -464,7 +463,7 @@ public class RoccaClassifier {
     		else {
 		        String fname = roccaControl.roccaParameters.roccaClickClassifierModelFilename.getAbsolutePath();
 		        File f = new File(fname);
-		        if (f.exists() == false) {
+		        if (!f.exists()) {
 		        	WarnOnce.showWarning(roccaControl.getUnitName(), "Rocca click classifier file cannot be found at " + fname, WarnOnce.WARNING_MESSAGE);
 		            roccaControl.roccaParameters.setClassifyClicks(false);
 		        }
@@ -521,7 +520,7 @@ public class RoccaClassifier {
     		else {
 		        String fname = roccaControl.roccaParameters.roccaEventClassifierModelFilename.getAbsolutePath();
 		        File f = new File(fname);
-		        if (f.exists() == false) {
+		        if (!f.exists()) {
 		        	WarnOnce.showWarning(roccaControl.getUnitName(), "Rocca events classifier file cannot be found at " + fname, WarnOnce.WARNING_MESSAGE);
 		            roccaControl.roccaParameters.setClassifyEvents(false);
 		        }
@@ -598,10 +597,10 @@ public class RoccaClassifier {
         ArrayList<String> keyNames = rcdb.getKeyNames();
 
         // if the model hasn't been loaded yet, do that now
-        if (!roccaControl.roccaProcess.isClassifierLoaded()) {
-            roccaControl.roccaProcess.setClassifierLoaded(setUpClassifier());
+        if (!roccaControl.getRoccaProcess().isClassifierLoaded()) {
+            roccaControl.getRoccaProcess().setClassifierLoaded(setUpClassifier());
             // if there was an error loading the model, return null
-            if (!roccaControl.roccaProcess.isClassifierLoaded()) {
+            if (!roccaControl.getRoccaProcess().isClassifierLoaded()) {
                 return null;
             }
         }
@@ -665,10 +664,10 @@ public class RoccaClassifier {
         ArrayList<String> keyNames = rcdb.getKeyNames();
 
         // if the model hasn't been loaded yet, do that now
-        if (!roccaControl.roccaProcess.isClassifierLoaded()) {
-            roccaControl.roccaProcess.setClassifierLoaded(setUpClassifier());
+        if (!roccaControl.getRoccaProcess().isClassifierLoaded()) {
+            roccaControl.getRoccaProcess().setClassifierLoaded(setUpClassifier());
             // if there was an error loading the model, return null
-            if (!roccaControl.roccaProcess.isClassifierLoaded()) {
+            if (!roccaControl.getRoccaProcess().isClassifierLoaded()) {
                 return null;
             }
         }

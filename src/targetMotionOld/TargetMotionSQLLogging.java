@@ -1,21 +1,19 @@
 package targetMotionOld;
 
 import java.sql.Types;
-import java.util.HashMap;
 import java.util.HashSet;
 
 import Localiser.LocaliserModel;
 import Localiser.algorithms.locErrors.LocaliserError;
 import Localiser.algorithms.locErrors.SimpleError;
 import Localiser.algorithms.locErrors.json.LocaliserErrorFactory;
-import Localiser.algorithms.locErrors.json.ErrorJsonConverter;
 import Localiser.detectionGroupLocaliser.GroupLocResult;
 import Localiser.detectionGroupLocaliser.GroupLocalisation;
 import PamDetection.AbstractLocalisation;
 import PamDetection.LocContents;
 import PamUtils.LatLong;
 import PamguardMVC.PamDataUnit;
-import generalDatabase.PamTableDefinition;
+import generalDatabase.EmptyTableDefinition;
 import generalDatabase.PamTableItem;
 import generalDatabase.SQLLoggingAddon;
 import generalDatabase.SQLTypes;
@@ -119,7 +117,7 @@ public class TargetMotionSQLLogging implements SQLLoggingAddon {
 	}
 	
 	@Override
-	public void addTableItems(PamTableDefinition pamTableDefinition) {
+	public void addTableItems(EmptyTableDefinition pamTableDefinition) {
 
 	
 		pamTableDefinition.addTableItem(modelName);
@@ -146,7 +144,7 @@ public class TargetMotionSQLLogging implements SQLLoggingAddon {
 	}
 
 	@Override
-	public boolean saveData(SQLTypes sqlTypes, PamTableDefinition pamTableDefinition,
+	public boolean saveData(SQLTypes sqlTypes, EmptyTableDefinition pamTableDefinition,
 			PamDataUnit pamDataUnit) {
 		AbstractLocalisation tmResult = pamDataUnit.getLocalisation();
 		clearEverything();
@@ -218,7 +216,7 @@ public class TargetMotionSQLLogging implements SQLLoggingAddon {
 		return true;
 	}
 
-	private boolean saveGroupLocalisation(SQLTypes sqlTypes, PamTableDefinition pamTableDefinition,
+	private boolean saveGroupLocalisation(SQLTypes sqlTypes, EmptyTableDefinition pamTableDefinition,
 			PamDataUnit pamDataUnit, GroupLocalisation groupLocalisation) {
 		
 		int nAmbiguities = groupLocalisation.getAmbiguityCount();
@@ -239,7 +237,7 @@ public class TargetMotionSQLLogging implements SQLLoggingAddon {
 		return true;
 	}
 
-	private boolean saveGroupLocalisation(SQLTypes sqlTypes, PamTableDefinition pamTableDefinition,
+	private boolean saveGroupLocalisation(SQLTypes sqlTypes, EmptyTableDefinition pamTableDefinition,
 			PamDataUnit pamDataUnit, int resultIndex, GroupLocResult tmResult) {
 		
 		
@@ -323,7 +321,7 @@ public class TargetMotionSQLLogging implements SQLLoggingAddon {
 	}
 
 	@Override
-	public boolean loadData(SQLTypes sqlTypes, PamTableDefinition pamTableDefinition,
+	public boolean loadData(SQLTypes sqlTypes, EmptyTableDefinition pamTableDefinition,
 			PamDataUnit pamDataUnit) {
 		
 		GroupLocalisation tml = new GroupLocalisation(pamDataUnit, null);
@@ -341,7 +339,7 @@ public class TargetMotionSQLLogging implements SQLLoggingAddon {
 		return true;
 	}
 
-		private GroupLocResult loadLocResult(SQLTypes sqlTypes, PamTableDefinition pamTableDefinition,
+		private GroupLocResult loadLocResult(SQLTypes sqlTypes, EmptyTableDefinition pamTableDefinition,
 				PamDataUnit pamDataUnit, GroupLocalisation tml, int resultIndex) {
 			
 		double latVal, longVal;
@@ -375,7 +373,7 @@ public class TargetMotionSQLLogging implements SQLLoggingAddon {
 		GroupLocResult tmr = new GroupLocResult(ll, sideVal, chiVal);
 		tmr.setBeamLatLong(bLL);
 		if (ts != null) {
-			tmr.setBeamTime(sqlTypes.millisFromTimeStamp(ts));
+			tmr.setBeamTime(SQLTypes.millisFromTimeStamp(ts));
 		}
 		tmr.setChi2((Double) chi2[resultIndex].getValue());
 		tmr.setAic((Double) aic[resultIndex].getValue());

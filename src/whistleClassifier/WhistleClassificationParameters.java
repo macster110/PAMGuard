@@ -5,6 +5,7 @@ import java.lang.reflect.Field;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 
 public class WhistleClassificationParameters implements Cloneable, Serializable, ManagedParameters {
@@ -63,7 +64,7 @@ public class WhistleClassificationParameters implements Cloneable, Serializable,
 	 * If fewer than lowWhistleNumber whistles collected over a period, then clear
 	 * and start again. 
 	 */
-	int lowWhistleNumber = 3;
+	public int lowWhistleNumber = 3;
 	
 	/**
 	 * classify anyway, even if not enough fragments when quitting due to low 
@@ -84,7 +85,7 @@ public class WhistleClassificationParameters implements Cloneable, Serializable,
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("lowWhistleNumber");
 			ps.put(new PrivatePamParameterData(this, field) {

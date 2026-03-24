@@ -33,7 +33,7 @@ public class MatchFiltControl extends IshDetControl implements PamSettings
 
 	@Override
 	public IshDetFnProcess getNewDetProcess(PamDataBlock defaultDataBlock) {
-		return new MatchFiltProcess(this, defaultDataBlock);
+		return new MatchFiltProcess2(this, defaultDataBlock);
 	}
 	
 	/* (non-Javadoc)
@@ -52,6 +52,7 @@ public class MatchFiltControl extends IshDetControl implements PamSettings
 	}
 	
 	class menuSmoothingDetection implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent ev) {
 		}
 	}
@@ -77,6 +78,7 @@ public class MatchFiltControl extends IshDetControl implements PamSettings
 		return super.restoreSettings(pamControlledUnitSettings);
 	}
 
+	@Override
 	public Serializable getSettingsReference() {
 		return ishDetParams;
 	}
@@ -84,6 +86,7 @@ public class MatchFiltControl extends IshDetControl implements PamSettings
 	/**
 	 * @return An integer version number for the settings
 	 */
+	@Override
 	public long getSettingsVersion() {
 		return MatchFiltParams.serialVersionUID;
 	}
@@ -92,5 +95,10 @@ public class MatchFiltControl extends IshDetControl implements PamSettings
 	public PamRawDataBlock getRawInputDataBlock() {
 		// TODO Auto-generated method stub
 		return null;
+	}
+	
+	@Override
+	String getHelpPoint() {
+		return "detectors.ishmael.docs.ishmael_matchedfilter";
 	}
 }

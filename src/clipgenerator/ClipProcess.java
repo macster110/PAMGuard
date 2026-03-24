@@ -9,17 +9,6 @@ import java.util.ListIterator;
 
 import javax.sound.sampled.AudioFormat;
 
-import networkTransfer.receive.BuoyStatusDataUnit;
-import soundPlayback.ClipPlayback;
-import warnings.PamWarning;
-import warnings.WarningSystem;
-import clipgenerator.clipDisplay.ClipSymbolManager;
-import clipgenerator.localisation.ClipDelays;
-import clipgenerator.localisation.ClipLocalisation;
-import dataPlotsFX.layout.TDGraphFX;
-import fftManager.FFTDataBlock;
-import wavFiles.Wav16AudioFormat;
-import wavFiles.WavFileWriter;
 import Localiser.algorithms.Correlations;
 import Localiser.algorithms.timeDelayLocalisers.bearingLoc.BearingLocaliser;
 import Localiser.algorithms.timeDelayLocalisers.bearingLoc.BearingLocaliserSelector;
@@ -37,8 +26,18 @@ import PamguardMVC.PamObserverAdapter;
 import PamguardMVC.PamRawDataBlock;
 import PamguardMVC.RawDataUnavailableException;
 import Spectrogram.SpectrogramDisplay;
+import Spectrogram.SpectrogramMarkObserver;
 import Spectrogram.SpectrogramMarkProcess;
 import annotation.handler.ManualAnnotationHandler;
+import clipgenerator.clipDisplay.ClipSymbolManager;
+import clipgenerator.localisation.ClipDelays;
+import clipgenerator.localisation.ClipLocalisation;
+import dataPlotsFX.layout.TDGraphFX;
+import networkTransfer.receive.BuoyStatusDataUnit;
+import soundPlayback.ClipPlayback;
+import warnings.PamWarning;
+import wavFiles.Wav16AudioFormat;
+import wavFiles.WavFileWriter;
 
 /**
  * Process for making short clips of audio data. 
@@ -95,7 +94,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 		symbolManager.addSymbolOption(StandardSymbolManager.HAS_LINE_AND_LENGTH);
 		clipDataBlock.setPamSymbolManager(symbolManager);
 		addOutputDataBlock(clipDataBlock);
-		clipDelays = new ClipDelays(clipControl);
+		clipDelays = new ClipDelays(clipControl, clipDataBlock);
 		buoyLocaliserManager = new BuoyLocaliserManager();
 		manualAnnotaionHandler = new ManualAnnotationHandler(clipControl, clipDataBlock);
 		clipDataBlock.setAnnotationHandler(manualAnnotaionHandler);
@@ -140,10 +139,13 @@ public class ClipProcess extends SpectrogramMarkProcess {
 				clipErr = clipRequest.clipBlockProcess.processClipRequest(clipRequest);
 				switch (clipErr) {
 				case 0: // no error - clip should have been created. 
+					li.remove();
+					break;
 				case RawDataUnavailableException.DATA_ALREADY_DISCARDED:
 				case RawDataUnavailableException.INVALID_CHANNEL_LIST:
-					//					System.out.println("Clip error : " + clipErr);
+					System.out.println("Clip error : " + clipErr + " " + clipRequest.toString());
 					li.remove();
+					break;
 				case RawDataUnavailableException.DATA_NOT_ARRIVED:
 					continue; // hopefully, will get this next time !
 				}
@@ -179,7 +181,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 		String path = getClipFileFolder(clipDataUnit.getTimeMilliseconds(), true);
 		path += clipDataUnit.fileName;
 		File aFile = new File(path);
-		if (aFile.exists() == false) {
+		if (!aFile.exists()) {
 			return null;
 		}
 		return aFile;
@@ -200,7 +202,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 
 			// now check that that folder exists. 
 			File folder = FileFunctions.createNonIndexedFolder(folderName);
-			if (folder == null || folder.exists() == false) {
+			if (folder == null || !folder.exists()) {
 				return null;
 			}
 		}
@@ -230,6 +232,17 @@ public class ClipProcess extends SpectrogramMarkProcess {
 			}
 			minH = Math.max(minH, clipBlockProcesses[i].getRequiredDataHistory(o, arg));
 		}
+		
+		ClipRequest firstClip = null;
+		synchronized(clipRequestSynch) {
+			if (clipRequestQueue.size() > 0) {
+				firstClip = clipRequestQueue.get(0);
+			}
+		}
+		if (firstClip != null) {
+			minH += firstClip.dataUnit.getDurationInMilliseconds();
+		}
+		
 		minH += Math.max(3000, 192000/(long)getSampleRate());
 		if (specMouseDown) {
 			minH = Math.max(minH, masterClockTime-specMouseDowntime);
@@ -249,7 +262,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 		/**
 		 * Called when a manual mark is made on the spectrogram display. 
 		 */
-		if (downUp == SpectrogramMarkProcess.MOUSE_DOWN) {
+		if (downUp == SpectrogramMarkObserver.MOUSE_DOWN) {
 			// REMOVE THIS CHECK - ClipGenerator already knows the raw data source, set in the parameters.  So it doesn't need to worry about whether the FFT source is actually beamformer data
 //    		// do a quick check here of the source.  If the fft has sequence numbers, the channels are ambiguous and Rocca can't use it.  warn the user and exit
 //    		FFTDataBlock source = display.getSourceFFTDataBlock();
@@ -268,7 +281,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 			specMouseDowntime = startMilliseconds;
 			return false;
 		}
-		else if (downUp == SpectrogramMarkProcess.MOUSE_DRAG) {
+		else if (downUp == SpectrogramMarkObserver.MOUSE_DRAG) {
 			return false;
 		}
 		else {
@@ -337,9 +350,9 @@ public class ClipProcess extends SpectrogramMarkProcess {
 		 */
 		// first work out which hydrophones are used by the clipDataUnit. 
 		// if they are the same as last time, then we're cool. 
-		int hydros = rawDataBlock.getChannelListManager().channelIndexesToPhones(clipDataUnit.getChannelBitmap());
+		int[] hydros = rawDataBlock.getChannelListManager().channelMapToPhonesList(clipDataUnit.getChannelBitmap());
 		// give up immediately if there is only one hydrophone
-		if (PamUtils.getNumChannels(hydros) < 2) {
+		if (hydros.length < 2) {
 			return false;
 		}
 		BearingLocaliser bearingLocaliser = buoyLocaliserManager.findBearingLocaliser(clipDataUnit);
@@ -353,16 +366,17 @@ public class ClipProcess extends SpectrogramMarkProcess {
 	 * where the max delay is < half the FFT length. 
 	 * @param clipDataUnit data unit to localise
 	 * @param bearingLocaliser bearing localiser converts delays to angle(s)
-	 * @param hydrophoneMap hydrophone map
+	 * @param hydrophoneList hydrophone map
 	 * @return true if a localisation was calculated. 
 	 */
-	private boolean localiseClip(ClipDataUnit clipDataUnit, BearingLocaliser bearingLocaliser, int hydrophoneMap) {
+	private boolean localiseClip(ClipDataUnit clipDataUnit, BearingLocaliser bearingLocaliser, int[] hydrophoneList) {
 		double[] delays = clipDelays.getDelays(clipDataUnit);
 		if (delays != null) {
 			for (int i = 0; i < delays.length; i++) {
 				delays[i] /= rawDataBlock.getSampleRate();
 			}
 			double[][] locData = bearingLocaliser.localise(delays, clipDataUnit.getTimeMilliseconds());
+			int hydrophoneMap = PamUtils.makeChannelMap(hydrophoneList);
 			if (locData != null) {
 				ClipLocalisation clipLoc = new ClipLocalisation(clipDataUnit, bearingLocaliser, hydrophoneMap, locData);
 				clipDataUnit.setLocalisation(clipLoc);
@@ -381,7 +395,12 @@ public class ClipProcess extends SpectrogramMarkProcess {
 	 */
 	public synchronized void subscribeDataBlocks() {
 		unSubscribeDataBlocks();
-		rawDataBlock = PamController.getInstance().getRawDataBlock(clipControl.clipSettings.dataSourceName);
+		rawDataBlock = (PamRawDataBlock) PamController.getInstance().getDataBlockByLongName(clipControl.clipSettings.dataSourceName);
+		if (rawDataBlock == null) {
+			// have changed dialog to use long data name. More robust. Old configs will get null
+			// from that, so use this instead. 
+			rawDataBlock = PamController.getInstance().getRawDataBlock(clipControl.clipSettings.dataSourceName);
+		}
 		setParentDataBlock(rawDataBlock, true);
 		
 		int nBlocks = clipControl.clipSettings.getNumClipGenerators();
@@ -392,7 +411,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 			
 			clipGenSetting = clipControl.clipSettings.getClipGenSetting(i);
 
-			if (clipGenSetting.enable == false) {
+			if (!clipGenSetting.enable) {
 				continue;
 			}
 			if (i == 0) {
@@ -440,7 +459,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 
 		private BearingLocaliser bearingLocaliser;
 
-		private int hydrophoneMap;
+		private int[] hydrophoneMap;
 		
 		/**
 		 * @param dataBlock
@@ -453,12 +472,11 @@ public class ClipProcess extends SpectrogramMarkProcess {
 			this.dataBlock = dataBlock;
 			this.clipGenSetting = clipGenSetting;
 			clipBudgetMaker = new StandardClipBudgetMaker(this);
-			dataBlock.addObserver(this, true);
-			
+			dataBlock.addObserver(this, false);
 
 			if (rawDataBlock != null) {
 				int chanMap = decideChannelMap(rawDataBlock.getChannelMap());
-				hydrophoneMap = rawDataBlock.getChannelListManager().channelIndexesToPhones(chanMap);
+				hydrophoneMap = rawDataBlock.getChannelListManager().channelMapToPhonesList(chanMap);
 				double timingError = Correlations.defaultTimingError(getSampleRate());
 				bearingLocaliser = BearingLocaliserSelector.createBearingLocaliser(hydrophoneMap, timingError); 
 			}
@@ -493,12 +511,17 @@ public class ClipProcess extends SpectrogramMarkProcess {
 //					}
 //				}
 //			}
+			if (rawDataBlock == null) {
+				return 0;
+			}
 			
 			double[][] rawData = null;
 			try {
 				rawData = rawDataBlock.getSamples(rawStart, (int) (rawEnd-rawStart), channelMap);
 			}
 			catch (RawDataUnavailableException e) {
+				// this can be OK, since if it's a "not yet arrived" it will try again,so don't print the error here. 
+//				System.out.println("Clip process" + e.getMessage());
 				return e.getDataCause();
 			}
 			if (rawData==null) {
@@ -535,6 +558,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 				clipDataUnit.setTriggerDataUnit(dataUnit);
 				clipDataUnit.setFrequency(dataUnit.getFrequency());
 				lastClipDataUnit = clipDataUnit;
+				clipDataUnit.setParentDataBlock(clipDataBlock);
 				if (bearingLocaliser != null) {
 					localiseClip(clipDataUnit, bearingLocaliser, hydrophoneMap);
 				}				
@@ -583,9 +607,15 @@ public class ClipProcess extends SpectrogramMarkProcess {
 		public PamObserver getObserverObject() {
 			return clipProcess.getObserverObject();
 		}
+	
 		@Override
 		public long getRequiredDataHistory(PamObservable o, Object arg) {
-			return (long) ((clipGenSetting.preSeconds+clipGenSetting.postSeconds) * 1000.);
+			long h = (long) ((clipGenSetting.preSeconds+clipGenSetting.postSeconds) * 1000.);
+//			if (dataBlock != null) {
+			// can't do this since dataBlock is observing this, so will wrap. 
+//				h += dataBlock.getRequiredHistory();
+//			}
+			return h;
 		}
 		
 		
@@ -645,6 +675,17 @@ public class ClipProcess extends SpectrogramMarkProcess {
 		
 		protected PamDataUnit dataUnit;
 
+		@Override
+		public String toString() {
+			try {
+			return String.format("Clip request from %s samples %d for %d", 
+					dataUnit.getParentDataBlock().getDataName(), dataUnit.getStartSample(), dataUnit.getSampleDuration());
+			}
+			catch (Exception e) {
+				return "Clip request from " + dataUnit.toString();
+			}
+		}
+
 	}
 	
 	/**
@@ -699,6 +740,7 @@ public class ClipProcess extends SpectrogramMarkProcess {
 		 */
 		public synchronized BearingLocaliser findBearingLocaliser(PamDataUnit pamDataUnit) {
 			int channels = pamDataUnit.getChannelBitmap();
+//			int[] phones = getSourceDataBlock().
 			int hydros = rawDataBlock.getChannelListManager().channelIndexesToPhones(channels);
 			for (BearingLocaliser loc:bearingLocalisers) {
 				if (loc.getHydrophoneMap() == hydros) {
@@ -707,7 +749,8 @@ public class ClipProcess extends SpectrogramMarkProcess {
 			}
 			// if it get's here, then there isn't one available so create one
 			double timingError = Correlations.defaultTimingError(getSampleRate());
-			BearingLocaliser loc = BearingLocaliserSelector.createBearingLocaliser(hydros, timingError);
+			int[] phones = rawDataBlock.getChannelListManager().channelMapToPhonesList(channels);
+			BearingLocaliser loc = BearingLocaliserSelector.createBearingLocaliser(phones, timingError);
 			if (loc != null) {
 				bearingLocalisers.add(loc);
 			}

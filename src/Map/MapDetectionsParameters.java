@@ -2,11 +2,11 @@ package Map;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.ListIterator;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 
 /**
  * PArameters for MapDetectionsManager which 
@@ -20,7 +20,7 @@ public class MapDetectionsParameters implements Serializable, Cloneable, Managed
 	
 	static public final long serialVersionUID = 0;
 	
-	protected ArrayList<MapDetectionData> mapDetectionDatas = new ArrayList<MapDetectionData>();;
+	protected ArrayList<MapDetectionData> mapDetectionDatas = new ArrayList<MapDetectionData>();
 
 	@Override
 	public MapDetectionsParameters clone() {
@@ -65,7 +65,7 @@ public class MapDetectionsParameters implements Serializable, Cloneable, Managed
 		
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DISPLAY);
 		return ps;
 	}
 

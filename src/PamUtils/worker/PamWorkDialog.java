@@ -1,5 +1,7 @@
 package PamUtils.worker;
 
+import java.awt.Dimension;
+import java.awt.Point;
 import java.awt.Window;
 
 import javax.swing.BoxLayout;
@@ -10,12 +12,25 @@ import javax.swing.border.TitledBorder;
 import PamView.dialog.PamDialog;
 import PamView.dialog.PamTextDisplay;
 
+/**
+ * A simple dialog with a progress bar, and potentially also some
+ * lines of text that can be used in conjunction with a SwingWorker to 
+ * show progress of a task that's taking some time to execute. 
+ * @author dg50
+ *
+ */
 public class PamWorkDialog extends PamDialog {
 	
 	private JProgressBar progressBar;
 	
 	private PamTextDisplay[] textRows;
 
+	/**
+	 * Create the work dialog
+	 * @param parentFrame parent frame, can be null
+	 * @param nTextRows Number of rows of text, can be 0
+	 * @param title title for the dialog. 
+	 */
 	public PamWorkDialog(Window parentFrame, int nTextRows, String title) {
 		super(parentFrame, title, false);
 		JPanel mainPanel = new JPanel();
@@ -23,6 +38,9 @@ public class PamWorkDialog extends PamDialog {
 		mainPanel.setBorder(new TitledBorder("Task Progress"));
 //		GridBagConstraints c = new PamGridBagContraints();
 		mainPanel.add(progressBar = new JProgressBar(0, 100));
+		Dimension sz = progressBar.getPreferredSize();
+		sz.width = 300;
+		progressBar.setPreferredSize(sz);
 		textRows = new PamTextDisplay[nTextRows];
 		for (int i = 0; i < nTextRows; i++) {
 //			c.gridy++;
@@ -35,8 +53,26 @@ public class PamWorkDialog extends PamDialog {
 		getButtonPanel().setVisible(false);
 		setDialogComponent(mainPanel);
 		setResizable(true);
+		
+		if (parentFrame != null) {
+			Dimension prefSize = this.getPreferredSize();
+			Point screenLoc = parentFrame.getLocationOnScreen();
+			int x = (parentFrame.getWidth()-prefSize.width)/2;
+			int y = (parentFrame.getHeight()-prefSize.height)/2;
+			if (screenLoc != null) {
+				x += screenLoc.x;
+				y += screenLoc.y;
+			}
+			setLocation(x, y);
+		}
 	}
 	
+	/**
+	 * Update the dialog. The message will contain a progress as a percentage
+	 * and lines of text, all of which will be updated. The number of lines of 
+	 * text should match the number of lines set in the constructor. 
+	 * @param progressMsg
+	 */
 	public void update(PamWorkProgressMessage progressMsg) {
 		if (progressMsg == null) return;
 		Integer progress = progressMsg.progress;
@@ -73,6 +109,11 @@ public class PamWorkDialog extends PamDialog {
 	public void restoreDefaultSettings() {
 		// TODO Auto-generated method stub
 		
+	}
+
+	@Override
+	public void setVisible(boolean visible) {
+		super.setVisible(visible);
 	}
 
 }

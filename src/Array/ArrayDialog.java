@@ -8,6 +8,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.util.ArrayList;
+
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -16,10 +17,12 @@ import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 import javax.swing.border.TitledBorder;
 import javax.swing.filechooser.FileFilter;
+
 import Acquisition.AcquisitionControl;
 import Acquisition.AcquisitionParameters;
 import PamController.PamController;
 import PamUtils.PamFileChooser;
+import PamUtils.PamFileFilter;
 import PamView.dialog.PamDialog;
 import PamView.dialog.PamGridBagContraints;
 import PamView.help.PamHelp;
@@ -44,6 +47,8 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 	private EnvironmentPanel environmentPanel;
 
 	private HydrophoneDiagram hydrophoneDiagram;
+	
+	private InstrumentIdentityPanel instrumentIdentityPanel;
 
 	private JButton okButton, cancelButton;
 
@@ -52,8 +57,11 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 
 	private PamArray selectedArray;
 
-	private ArrayDialog(Frame parentFrame) {
+	private ArrayManager arrayManager;
+
+	private ArrayDialog(Frame parentFrame, ArrayManager arrayManager) {
 		super(parentFrame, "Pamguard hydrophone array", false);
+		this.arrayManager = arrayManager;
 
 		JPanel mainPanel = new JPanel(new BorderLayout());
 		JSplitPane splitPanel = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
@@ -62,18 +70,21 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 		JPanel eastPanel = new JPanel();
 		eastPanel.setLayout(new BoxLayout(eastPanel, BoxLayout.Y_AXIS));
 
-		hydrophoneDialogPanel = new HydrophoneDialogPanel(this);
+		hydrophoneDialogPanel = new HydrophoneDialogPanel(this, arrayManager);
 		eastPanel.add(hydrophoneDialogPanel.getPanel());
 
 		channelPanel = new ChannelPanel(this);
 		eastPanel.add(channelPanel.getChannelPanel());
 
 		environmentPanel = new EnvironmentPanel(this);
+		instrumentIdentityPanel = new InstrumentIdentityPanel();
+		//		eastPanel.add(environmentPanel.getEnvironmentPanel());
 
 		hydrophoneDiagram = new HydrophoneDiagram(this);
 		JPanel westPanel = new JPanel(new BorderLayout());
 		westPanel.add(BorderLayout.CENTER, hydrophoneDiagram.getPlotPanel());
 		westPanel.add(BorderLayout.SOUTH, environmentPanel.getEnvironmentPanel());
+		westPanel.add(BorderLayout.NORTH, instrumentIdentityPanel.getComponent());
 		
 
 		splitPanel.add(westPanel);
@@ -128,14 +139,22 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 	}
 
 	/**
-	 * Open main dialog for hydrophone array configuration
+	 * Open main dialog for hydrophone array configuration. Modified to allow changes to 
+	 * arrays from secondary configurations, e.g. when setting up batch processor. Generally
+	 * call this wither with an arrayManager (most often) and null array, or just the array when
+	 * modifying a batch job configuration. 
 	 * @param parentFrame parent frame or window. 
+	 * @param arrayManager
+	 * @param array
 	 */
-	public static PamArray showDialog (Frame parentFrame, ArrayManager arrayManager) {
-		if (singleInstance == null || singleInstance.getOwner() != parentFrame) {
-			singleInstance = new ArrayDialog(parentFrame);
+	public static PamArray showDialog (Frame parentFrame, ArrayManager arrayManager, PamArray array) {
+		/**
+		 * Bit of a cludge to allow changes for the batch processor which do not update the main array. 
+		 */
+		if (singleInstance == null || singleInstance.getOwner() != parentFrame || singleInstance.arrayManager != arrayManager) {
+			singleInstance = new ArrayDialog(parentFrame, arrayManager);
 		}
-		singleInstance.setParams(null);
+		singleInstance.setParams(array);
 		singleInstance.setVisible(true);
 		return singleInstance.selectedArray;
 	}
@@ -144,6 +163,7 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 		hydrophoneDialogPanel.setParams(selArray);
 		channelPanel.setParams();
 		hydrophoneDiagram.rePaint();
+		instrumentIdentityPanel.setParams(selArray);
 		if (selArray != null) {
 			environmentPanel.setNewSpeed(selArray.getSpeedOfSound());
 		}
@@ -164,15 +184,18 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 	public boolean getParams() {
 		// all OK, so
 		// move the selected array to the top of the list in the ArrayManager
-		if (okOK(true) == false) return false;
+		if (!okOK(true)) return false;
 
 		PamArray array = hydrophoneDialogPanel.getDialogSelectedArray();
-		ArrayManager.getArrayManager().setCurrentArray(array);
+		if (arrayManager != null) {
+			arrayManager.setCurrentArray(array);
+		}
 		array.setSpeedOfSound(environmentPanel.getNewSpeed());
 		array.setSpeedOfSoundError(environmentPanel.getNewError());
 		hydrophoneDialogPanel.getParams();
+		instrumentIdentityPanel.getParams(array);
 
-		if (checkDaqChannels(array) == false) {
+		if (!checkDaqChannels(array)) {
 			return false;
 		}
 
@@ -180,6 +203,16 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 		//		new MLGridBearingLocaliser(PamUtils.makeChannelMap(array.getHydrophoneCount()), 1./96000.);
 		return true;
 	}
+	
+//	/**
+//	 * Get the params from the main dialog panel, not the
+//	 * sub panels. Sub panels may need to call this before they 
+//	 * try to do their bit to ensure central dat ais up to date. 
+//	 * @return
+//	 */
+//	public boolean getCentralParams() {
+//		
+//	}
 
 	/**
 	 * Check that all software channels are assigned before 
@@ -191,7 +224,7 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 		ArrayList<AcquisitionControl> daqControllers = AcquisitionControl.getControllers();
 		boolean allOk = true;
 		for (int i = 0; i < daqControllers.size(); i++) {
-			if (checkDaqChannels(daqControllers.get(i), array) == false) {
+			if (!checkDaqChannels(daqControllers.get(i), array)) {
 				allOk = false;
 			}
 		}
@@ -231,7 +264,7 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 			}
 			return false;
 		}
-		else if (environmentPanel.getParams() == false) {
+		else if (!environmentPanel.getParams()) {
 			return false;
 		}
 
@@ -250,6 +283,7 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 			environmentPanel.setNewSpeed(currentArray.getSpeedOfSound());
 			environmentPanel.setNewError(currentArray.getSpeedOfSoundError());
 		}
+		instrumentIdentityPanel.setParams(currentArray);
 	}
 
 	void newChannelSelection() {
@@ -257,15 +291,15 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 	}
 
 	void enableButtons() {
-		//PamArray currentArray = ArrayManager.getArrayManager().getCurrentArray();
 		if (hydrophoneDialogPanel == null) return;
 		PamArray currentArray = hydrophoneDialogPanel.getDialogSelectedArray();
 		//JButton newArrayButton, importArrayButton, exportArrayButton, deleteArrayButton;
 		okButton.setEnabled(okOK(false));
 		exportArrayButton.setEnabled(currentArray != null);
-		deleteArrayButton.setEnabled(ArrayManager.getArrayManager().getArrayCount() > 1);
+		deleteArrayButton.setEnabled(arrayManager != null && arrayManager.getArrayCount() > 1);
 	}
 
+	@Override
 	public void actionPerformed(ActionEvent e) {
 		if (e.getSource() == cancelButton) {
 			this.setVisible(false);
@@ -337,7 +371,6 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 	}
 
 	private void importArray() {
-		//		PamArray currArray = ArrayManager.getArrayManager().getCurrentArray();
 		//		if (currentArray == null) return;
 		JFileChooser fileChooser = getArrayFileChooser();
 		int state = fileChooser.showOpenDialog(this);
@@ -350,27 +383,32 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 	}
 
 	public void addArray(PamArray newArray) {
-		ArrayManager.getArrayManager().addArray(newArray);
+		if (arrayManager != null) {
+			arrayManager.addArray(newArray);
+		}
 		setParams(newArray);
 	}
 
 	private void exportArray() {
-		//		PamArray currArray = ArrayManager.getArrayManager().getCurrentArray();
 		PamArray currentArray = hydrophoneDialogPanel.getDialogSelectedArray();
 		if (currentArray == null) return;
 		JFileChooser fileChooser = getArrayFileChooser();
 		int state = fileChooser.showSaveDialog(this);
 		if (state == JFileChooser.APPROVE_OPTION) {
-			currentArray.setArrayFile(fileChooser.getSelectedFile().getAbsolutePath());
+			File pafFile = fileChooser.getSelectedFile();
+			pafFile = PamFileFilter.checkFileEnd(pafFile, ArrayManager.getArrayFileType(), true);
+			currentArray.setArrayFile(pafFile.getAbsolutePath());
 			ArrayManager.saveArrayToFile(currentArray);
 		}
 	}
 
 	private void deleteArray() {
-		//		PamArray currArray = ArrayManager.getArrayManager().getCurrentArray();
 		PamArray currentArray = hydrophoneDialogPanel.getDialogSelectedArray();
 		if (currentArray == null) return;
-		if (ArrayManager.getArrayManager().getRecentArrays().size() < 2) {
+		if (arrayManager == null) {
+			return;
+		}
+		if (arrayManager.getRecentArrays().size() < 2) {
 			JOptionPane.showMessageDialog(this, "You cannot delete the last array in the list", "Array delete",
 					JOptionPane.WARNING_MESSAGE);
 			return;
@@ -380,7 +418,7 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 				"Confirm array delete", JOptionPane.YES_NO_OPTION);
 		if (ans == JOptionPane.NO_OPTION) return;
 		// go ahead and delete it !
-		ArrayManager.getArrayManager().removeArray(currentArray);
+		arrayManager.removeArray(currentArray);
 		setParams(null);
 	}
 
@@ -396,7 +434,6 @@ public class ArrayDialog extends PamDialog implements ActionListener {
 		}
 		fileChooser.addChoosableFileFilter(new ArrayFileFilter());
 		PamArray currentArray = hydrophoneDialogPanel.getDialogSelectedArray();
-		//		PamArray currArray = ArrayManager.getArrayManager().getCurrentArray();
 		fileChooser.setSelectedFile(new File(currentArray.getArrayFileName()));
 
 		return fileChooser;

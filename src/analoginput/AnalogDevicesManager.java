@@ -3,18 +3,16 @@ package analoginput;
 import java.io.Serializable;
 import java.util.ArrayList;
 
-import javax.swing.JComponent;
-import javax.swing.JFrame;
-
 import PamController.PamControlledUnitSettings;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamController.SettingsNameProvider;
+import PamModel.CommonPluginInterface;
+import PamModel.PamModel;
 import PamView.dialog.PamDialog;
 import PamView.dialog.PamDialogPanel;
 import analoginput.brainboxes.BrainBoxDevices;
 import analoginput.measurementcomputing.MCCAnalogDevices;
-import analoginput.swing.AnalogDiagnosticsDisplay;
 import analoginput.swing.AnalogDiagnosticsDisplayProvider;
 import analoginput.swing.AnalogDialogPanel;
 import userDisplay.UserDisplayControl;
@@ -29,12 +27,21 @@ public class AnalogDevicesManager implements PamSettings {
 	private AnalogDeviceType activeDevice;
 	
 	private ArrayList<AnalogInputObserver> inputObservers = new ArrayList<>();
+	
 
 	public AnalogDevicesManager(SettingsNameProvider settingsNameProvider, AnalogSensorUser sensorUser) {
 		this.settingsNameProvider = settingsNameProvider;
 		this.sensorUser = sensorUser;
 		availableTypes.add(new MCCAnalogDevices(this, settingsNameProvider, sensorUser));
 		availableTypes.add(new BrainBoxDevices(this, settingsNameProvider, sensorUser));
+		/**
+		 * Load plugins by accessing the list for this module
+		 */
+		ArrayList<CommonPluginInterface> analogPlugins = PamModel.getPamModel().getPluginType(AnalogDevicePlugin.class);
+		for (CommonPluginInterface cpi : analogPlugins) {
+			AnalogDevicePlugin dev = (AnalogDevicePlugin) cpi;
+			availableTypes.add(dev.createAnalogDevice(this, settingsNameProvider, sensorUser));
+		}
 		PamSettingManager.getInstance().registerSettings(this);
 		UserDisplayControl.addUserDisplayProvider(new AnalogDiagnosticsDisplayProvider(this));
 	}

@@ -12,6 +12,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.shape.Polygon;
 import PamController.PamController;
 import PamUtils.Coordinate3d;
+import PamUtils.PamCalendar;
 import PamUtils.PamUtils;
 import PamView.HoverData;
 import PamView.GeneralProjector.ParameterType;
@@ -142,6 +143,11 @@ public abstract class TDDataInfoFX {
 
 		scaleInfoIndex = -1;
 		for (int i = 0; i < scaleInfos.size(); i++) {
+			TDScaleInfo scaleInfo = scaleInfos.get(i);
+			ParameterType scaleDataType = scaleInfo.getDataType();
+			if (scaleDataType == null) {
+				continue;
+			}
 			if (scaleInfos.get(i).getDataType().equals(dataType) && scaleInfos.get(i).getDataUnit().equals(dataUnits)) {
 				scaleInfoIndex = i;
 				return true;
@@ -166,7 +172,15 @@ public abstract class TDDataInfoFX {
 	 */
 	public boolean hasAxisName(ParameterType dataType, ParameterUnits dataUnits) {
 		for (int i = 0; i < scaleInfos.size(); i++) {
-			if (scaleInfos.get(i).getDataType().equals(dataType) 
+			TDScaleInfo scaleInfo = scaleInfos.get(i);
+			if (scaleInfo == null) {
+				return false;
+			}
+			ParameterType scaleDataType = scaleInfo.getDataType();
+			if (scaleDataType == null) {
+				return false;
+			}
+			if (scaleInfo.getDataType().equals(dataType) 
 					&& scaleInfos.get(i).getDataUnit().equals(dataUnits)) {
 				return true;
 			}
@@ -290,6 +304,9 @@ public abstract class TDDataInfoFX {
 	 */
 	public TDScaleInfo getScaleInfo() {
 		if (scaleInfoIndex==-1 && scaleInfos.size()>0) scaleInfoIndex=0; 
+		if (scaleInfoIndex < 0 || scaleInfoIndex >= scaleInfos.size()) {
+			return null;
+		}
 		return scaleInfos.get(this.scaleInfoIndex);
 	}
 
@@ -373,8 +390,8 @@ public abstract class TDDataInfoFX {
 	 */
 	public void drawAllDataUnits(int plotNumber, GraphicsContext g, double scrollStart, TDProjectorFX tdProjector) {
 		
-//		System.out.println("Max double value: " +  PamCalendar.formatDateTime((long)  Double.MAX_EXPONENT)); 
-//		System.out.println("Max long value: " +  PamCalendar.formatDateTime((long)  Long.MAX_VALUE)); 
+//		System.out.println("Max double value: " + this.getDataName() +  PamCalendar.formatDateTime((long)  Double.MAX_EXPONENT)); 
+//		System.out.println("Max long value: " + this.getDataName() + PamCalendar.formatDateTime((long)  Long.MAX_VALUE)); 
 
 		
 		PamDataUnit dataUnit = null;
@@ -391,29 +408,55 @@ public abstract class TDDataInfoFX {
 //			scrollStart = PamCalendar.getTimeInMillis();
 			//work out start and stop times
 			long loopEnd = (long) (scrollStart + (tdProjector.getVisibleTime() * 1.5));
-			long loopStart = (long) (scrollStart - (tdProjector.getVisibleTime() * .5));
+			long loopStart = (long) (scrollStart - (tdProjector.getVisibleTime() * 1.5));
+			
+//			System.out.println("Loop start: " + this.getDataName() +  PamCalendar.formatDateTime((long)  loopStart)); 
+//			System.out.println("Loop end: " + this.getDataName() + PamCalendar.formatDateTime((long)  loopEnd)); 
 
 			//find a number close to the index start, 			
 			ListIterator<PamDataUnit> it = getUnitIterator( loopStart,  plotNumber);
-
-			clearDraw();
+			
+			clearDraw();			
+			
+			/**
+			 * Need to be careful here. If using line plots then we always want to have the
+			 * first unit outside the screen. This does not matter for scatter points is
+			 * critical for line plots - otherwise the lines do not draw between data units
+			 * outside the screen
+			 */
+			if (it.hasPrevious()) {
+				it.previous();
+			}
+			
+			//true to break after painting the next data unit
+			boolean breakNext = false;
 
 			while (it.hasNext()) {
 				dataUnit = it.next();
 				count++; 
 				if (dataUnit!=null && shouldDraw(plotNumber, dataUnit)) {
-					if (dataUnit.getEndTimeInMilliseconds() < loopStart) {
-						continue;
-					}
+					
+//					if (dataUnit.getEndTimeInMilliseconds() < loopStart) {
+//						continue;
+//					}
+					
+					//at some point we have to stop drawing off the end of the screen but again, for line plots
+					//we want to draw data units that are next if needed. So if past the end of the point that
+					//needs to be painted, set breakNext to true so the next data unit is painted for line plots 
+					//then exit. 
 					if (dataUnit.getTimeMilliseconds() > loopEnd) {
-						break;
+						breakNext = true;
 					}
 					
+					drawCalls++;
 					drawDataUnit(plotNumber, dataUnit, g,  scrollStart, 
 							tdProjector ,TDSymbolChooserFX.NORMAL_SYMBOL);
 				}
+				
+				if (breakNext) break;
 			}
 			
+//			System.out.println("Found: " + drawCalls + "  " + this.getDataName() + "  to draw"); 
 			lastUnitDrawn(g, scrollStart, tdProjector, plotNumber); 
 		}
 		//System.out.println("Total data units: " + count+ " draw calls: " +drawCalls );
@@ -645,8 +688,8 @@ public abstract class TDDataInfoFX {
 		drawCalls++;
 		if ((symbolchoser.getDrawTypes(pamDataUnit) & TDSymbolChooserFX.DRAW_LINES) != 0) {
 			//WARNING<- the getPreviousDataUnit function is currently very slow and caused serious issue
-			//in display speed. Onyl use draw lines with super detections if data units are very sparse. 
-			// For example not suitbale for the the click detector. 
+			//in display speed. Only use draw lines with super detections if data units are very sparse. 
+			// For example not suitable for the the click detector. 
 			Point2D lastDrawPoint=getPreviousDataUnit(tdProjector, pamDataUnit); 
 			if (lastDrawPoint!= null)
 			g.setFill(symbolchoser.getPamSymbol(pamDataUnit,type).getLineColor());
@@ -729,13 +772,6 @@ public abstract class TDDataInfoFX {
 	 */
 	public boolean editOptions() {
 		return false;
-	}
-
-	/**
-	 * @return the pamDataBlock
-	 */
-	protected PamDataBlock getPamDataBlock() {
-		return pamDataBlock;
 	}
 
 	/**

@@ -20,10 +20,6 @@
  */
 package PamguardMVC;
 
-import generalDatabase.SQLLogging;
-import generalDatabase.external.crossreference.CrossReference;
-import jsonStorage.JSONObjectDataSource;
-
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -40,23 +36,19 @@ import java.util.Vector;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
+import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 
 import org.springframework.core.GenericTypeResolver;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 import Acquisition.AcquisitionControl;
 import Acquisition.AcquisitionProcess;
-import pamScrollSystem.ViewLoadObserver;
-import dataGram.DatagramProvider;
-import dataMap.BespokeDataMapGraphic;
-import dataMap.OfflineDataMap;
-import annotation.DataAnnotationType;
-import annotation.handler.AnnotationHandler;
-import binaryFileStorage.BinaryDataSource;
-import binaryFileStorage.BinaryOfflineDataMap;
-import binaryFileStorage.SecondaryBinaryStore;
+import Localiser.LocalisationAlgorithm;
 import PamController.OfflineDataStore;
+import PamController.PamConfiguration;
 import PamController.PamControlledUnit;
 import PamController.PamController;
 import PamController.PamControllerInterface;
@@ -69,6 +61,7 @@ import PamguardMVC.background.BackgroundDataBlock;
 import PamguardMVC.background.BackgroundManager;
 import PamguardMVC.dataOffline.OfflineDataLoadInfo;
 import PamguardMVC.dataOffline.OfflineDataLoading;
+import PamguardMVC.dataSelector.DataSelectParams;
 import PamguardMVC.dataSelector.DataSelector;
 import PamguardMVC.dataSelector.DataSelectorCreator;
 import PamguardMVC.dataSelector.NullDataSelectorCreator;
@@ -79,6 +72,26 @@ import PamguardMVC.toad.TOADCalculator;
 import PamguardMVC.uid.DataBlockUIDHandler;
 import SoundRecorder.RecorderControl;
 import SoundRecorder.trigger.RecorderTrigger;
+import annotation.DataAnnotationType;
+import annotation.handler.AnnotationHandler;
+import binaryFileStorage.BinaryDataSource;
+import binaryFileStorage.BinaryOfflineDataMap;
+import binaryFileStorage.BinaryStore;
+import binaryFileStorage.SecondaryBinaryStore;
+import dataGram.DatagramProvider;
+import dataMap.BespokeDataMapGraphic;
+import dataMap.OfflineDataMap;
+import effort.EffortProvider;
+import effort.binary.DataMapEffortProvider;
+import generalDatabase.SQLLogging;
+import generalDatabase.external.crossreference.CrossReference;
+import jsonStorage.JSONObjectDataSource;
+import offlineProcessing.OfflineTaskGroup;
+import pamScrollSystem.ViewLoadObserver;
+import pamguard.GlobalArguments;
+import tethys.TethysControl;
+import tethys.pamdata.TethysDataProvider;
+import tethys.species.DataBlockSpeciesManager;
 
 /**
  * 
@@ -212,9 +225,10 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 
 	/**
 	 * Used in offline analysis when data are being reloaded. this list gets used to
-	 * distribute data being loaded from upstream processes.
+	 * distribute data being loaded from upstream processes. No it doesn't. 
+	 * All handled in the OfflineDataLoading
 	 */
-	private Vector<PamObserver> requestingObservers;
+//	private Vector<PamObserver> requestingObservers;
 
 	/**
 	 * Natural lifetime of data in seconds.
@@ -314,7 +328,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	 * Class of any super detections referenced by the data units held in this data
 	 * block
 	 */
-	private Class<?> superDetectionClass;
+//	private Class<?> superDetectionClass;
 
 	//	/**
 	//	 * Class of any sub detections referenced by the data units held in this data
@@ -393,6 +407,9 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 		if (!isOffline) {
 			removeTimer.start();
 		}
+		
+		// can't call this here. 
+//		getDatablockSpeciesManager();
 	}
 
 	/**
@@ -428,8 +445,8 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 		try {
 			Class[] superDetArgs = { Class.class };
 			method = unitClass.getMethod("getSuperDetection", superDetArgs);
-			superDetectionClass = GenericTypeResolver.resolveReturnType(method, unitClass);
-		} catch (NoSuchMethodException | SecurityException e) {
+//			superDetectionClass = GenericTypeResolver.resolveReturnType(method, unitClass);
+		} catch (Exception e) {
 			//			ok = false;
 		}
 		//		try {
@@ -470,6 +487,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	}
 
 	Timer removeTimer = new Timer(500, new ActionListener() {
+		@Override
 		public void actionPerformed(ActionEvent evt) {
 			int n;
 			if (shouldDelete()) {
@@ -627,7 +645,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 
 	/**
 	 * Find a dataunit based on it's database index. If there have been no updates,
-	 * then database indexes should be in order and a fast find canbe used. If
+	 * then database indexes should be in order and a fast find can be used. If
 	 * however, there have been updates, then things will not be in order so it's
 	 * necessary to go through everything from start to end.
 	 * 
@@ -976,6 +994,23 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 			}
 		}
 	}
+	
+	public void clearAll(boolean andDownStream) {
+		clearAll();
+		if (andDownStream) {
+			int nObs = countObservers();
+			for (int i = 0; i < nObs; i++) {
+				PamObserver obs = getPamObserver(i);
+				if (obs instanceof PamProcess) {
+					PamProcess proc = (PamProcess) obs;
+					ArrayList<PamDataBlock> procOuts = proc.getOutputDataBlocks();
+					for (PamDataBlock b : procOuts) {
+						b.clearAll(andDownStream);
+					}
+				}
+			}
+		}
+	}
 
 	/**
 	 * Reset a datablock. This is called at PamStart from PamController It's been
@@ -1067,14 +1102,22 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	 *                            load progress.
 	 */
 	public boolean loadViewerData(OfflineDataLoadInfo offlineDataLoadInfo, ViewLoadObserver loadObserver) {
-		if (PamController.getInstance().isInitializationComplete() == false) {
+		if (!PamController.getInstance().isInitializationComplete()) {
 			System.err.printf("Not loading %s since initialisation not yet complete\n", getDataName());
 			return false;
 		}
+//		long tenDays = 3600L*24L*1000L*10L;
+//		if (offlineDataLoadInfo.getEndMillis() - offlineDataLoadInfo.getStartMillis() > tenDays) {
+//			System.out.printf("Big many day data load %s to %s in %s", PamCalendar.formatDateTime(offlineDataLoadInfo.getStartMillis()),
+//					PamCalendar.formatDateTime(offlineDataLoadInfo.getEndMillis()) ,getLongDataName());
+//		}
 
+		if (GlobalArguments.getParam(GlobalArguments.BATCHVIEW) != null) {
+			return false;
+		}
 		saveViewerData();
 
-		if (needViewerDataLoad(offlineDataLoadInfo) == false) {
+		if (!needViewerDataLoad(offlineDataLoadInfo)) {
 			return true;
 		}
 
@@ -1113,6 +1156,11 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 			long uid = iter.next().getUID();
 			firstViewerUID = Math.min(firstViewerUID, uid);
 			lastViewerUID = Math.max(lastViewerUID, uid);
+		}
+		
+		EffortProvider effProv = getEffortProvider();
+		if (effProv != null) {
+			effProv.viewerLoadData();
 		}
 
 		return loadOk;
@@ -1259,12 +1307,16 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 			 */
 			if (shouldNotify()) {
 				notifyInstantObservers(pamDataUnit);
+				EffortProvider effProvider = getEffortProvider();
+				if (effProvider != null) {
+					effProvider.newData(pamDataUnit);
+				}
 			}
 
 			if (offlineDataLoading.isCurrentOfflineLoadKeep()) {
 				pamDataUnits.add(pamDataUnit);
 			}
-			if (shouldBinary && getBinaryDataSource() != null && !isOffline && pamDataUnit.isEmbryonic() == false) {
+			if (shouldBinary && getBinaryDataSource() != null && !isOffline && !pamDataUnit.isEmbryonic()) {
 				getBinaryDataSource().saveData(pamDataUnit);
 			}
 		}
@@ -1338,7 +1390,8 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	public void updatePamData(Tunit pamDataUnit, long updateTimeMillis) {
 		pamDataUnit.updateDataUnit(updateTimeMillis);
 		setChanged();
-		if (!isOffline && pamDataUnit.isEmbryonic() == false) {
+		
+		if (!isOffline && !pamDataUnit.isEmbryonic()) {
 			/*
 			 * Save it if it't not been saved already or we're saving updates. 
 			 * Detectors can keep a dataunit in an embryonic state and add them to the 
@@ -1406,9 +1459,10 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 		synchronized (synchronizationLock) {
 			//			if (isdebug()) {
 			//				Debug.out.println("Removing data unit " + aDataUnit);
-			//			}
+			//			
+			aDataUnit.setDeleted(true);
 			boolean rem = pamDataUnits.remove(aDataUnit);
-			if (rem == false) {
+			if (!rem) {
 				return false;
 			}
 			if (isOffline) {
@@ -1958,7 +2012,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 			long difference;
 
 			ListIterator<Tunit> listIterator = getListIterator(ITERATOR_END);
-			if (listIterator.hasPrevious() == false) {
+			if (!listIterator.hasPrevious()) {
 				return null;
 			}
 			unit = listIterator.previous();
@@ -2004,7 +2058,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 			long difference;
 
 			ListIterator<Tunit> listIterator = getListIterator(ITERATOR_END);
-			if (listIterator.hasPrevious() == false) {
+			if (!listIterator.hasPrevious()) {
 				return null;
 			}
 			unit = listIterator.previous();
@@ -2155,7 +2209,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	 */
 	@Override
 	public String toString() {
-		return getDataName();
+		return getLongDataName();
 	}
 
 	/**
@@ -2521,6 +2575,42 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	public void addLocalisationContents(int localisationContents) {
 		this.localisationContents.addLocContent(localisationContents);
 	}
+	
+	/**
+	 * Find localisation algorithm for this data. 
+	 * This may be within the owning module, or a downstream algorithm. 
+	 * @return first found localisation algorithm or null;
+	 */
+	public LocalisationAlgorithm getLocalisationAlgorithm() {
+		/*
+		 *  first check downstream modules. If these are in use, they
+		 *  probably override anything internal, so look for these first.  
+		 */
+		List<PamObserver> instObs = getInstantObservers();
+		for (PamObserver obs : instObs) {
+			if (obs instanceof LocalisationAlgorithm) {
+				return (LocalisationAlgorithm) obs;
+			}
+			if (obs instanceof PamProcess) {
+				PamProcess proc = (PamProcess) obs;
+				PamControlledUnit pcu = proc.getPamControlledUnit();
+				if (pcu == null) {
+					continue;
+				}
+				if (pcu instanceof LocalisationAlgorithm) {
+					return (LocalisationAlgorithm) pcu;
+				}
+			}
+		}
+		// if nothing downstream, then check the owning module
+		PamProcess proc = getParentProcess();
+		if (proc == null) return null;
+		PamControlledUnit pcu = proc.getPamControlledUnit();
+		if (pcu instanceof LocalisationAlgorithm) {
+			return (LocalisationAlgorithm) pcu;
+		}		
+		return null;
+	}
 
 	public static final int ITERATOR_END = -1;
 
@@ -2606,6 +2696,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 			return getDataCopy(getListIterator(startTimeMillis, channels, match, position));
 		}
 	}
+	
 
 	/**
 	 * Get an iterator, positioned at the given startTime.
@@ -2799,6 +2890,19 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 		return copy;
 	}
 	
+
+	/**
+	 * Get a copy of the data for offline tasks. Required since one or two data blocks
+	 * have to do something a bit different for some specific tasks. 
+	 * @param startTime data start time
+	 * @param endTime data end time
+	 * @param taskGroup task group
+	 * @return copy of data within those times, possibly modified for specific tasks
+	 */
+	public ArrayList<Tunit> getTaskDataCopy(long startTime, long endTime, OfflineTaskGroup taskGroup) {
+		return getDataCopy(startTime, endTime, false);
+	}
+	
 	/**
 	 * Get a temporary copy of all data between two times (inclusive)
 	 * @param t1 first time
@@ -2833,7 +2937,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	 * @return temporary copy of the data
 	 */
 	public ArrayList<Tunit> getDataCopy(long t1, long t2, boolean assumeOrder, DataSelector dataSelector) {
-		if (dataSelector == null) {
+		if (dataSelector == null || dataSelector.getParams().getCombinationFlag() == DataSelectParams.DATA_SELECT_DISABLE) {
 			return getDataCopy(t1, t2, assumeOrder);
 		}
 		else {
@@ -2865,6 +2969,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	private SQLLogging logging;
 
 	private JSONObjectDataSource jsonDataSource;
+	
 
 	public Vector<ProcessAnnotation> getProcessAnnotations() {
 		return processAannotations;
@@ -3007,7 +3112,16 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 		case PamControllerInterface.HYDROPHONE_ARRAY_CHANGED:
 			clearDataOrigins();
 			break;
+		case PamControllerInterface.INITIALIZATION_COMPLETE:
+			effortProvider = autoEffortProvider();
+			break;
+		case PamControllerInterface.ADD_CONTROLLEDUNIT:
+			if (PamController.getInstance().isInitializationComplete()) {
+				effortProvider = autoEffortProvider();
+			}
+			break;
 		}
+		
 	}
 
 	/**
@@ -3073,6 +3187,34 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 
 	public SQLLogging getLogging() {
 		return logging;
+	}
+	
+	/**
+	 * Gets a data provider for Tethys. These will probably need
+	 * to be bespoke, but for now will autogenerate based on the SQLLogging information. 
+	 * @return the tethysDataProvider
+	 */
+	public TethysDataProvider getTethysDataProvider(TethysControl tethysControl) {
+		return null;
+	}
+
+	/**
+	 * Get the level of automation employed by the generation of these data. 
+	 * Should ideally be completed for everything providing data to Tethys. 
+	 * @return level of automation for this data block. 
+	 */
+	public DataAutomationInfo getDataAutomationInfo() {
+		return null;
+	}
+	
+	/**
+	 * Get information about species types that may occur within this data 
+	 * block.  Primarily for conversion into Tethys compatible data, but may 
+	 * prove to have other uses. 
+	 * @return Types of species information available within this datablock. 
+	 */
+	public DataBlockSpeciesManager<Tunit> getDatablockSpeciesManager() {
+		return null;
 	}
 
 	final public boolean getCanLog() {
@@ -3583,6 +3725,8 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 
 	private DataSelectorCreator dataSelectorCreator;
 
+	private EffortProvider effortProvider;
+
 	public void setRecordingTrigger(RecorderTrigger recorderTrigger) {
 		this.recorderTrigger = recorderTrigger;
 		RecorderControl.registerRecorderTrigger(recorderTrigger);
@@ -4081,12 +4225,12 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 		this.currentViewDataEnd = currentViewDataEnd;
 	}
 
-	/**
-	 * @return the superDetectionClass
-	 */
-	public Class<?> getSuperDetectionClass() {
-		return superDetectionClass;
-	}
+//	/**
+//	 * @return the superDetectionClass
+//	 */
+//	public Class<?> getSuperDetectionClass() {
+//		return superDetectionClass;
+//	}
 
 	//	/**
 	//	 * @return the subDetectionClass
@@ -4163,7 +4307,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 			lab = String.format("        %s ...", getDataName());
 		}
 		JLabel label;
-		popMenu.add(label = new JLabel(lab, JLabel.CENTER));
+		popMenu.add(label = new JLabel(lab, SwingConstants.CENTER));
 		label.setBorder(new EmptyBorder(3, 6, 0, 0));
 		for (JMenuItem menuItem : menuItems) {
 			popMenu.add(menuItem);
@@ -4202,7 +4346,7 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 			if (superDet == null) {
 				continue;
 			}
-			if (uniqueSuperDets.contains(superDet) == false) {
+			if (!uniqueSuperDets.contains(superDet)) {
 				uniqueSuperDets.add(superDet);
 			}
 		}
@@ -4229,4 +4373,127 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 	public void setBackgroundManager(BackgroundManager backgroundManager) {
 		this.backgroundManager = backgroundManager;
 	}
+
+	/**
+	 * Get a brief summary of datablock to include in XML descriptions. 
+	 * Basic output is very simple. Expect other datablock to extend this by 
+	 * adding additional attributes. 
+	 * @param doc
+	 * @return XML element with description of data. 
+	 */
+	public Element getDataBlockXML(Document doc) {
+		Element inputEl = doc.createElement("Input");
+		if (getParentProcess() != null && getParentProcess().getPamControlledUnit() != null) {
+			PamControlledUnit pcu = getParentProcess().getPamControlledUnit();
+			inputEl.setAttribute("ModuleType", pcu.getUnitType());
+			inputEl.setAttribute("ModuleName", pcu.getUnitName());
+		}
+		inputEl.setAttribute("Name", getLongDataName());
+		inputEl.setAttribute("Channels", String.format("0x%X", getChannelMap()));
+		return inputEl;
+	}
+
+	/**
+	 * Look in every data block, particularly threaded ones, and dump
+	 * the buffer status. This will have to go via PamProcess so that 
+	 * additional information can be added from any processes that 
+	 * hold additional data in other internal buffers. 
+	 * @param message Message to print prior to dumping buffers for debug. 
+	 * @param sayEmpties dump info even if a buffer is empty (otherwise, only ones that have stuff still)
+	 */
+	public void dumpBufferStatus(String message, boolean sayEmpties) {
+		if (sayEmpties || unitsAdded > 0) {
+			System.out.printf("Datablock %s: Added %d data units\n", getLongDataName(), unitsAdded);
+		}
+		int nObs = countObservers();
+		for (int i = 0; i < nObs; i++) {
+			PamObserver obs = getPamObserver(i);
+			if (obs instanceof ThreadedObserver) {
+				ThreadedObserver tObs = (ThreadedObserver) obs;
+				tObs.dumpBufferStatus(message, sayEmpties);
+			}
+		}
+	}
+	
+	
+	/**
+	 * @return the effort provider. 
+	 */
+	public EffortProvider getEffortProvider() {
+		return effortProvider;
+	}
+
+	/**
+	 * Auto generate an effort provider. This may get called many times
+	 * for blocks without effort, but that doesn't really matter since its
+	 * only going to happen when opening dialogs, etc. 
+	 * @return
+	 */
+	public EffortProvider autoEffortProvider() {
+		if (effortProvider != null) {
+			// don't change if there already is one. 
+			return effortProvider;
+		}
+		// see if we can do an auto binary one. 
+		BinaryStore binaryStore = BinaryStore.findBinaryStoreControl();
+		if (binaryStore != null && getBinaryDataSource() != null) {
+			return new DataMapEffortProvider(this, BinaryStore.class);
+		}
+		// other options may follow ...
+		return null;
+	}
+
+	/**
+	 * @param effortProvider the effortProvider to set
+	 */
+	protected void setEffortProvider(EffortProvider effortProvider) {
+		this.effortProvider = effortProvider;
+	}
+
+	/**
+	 * Need this notification at startup time to perform a few standard actions. 
+	 * @param startTime
+	 */
+	public void pamStart(long startTime) {
+		EffortProvider effP = getEffortProvider();
+		if (effP != null) {
+			effP.realTimeStart(startTime);
+		}
+	}
+	/**
+	 * Need this notification at stop time to perform a few standard actions. 
+	 * @param startTime
+	 */
+	public void pamStop(long stopTime) {
+		EffortProvider effP = getEffortProvider();
+		if (effP != null) {
+			effP.realTimeStop(stopTime);
+		}
+	}
+
+	/**
+	 * Get the configuration for this datablock. Needed with batch processor since there are configs
+	 * flying everywhere. 
+	 * @return
+	 */
+	public PamConfiguration getPamConfiguration() {
+		PamConfiguration config = null;
+		if (getParentProcess() != null && getParentProcess().getPamControlledUnit() != null) {
+			config = getParentProcess().getPamControlledUnit().getPamConfiguration();
+		}
+		if (config == null) {
+			return PamController.getInstance().getPamConfiguration();
+		}
+		else {
+			return config;
+		}
+	}
+
+	/**
+	 * @return the offlineDataLoading
+	 */
+	public OfflineDataLoading<Tunit> getOfflineDataLoading() {
+		return offlineDataLoading;
+	}
+
 }

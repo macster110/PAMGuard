@@ -8,9 +8,8 @@ import java.lang.reflect.Field;
 import PamController.PamSettingManager;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
-import difar.DifarControl;
-import difar.DifarParameters;
 import generalDatabase.lookupTables.LookupItem;
 import generalDatabase.lookupTables.LookupList;
 
@@ -42,6 +41,7 @@ public class QuickAnnotationParameters implements Serializable, Cloneable, Manag
 		shouldPopupDialog = false;
 	}
 	
+	@Override
 	public QuickAnnotationParameters clone() {
 		try {
 			QuickAnnotationParameters np = (QuickAnnotationParameters) super.clone();
@@ -96,7 +96,7 @@ public class QuickAnnotationParameters implements Serializable, Cloneable, Manag
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("exportClips");
 			ps.put(new PrivatePamParameterData(this, field) {

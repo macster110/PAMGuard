@@ -34,6 +34,7 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.AdjustmentEvent;
@@ -63,19 +64,6 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.InternalFrameAdapter;
 import javax.swing.event.InternalFrameEvent;
 
-import binaryFileStorage.DataUnitFileInformation;
-import pamMaths.PamQuaternion;
-import pamMaths.PamVector;
-import pamScrollSystem.AbstractPamScroller;
-import pamScrollSystem.AbstractPamScrollerAWT;
-import pamScrollSystem.PamScrollObserver;
-import pamScrollSystem.PamScroller;
-import pamScrollSystem.RangeSpinner;
-import pamScrollSystem.RangeSpinnerListener;
-import soundPlayback.PlaybackControl;
-import soundPlayback.PlaybackDataServer;
-import soundPlayback.PlaybackProgressMonitor;
-import soundtrap.STClickControl;
 import Array.ArrayManager;
 import GPS.GpsData;
 import Layout.PamAxis;
@@ -93,11 +81,11 @@ import PamView.ColorManaged;
 import PamView.CtrlKeyManager;
 import PamView.GeneralProjector;
 import PamView.PamColors;
+import PamView.PamColors.PamColor;
 import PamView.PamKeyItem;
 import PamView.PamSymbol;
 import PamView.PamSymbolType;
 import PamView.TextKeyItem;
-import PamView.PamColors.PamColor;
 import PamView.dialog.GroupedSourcePanel;
 import PamView.dialog.PamCheckBox;
 import PamView.dialog.PamLabel;
@@ -115,13 +103,29 @@ import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
 import PamguardMVC.PamObserver;
+import PamguardMVC.dataSelector.DataSelectDialog;
+import PamguardMVC.dataSelector.DataSelector;
 import PamguardMVC.superdet.SuperDetection;
+import binaryFileStorage.DataUnitFileInformation;
 import clickDetector.ClickClassifiers.ClickIdInformation;
 import clickDetector.ClickClassifiers.ClickIdentifier;
+import clickDetector.alarm.ClickAlarmParameters;
+import clickDetector.dataSelector.ClickDataSelector;
 import clickDetector.dialogs.ClickDisplayDialog;
 import clickDetector.offlineFuncs.OfflineEventDataBlock;
 import clickDetector.offlineFuncs.OfflineEventDataUnit;
 import clickDetector.tdPlots.ClickDetSymbolChooser;
+import pamMaths.PamVector;
+import pamScrollSystem.AbstractPamScroller;
+import pamScrollSystem.AbstractPamScrollerAWT;
+import pamScrollSystem.PamScrollObserver;
+import pamScrollSystem.PamScroller;
+import pamScrollSystem.RangeSpinner;
+import pamScrollSystem.RangeSpinnerListener;
+import soundPlayback.PlaybackControl;
+import soundPlayback.PlaybackDataServer;
+import soundPlayback.PlaybackProgressMonitor;
+import soundtrap.STClickControl;
 
 /**
  * This is the main bearing time display for the click detector.
@@ -333,6 +337,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 
 	}
 
+	@Override
 	public long getRequiredDataHistory(PamObservable o, Object arg) {
 		if (o == clickControl.getClickDataBlock()) {
 			return hScrollBar.getMaximumMillis()-hScrollBar.getMinimumMillis();
@@ -418,7 +423,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			//			btPlot.drawClick(btPlot.getImageGraphics(), clickDataUnit, null);
 			//			btPlot.repaint(minPaintTime);
 		}
-		if (followCheckBox.isSelected() == true) {
+		if (followCheckBox.isSelected()) {
 			selectedClick = null;
 		}
 
@@ -477,14 +482,27 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		 *  since it's unlikely a uid that different would be in memory at the same time.  
 		 */
 		long totalId = superId<<32 | chans;
+		double fs = sampleRate; 
 		synchronized(lastClicks) {
 			ClickDetection prevClick = lastClicks.get(totalId);
 			if (prevClick == null) {
 				aClick.setTempICI(0);
 			}
 			else {
+				/*
+				 *  first do using sample number, but if it's silly, then use millis.
+				 *  Silly will occur when clicks from different files are loaded.  
+				 */
+				double fsICI = (aClick.getStartSample() - prevClick.getStartSample()) / fs;
 				double ici = (double) (aClick.getTimeMilliseconds() - prevClick.getTimeMilliseconds()) / 1000.;
-				aClick.setTempICI(ici);
+				// test to see if it's silly ...
+				if (Math.abs(ici - fsICI) > 1000) { // silly
+					aClick.setTempICI(ici);
+				}
+				else {
+					aClick.setTempICI(fsICI);;
+				}
+				
 			}
 			lastClicks.put(totalId, aClick);
 		}
@@ -557,6 +575,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 	}
 
+	@Override
 	public String getObserverName() {
 		return "click detector bearing time display";
 	}
@@ -578,6 +597,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		btAxis.makeAxis();
 	}
 
+	@Override
 	public void setSampleRate(float sampleRate, boolean notify) {
 		this.sampleRate = sampleRate;
 		setScales();
@@ -820,7 +840,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 
 		public void setSelected() {
-			if (checkNoZoom() == true) {
+			if (checkNoZoom()) {
 				setupScrollBar(currentStart, currentRange);
 			}
 		}
@@ -938,7 +958,8 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		 * @return
 		 */
 		public double getCurrentEnd() {
-			return Math.round(currentStart + currentRange);
+//			return Math.round(currentStart + currentRange);
+			return (currentStart + currentRange);
 		} 
 
 		/**
@@ -1788,7 +1809,10 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 	//	private ClickDetection lastICIClick;
 	private double clickICIToY(ClickDetection click) {
 		//		if (click.getTempICI() > 0) {
-		return btPlot.getHeight() - yAxis.getPosition(click.getTempICI());
+		double tmpICI = click.getTempICI();
+		double nY = yAxis.getPosition(tmpICI);
+		double y = btPlot.getHeight() - nY;
+		return y;
 		//			return click.getICI() * yScale;
 		//		}
 		//		else {
@@ -2025,6 +2049,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			this.whaleId = whaleId;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent arg0) {
 
 			if (popupClick == null) return;
@@ -2215,7 +2240,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			xAxis.drawAxis(g, insets.left, insets.top, insets.left + rp.width,
 					insets.top);
 
-			if (btDisplayParameters.trackedClickMarkers && isViewer == false) {
+			if (btDisplayParameters.trackedClickMarkers && !isViewer) {
 				drawTrackedClickMarkers(g);
 			}
 
@@ -2237,14 +2262,18 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			/**
 			 * paint information about click excluded due to amplitude selection
 			 */
-			if (btDisplayParameters.amplitudeSelect == false) {
+			if (!btDisplayParameters.amplitudeSelect) {
+				return;
+			}
+			ClickDataSelector clickDataSelector = getClickDataSelector();
+			if (clickDataSelector == null) {
 				return;
 			}
 			int n = countAmplitudeDeselected();
 			PamDataBlock<ClickDetection> clickData = clickControl.getClickDataBlock();
 			int nAll = clickData.getUnitsCount();
 			String txt = String.format("%d of %d loaded clicks will not be displayed because their amplitude is < %3.1fdB",
-					n, nAll, btDisplayParameters.minAmplitude);
+					n, nAll, clickDataSelector.getParams().minimumAmplitude);
 			Insets insets = getInsets();
 			int x = insets.left;
 			int y = getHeight()-5;
@@ -2298,6 +2327,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 
 	public class FollowBoxListener implements ActionListener {
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			clickDisplayManager.setBAutoScroll(followCheckBox.isSelected());
 			hScrollManager.setupScrollBar(hScrollBar.getMaximumMillis());
@@ -2327,7 +2357,6 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 	}
 
 
-
 	/**
 	 * Creates the pop up menu for the bearing time display. The pop up menu will change depending on a number of factors, whether in offline mode, if the selected near or on a click or in whitespace, if the sleected click 
 	 * is part of an invent or if localiser modules have been created. 
@@ -2342,11 +2371,26 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 
 		if (isView) {
 			/**
-			 * Bit of  aporblem here - need to have some sort of event mark to 
-			 * pass into the menu items. 
+			 * Bit of a porblem here - need to have some sort of event mark to 
+			 * pass into the menu items. But we only want to do this if there is an event mark 
+			 * on the data, so need to look at the zoomer. 
 			 */
 			OverlayMark oMark = new OverlayMark(btMarker, btPlot, null, 0, btMarker.getProjector().getParameterTypes(), null);
 			if (clickControl.getClicksOffline().addBTMenuItems(menu, oMark, this, false, clickedClick)>0) {
+				menu.addSeparator();
+			}
+			
+			/**
+			 * Add the additional menu items to classify all clicks in a mark. 
+			 */
+			ArrayList<ClickDetection> markClicks = getMarkedClickClicks();
+			if (markClicks != null && markClicks.size() > 0) {
+//				 add menu items to mark a whole load of clicks. 
+				menuItem = new JMenuItem("Classify marked clicks");
+				menuItem.setToolTipText("Re-run automatic classification on marked clicks");
+				menuItem.addActionListener(new ClassifyClick(markClicks));
+				menu.add(menuItem);
+				addClickClassifierOption(menu, markClicks);
 				menu.addSeparator();
 			}
 
@@ -2355,10 +2399,10 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			 */
 			if (clickedClick != null) {
 
-				menuItem = new JMenuItem("Classify Click");
+				menuItem = new JMenuItem("Classify click");
+				menuItem.setToolTipText("Re-run automatic classification on this click");
 				menuItem.addActionListener(new ClassifyClick(clickedClick));
 				menu.add(menuItem);
-
 
 				addClickClassifierOption(menu, clickedClick);
 				menu.addSeparator();
@@ -2383,19 +2427,33 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 
 		menuItem = new JMenuItem("Settings ...");
+		menuItem.setToolTipText("Display options");
 		menuItem.addActionListener(new SettingsMenuAction());
 		menu.add(menuItem);
+		menuItem = new JMenuItem("Click data selector ...");
+		menuItem.setToolTipText("Detailed data selection options");
+		menuItem.addActionListener(new DataSelectorAction());
+		menu.add(menuItem);
 		menuItem = new JMenuItem("Show amplitude selector ...");
+		menuItem.setToolTipText("Graphical amplitude selector display");
 		menuItem.addActionListener(new AmplitudeSelector());
 		menu.add(menuItem);
 		menu.addSeparator();
-		ArrayList<JMenuItem> colOptList = getSymbolChooser().getQuickMenuItems(clickControl.getGuiFrame(), this, "Colour by ", SymbolModType.EVERYTHING, true);
+		ArrayList<JMenuItem> colOptList = getSymbolChooser().getQuickMenuItems(clickControl.getGuiFrame(), this, "Colour by ", SymbolModType.EVERYTHING, false);
 		if (colOptList != null) {
 			for (JMenuItem menuIt : colOptList) {
 				menu.add(menuIt);
 			}
-			menu.addSeparator();
 		}
+		menuItem = new JMenuItem("More symbol options ...");
+		menuItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				showDataSymbolOptions(1);
+			}
+		});
+		menu.add(menuItem);
+		menu.addSeparator();
 
 		//		menuItem = new JCheckBoxMenuItem("Colour by species id", 
 		//				btDisplayParameters.colourScheme == BTDisplayParameters.COLOUR_BY_SPECIES);
@@ -2470,7 +2528,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 
 		return menu;
 	}
-
+	
 	/**
 	 * Looks through the current modules and finds if there is a target motion or static localiser
 	 */
@@ -2483,15 +2541,31 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 	}
 
-
 	/**
 	 * Creates options in the menu to force clicks to be classified as a particular species.
 	 */
 	private void addClickClassifierOption(JPopupMenu menu, ClickDetection detection){
+		ArrayList<ClickDetection> asList = new ArrayList();
+		asList.add(detection);
+		addClickClassifierOption(menu, asList);
+	}
+
+	/**
+	 * Creates options in the menu to force clicks to be classified as a particular species.
+	 */
+	private void addClickClassifierOption(JPopupMenu menu, ArrayList<ClickDetection> detection){
 		JMenuItem mi;
-		JMenu subMenu=new 	JMenu("Classify as...");
+		boolean many = detection.size() > 1;
+		JMenu subMenu;
+		if (many) {
+			subMenu = new JMenu("Classify marked clicks as...");
+		}
+		else {
+			subMenu = new JMenu("Classify click as...");
+		}
 
 		mi=new JMenuItem("Classify as Unclassified");
+		mi.setToolTipText("Clear classification of this click");
 		mi.addActionListener(new ForceClassifyClick(detection, (byte) 0));
 		subMenu.add(mi);
 
@@ -2502,11 +2576,28 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		for (int i=0; i<clickControl.getClickIdentifier().getCodeList().length; i++){
 
 			if (i==0){
-				mi=new JMenuItem("Classify as "+ clickControl.getClickIdentifier().getSpeciesList()[i]);
+				if (many) {
+					mi=new JMenuItem("Classify marked clicks as "+ clickControl.getClickIdentifier().getSpeciesList()[i]);
+					mi.setToolTipText("Set classification of selected clicks to " + 
+							clickControl.getClickIdentifier().getSpeciesList()[i]);
+				}
+				else {
+					mi=new JMenuItem("Classify click as "+ clickControl.getClickIdentifier().getSpeciesList()[i]);
+					mi.setToolTipText("Set classification of this click to " + 
+							clickControl.getClickIdentifier().getSpeciesList()[i]);
+				}
 				menu.add(mi);
 			}
 			else{ 
 				mi=new JMenuItem( clickControl.getClickIdentifier().getSpeciesList()[i]);
+				if (many) {
+					mi.setToolTipText("Set classification of selected clicks to " + 
+							clickControl.getClickIdentifier().getSpeciesList()[i]);
+				}
+				else {
+					mi.setToolTipText("Set classification of this click to " + 
+							clickControl.getClickIdentifier().getSpeciesList()[i]);
+				}
 				subMenu.add(mi);
 			}
 
@@ -2526,13 +2617,22 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 	 */
 	private class ClassifyClick implements ActionListener {
 
-		private ClickDetection click;
+		private ArrayList<ClickDetection> clicks;
 
 		public ClassifyClick(ClickDetection click) {
 			super();
-			this.click = click;
-			click.getDataUnitFileInformation().setNeedsUpdate(true);
+			clicks = new ArrayList<>();
+			clicks.add(click);
+//			click.getDataUnitFileInformation().setNeedsUpdate(true);
 
+		}
+
+		/**
+		 * @param clicks
+		 */
+		public ClassifyClick(ArrayList<ClickDetection> clicks) {
+			super();
+			this.clicks = clicks;
 		}
 
 		@Override
@@ -2542,9 +2642,12 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 				return;
 			}
 
-			ClickIdInformation idInfo = clickIdentifier.identify(click);
-			click.setClickType((byte)idInfo.clickType);
-			click.getDataUnitFileInformation().setNeedsUpdate(true);
+			for (ClickDetection click: clicks) {
+				ClickIdInformation idInfo = clickIdentifier.identify(click);
+				click.setClickType((byte)idInfo.clickType);
+				click.getParentDataBlock().updatePamData(click, System.currentTimeMillis());
+				click.getDataUnitFileInformation().setNeedsUpdate(true);
+			}
 			repaintTotal();
 		}
 	}
@@ -2556,20 +2659,23 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 	 */
 	private class ForceClassifyClick implements ActionListener {
 
-		private ClickDetection click;
+		private ArrayList<ClickDetection> clickList;
 		private byte code;
 
-		public ForceClassifyClick(ClickDetection click, byte code) {
+		public ForceClassifyClick(ArrayList<ClickDetection> clickList, byte code) {
 			super();
-			this.click = click;
+			this.clickList = clickList;
 			this.code = code;
 		}
 
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
 
-			if (click==null) return;
-			click.setClickType((byte) code);
+			if (clickList==null) return;
+			for (ClickDetection aClick : clickList) {
+				aClick.setClickType((byte) code);
+				aClick.getParentDataBlock().updatePamData(aClick, System.currentTimeMillis());
+			}
 			repaintTotal();
 		}
 	}
@@ -2672,7 +2778,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 
 		@Override
 		public void mouseClicked(MouseEvent e) {
-			if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 && isViewer == false) {
+			if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 && !isViewer) {
 				showPopupMenu(e);
 			}
 		}
@@ -2731,16 +2837,17 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 	 */
 	private boolean pamguardPopupTrigger(MouseEvent e) {
 		boolean ctrl = e.isControlDown();
-		if (PamController.getInstance().getPamStatus() == PamController.PAM_RUNNING && ctrl == false) {
+		if (PamController.getInstance().getPamStatus() == PamController.PAM_RUNNING && !ctrl) {
 			return false; 
 		}
-		if (e.isPopupTrigger() == false && e.getButton()==MouseEvent.BUTTON1) {
+		if (!e.isPopupTrigger() && e.getButton()==MouseEvent.BUTTON1) {
 			return false;
 		}
 		return true;
 	}
 
 	class ShowKeyAction implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			btDisplayParameters.showKey = !btDisplayParameters.showKey;
 			btPlot.createKey();
@@ -2767,11 +2874,12 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 
 	class SettingsMenuAction implements ActionListener {
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 
 			BTDisplayParameters newParameters = 
 					ClickDisplayDialog.showDialog(clickControl, 
-							clickControl.getGuiFrame(), btDisplayParameters);
+							clickControl.getGuiFrame(), btDisplayParameters, getClickDataSelector().getClickAlarmParameters());
 			if (newParameters != null){
 				btDisplayParameters = newParameters.clone();
 				if (getVScaleManager() != null) {
@@ -2788,11 +2896,42 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 
 	}
+	
+	
+	/**
+	 * Get a data selector specific to this display. 
+	 * @return click data selector specific to this display. 
+	 */
+	public DataSelector getDataSelector() {
+		return clickControl.getClickDataBlock().getDataSelector(getUnitName(), false);
+	}
+	
+	/**
+	 * get the click specific data selector which may now be burried in a 
+	 * CompoundDataSelector if annotations have been used. 
+	 * @return ClickDataSelector. 
+	 */
+	public ClickDataSelector getClickDataSelector() {
+		DataSelector baseSel = getDataSelector();
+		if (baseSel == null) {
+			return null;
+		}
+		else {
+			return (ClickDataSelector) baseSel.findDataSelector(ClickDataSelector.class);
+		}
+	}
 
 	class AmplitudeSelector implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			showAmplitudeSelector();
+		}
+	}
+	
+	class DataSelectorAction implements ActionListener {
+		@Override
+		public void actionPerformed(ActionEvent e) {
+			showDataSelector();
 		}
 	}
 
@@ -2814,6 +2953,38 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		//		}
 	}
 
+	/**
+	 * Show a dialog with both data and symbol options, but go to the correct tab. 
+	 * @param selectedTab
+	 * @return
+	 */
+	private boolean showDataSymbolOptions(int selectedTab) {
+		Window javaFrame = clickControl.getGuiFrame();
+		DataSelectDialog dataSelectDialog = new DataSelectDialog(javaFrame, clickControl.getClickDataBlock(), getDataSelector(), symbolChooser);
+		if (javaFrame == null) {
+			dataSelectDialog.moveToMouseLocation();
+		}
+		dataSelectDialog.setTab(selectedTab);
+		boolean ok = dataSelectDialog.showDialog();
+		if (ok) {
+			repaintBoth();
+			if (clickControl.getOfflineToolbar() != null) {
+				clickControl.getOfflineToolbar().displayActivated(clickBTDisplay);
+			}
+		}
+		return ok;
+	}
+
+	public void showDataSelector() {
+//		if (getDataSelector().showSelectDialog(clickControl.getGuiFrame())) {
+//			repaintBoth();
+//			if (clickControl.getOfflineToolbar() != null) {
+//				clickControl.getOfflineToolbar().displayActivated(clickBTDisplay);
+//			}
+//		};
+		showDataSymbolOptions(0);
+	}
+
 	private void checkBTAmplitudeSelectHisto() {
 		if (btAmplitudeSelector == null) {
 			return;
@@ -2829,6 +3000,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			this.axesType = axesType;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			setVScale(axesType);
 		}
@@ -2850,6 +3022,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			this.groupSelection = groupSelection;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 
 			setDisplayChannels(groupSelection);
@@ -2978,6 +3151,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			return PamColor.PlOTWINDOW;
 		}
 
+		@Override
 		public Graphics getGraphics(){
 			Graphics g=super.getGraphics();
 			return g;
@@ -3030,21 +3204,24 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 
 			ClickDetection click = null;
 			ClickDetection prevPlottedClick = null;
-			PamDataBlock<ClickDetection> clickData = clickControl.getClickDataBlock();
+			//PamDataBlock<ClickDetection> clickData = clickControl.getClickDataBlock();
 
 			if (zoomer != null) {
 				zoomer.paintShape(g, this, true);
 			}
 
-			//			long t1 = System.nanoTime();
-			synchronized (clickData.getSynchLock()) {
-				//				long t2 = System.nanoTime();
-				//				double ms = ((double) (t2-t1)) / 1000000.;
-				//				if (btDisplayParameters.VScale == BTDisplayParameters.DISPLAY_ICI) { 
-				//					sortTempICIs();
-				//				}
-
-				ListIterator<ClickDetection> clickIterator = clickData.getListIterator(PamDataBlock.ITERATOR_END);
+//			ArrayList<ClickDetection> clickCopy = clickData.getDataCopy(displayStartMillis, displayStartMillis+displayLengthMillis, true, getDataSelector());
+			ArrayList<ClickDetection> clickCopy = getPlottableClicks();
+			if (clickCopy.size() == 0) {
+				return;
+			}
+			
+			//note the iterator strats off the end of the list and works backwards 
+			ListIterator<ClickDetection> clickIterator = clickCopy.listIterator(clickCopy.size());
+			
+//			synchronized (clickData.getSynchLock()) {
+//			ListIterator<ClickDetection> clickIterator = clickData.getListIterator(PamDataBlock.ITERATOR_END);
+			int count=0; 
 				while (clickIterator.hasPrevious()) {
 					click = clickIterator.previous();
 					if (shouldPlot(prevPlottedClick)){
@@ -3060,11 +3237,6 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 				if (shouldPlot(prevPlottedClick)){ // and draw the last one !
 					drawClick(g, prevPlottedClick, clipRectangle);
 				}
-				//				g.drawString(String.format("Wait synch %3.3fms", ms), 0, 20);
-			}
-			//			long t3 = System.nanoTime();
-			//			g.drawString(String.format("Last draw %3.3fms", lastPaintTime), 0, 20);
-			//			lastPaintTime = ((double) (t3-t0)) / 1000000.;
 		}
 
 		@Override
@@ -3083,7 +3255,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 
 			//			g.setColor(Color.BLUE);
 			//			g.fillRect(0, 0, 30, 30);
-			if (hasData == false) {
+			if (!hasData) {
 				g.setColor(PamColors.getInstance().getColor(PamColor.AXIS));
 				g.setFont(PamColors.getInstance().getBoldFont());
 				Graphics2D g2d = (Graphics2D) g;
@@ -3106,7 +3278,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			Graphics2D g2d = (Graphics2D) g;
 			g2d.setStroke(new BasicStroke());
 
-			if (isViewer == false) {
+			if (!isViewer) {
 				paintClicks(g, clipRectangle);
 				if (selectedClick != null) {
 					drawClick(g, selectedClick, clipRectangle, true);
@@ -3117,7 +3289,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			// need to be always plotting the next / prev' click so that 
 			// ici can be calculated on the fly if necessary. 
 
-			if (redrawClicks==true || dougsBufferedImage == null) {
+			if (redrawClicks || dougsBufferedImage == null) {
 				createBufferedImage(clipRectangle, getBackground());
 			}
 
@@ -3325,7 +3497,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 
 		public void createKey() {
-			if (btDisplayParameters.showKey == false) {
+			if (!btDisplayParameters.showKey) {
 				this.setKeyPanel(null);
 				return;
 			}
@@ -3342,8 +3514,10 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			else if (btDisplayParameters.colourScheme == BTDisplayParameters.COLOUR_BY_HYDROPHONE) {
 				keyPanel.add(new TextKeyItem("Colour by hydrophone"));
 			}
-			if (btDisplayParameters.getShowSpecies(0)) {
-				keyPanel.add(symbolChooser.getDefaultSymbol(true).makeKeyItem("Unidentified species"));
+			ClickAlarmParameters selectParams = getClickDataSelector().getParams();
+//			if (btDisplayParameters.getShowSpecies(0)) {
+			if (selectParams.onlineAutoEvents | selectParams.onlineManualEvents) {
+				keyPanel.add(ClickDetSymbolChooser.getDefaultSymbol(true).makeKeyItem("Unidentified species"));
 			}
 
 			//			System.out.println("Create key now " + PamCalendar.formatDateTime(System.currentTimeMillis()));
@@ -3354,7 +3528,8 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			PamSymbol[] symbols = clickControl.getClickIdentifier().getSymbols();
 			if (speciesList != null) {
 				for (int i = 0; i < speciesList.length; i++) {
-					if (btDisplayParameters.getShowSpecies(i+1)) {
+					if (selectParams.getUseSpecies(i+1)) {
+//					if (btDisplayParameters.getShowSpecies(i+1)) {
 						if (btDisplayParameters.colourScheme != BTDisplayParameters.COLOUR_BY_TRAIN) {
 							keyPanel.add(symbols[i].makeKeyItem(speciesList[i]));
 						}
@@ -3391,23 +3566,20 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 	 */
 	ClickDetection findClick(int x, int y, int maxdist) {
 		ClickDetection closestClick = null;
-		PamDataBlock<ClickDetection> clickData = clickControl.getClickDataBlock();
 		ClickDetection unit;
 		Point pt;
 		int dist;
 		int closest = maxdist * maxdist;
-		synchronized (clickData.getSynchLock()) {
-			ListIterator<ClickDetection> clickIterator = clickData.getListIterator(PamDataBlock.ITERATOR_END);
-			while (clickIterator.hasPrevious()) {
-				unit = clickIterator.previous();
-				//				if (unit.getTimeMilliseconds() < displayStartMillis - 1000)
-				//					break;
-				if (shouldPlot(unit) == false) continue;
-				pt = clickXYPos(unit);
-				if ((dist = ((pt.x - x) * (pt.x - x) + (pt.y - y) * (pt.y - y))) <= closest) {
-					closest = dist;
-					closestClick = unit;
-				}
+		ListIterator<ClickDetection> clickIterator = getPlottableClicksIterator(0);
+		while (clickIterator.hasNext()) {
+			unit = clickIterator.next();
+			//				if (unit.getTimeMilliseconds() < displayStartMillis - 1000)
+			//					break;
+			if (!shouldPlot(unit)) continue;
+			pt = clickXYPos(unit);
+			if ((dist = ((pt.x - x) * (pt.x - x) + (pt.y - y) * (pt.y - y))) <= closest) {
+				closest = dist;
+				closestClick = unit;
 			}
 		}
 
@@ -3423,11 +3595,12 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		PamDataBlock<ClickDetection> clickData = clickControl.getClickDataBlock();
 		ClickDetection click;
 		int n = 0;
+		double minAmpli = getClickDataSelector().getParams().minimumAmplitude;
 		synchronized (clickData.getSynchLock()) {
 			ListIterator<ClickDetection> clickIterator = clickData.getListIterator(0);
 			while (clickIterator.hasNext()) {
 				click = clickIterator.next();
-				if (click.getAmplitudeDB() < btDisplayParameters.minAmplitude) {
+				if (click.getAmplitudeDB() < minAmpli) {
 					n++;
 				}
 			}
@@ -3448,29 +3621,30 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 	 */
 	synchronized boolean shouldPlot(ClickDetection click) {
 		if (click == null) return false;
-		if (!clickInTimeWindow(click)) return false;
-		if (btDisplayParameters.showEchoes == false && click.isEcho()) {
-			return false;
-		}
+//		if (!clickInTimeWindow(click)) return false;
+//		if (btDisplayParameters.showEchoes == false && click.isEcho()) {
+//			return false;
+//		}
 		if (btDisplayParameters.VScale == BTDisplayParameters.DISPLAY_ICI) {
 			//			if (btDisplayParameters.showUnassignedICI == false && click.getICI() < 0) return false;
-			if (btDisplayParameters.showUnassignedICI == false && click.getSuperDetectionsCount() <= 0) return false;
+			if (!btDisplayParameters.showUnassignedICI && click.getSuperDetectionsCount() <= 0) return false;
 			// otherwise may be ok, since will estimate all ici's on teh fly. 
 		}
-		if (btDisplayParameters.amplitudeSelect && click.getAmplitudeDB() < btDisplayParameters.minAmplitude) {
-			return false;
-		}
+//		if (btDisplayParameters.amplitudeSelect && click.getAmplitudeDB() < btDisplayParameters.minAmplitude) {
+//			return false;
+//		}
 		if (btDisplayParameters.displayChannels > 0 && (btDisplayParameters.displayChannels & click.getChannelBitmap()) == 0) return false;
 
-		int speciesIndex = clickControl.getClickIdentifier().codeToListIndex(click.getClickType());	
-		boolean showSpecies = btDisplayParameters.getShowSpecies(speciesIndex+1);
-		boolean showEvents = (btDisplayParameters.showEventsOnly == false || click.getSuperDetectionsCount() > 0);
-		if (btDisplayParameters.showANDEvents) {
-			return showSpecies & showEvents;
-		}
-		else {
-			return showSpecies | showEvents;
-		}
+//		int speciesIndex = clickControl.getClickIdentifier().codeToListIndex(click.getClickType());	
+//		boolean showSpecies = btDisplayParameters.getShowSpecies(speciesIndex+1);
+//		boolean showEvents = (btDisplayParameters.showEventsOnly == false || click.getSuperDetectionsCount() > 0);
+//		if (btDisplayParameters.showANDEvents) {
+//			return showSpecies & showEvents;
+//		}
+//		else {
+//			return showSpecies | showEvents;
+//		}
+		return true;
 	}
 
 	/**
@@ -3567,6 +3741,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 	}
 
+	@Override
 	public void removeObservable(PamObservable o) {
 		// TODO Auto-generated method stub
 
@@ -3593,22 +3768,27 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		repaintBoth();
 	}
 
+	@Override
 	public Serializable getSettingsReference() {
 		return btDisplayParameters;
 	}
 
+	@Override
 	public long getSettingsVersion() {
 		return BTDisplayParameters.serialVersionUID;
 	}
 
+	@Override
 	public String getUnitName() {
 		return clickControl.getUnitName() + "_BTDisplay_" + displayNumber; 
 	}
 
+	@Override
 	public String getUnitType() {
 		return "Click Detector Bearing Time Display";
 	}
 
+	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 		this.btDisplayParameters = ((BTDisplayParameters) pamControlledUnitSettings
 				.getSettings()).clone();
@@ -3662,7 +3842,8 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 		// first find the current click
 		ClickDetection click;
-		ListIterator<ClickDetection> clickIterator = cdb.getListIterator(PamDataBlock.ITERATOR_END);
+//		ListIterator<ClickDetection> clickIterator = cdb.getListIterator(PamDataBlock.ITERATOR_END);
+		ListIterator<ClickDetection> clickIterator = getPlottableClicksIterator(PamDataBlock.ITERATOR_END);
 		while (clickIterator.hasPrevious()) {
 			click = clickIterator.previous();
 			if (click == selectedClick) {
@@ -3696,14 +3877,45 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		// TODO Auto-generated method stub
 		super.clickedOnClick(click);
 	}
+	
+	/**
+	 * Get plottable clicks, i.e ones within time range and ones which 
+	 * pass data selection. 
+	 * @return Array list of clicks. 
+	 */
+	private ArrayList<ClickDetection> getPlottableClicks() {
+		/**
+		 * In viewer mode, it may be possible to not bother calling this by simply keeping
+		 * this list if the parameters haven't changed. 
+		 */
+		PamDataBlock<ClickDetection> clickData = clickControl.getClickDataBlock();
+		return clickData.getDataCopy(displayStartMillis, displayStartMillis+displayLengthMillis, true, getClickDataSelector());		
+	}
+	
+	/**
+	 * Get an iterator to plottable clicks, based around a COPY of underlying 
+	 * data, so no need to synchronize, but not to modify. 
+	 * @return iterator from start of plottable clicks array list. 
+	 */
+	private ListIterator<ClickDetection> getPlottableClicksIterator(int whereFrom) {
+		ArrayList<ClickDetection> clicks = getPlottableClicks();
+		if (whereFrom == PamDataBlock.ITERATOR_END) {
+			whereFrom = Math.max(0, clicks.size()-1);
+		}
+		return clicks.listIterator(whereFrom);
+	}
 
 	private ClickDetection getFirstSelectableClick() {
 		PamDataBlock<ClickDetection> cdb = clickControl.getClickDataBlock();
 		ListIterator<ClickDetection> clickIterator = cdb.getListIterator(0);
 		ClickDetection click;
+		ClickDataSelector dataSelector = getClickDataSelector();
 		while (clickIterator.hasNext()) {
 			click = clickIterator.next();
-			if (shouldPlot(click) == false || clickInMarkedArea(click) == false) {
+			if (!shouldPlot(click) || !clickInMarkedArea(click)) {
+				continue;
+			}
+			if (dataSelector != null && dataSelector.scoreData(click) == 0) {
 				continue;
 			}
 			return click;
@@ -3715,9 +3927,13 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		PamDataBlock<ClickDetection> cdb = clickControl.getClickDataBlock();
 		ListIterator<ClickDetection> clickIterator = cdb.getListIterator(PamDataBlock.ITERATOR_END);
 		ClickDetection click;
+		ClickDataSelector dataSelector = getClickDataSelector();
 		while (clickIterator.hasPrevious()) {
 			click = clickIterator.previous();
-			if (shouldPlot(click) == false || clickInMarkedArea(click) == false) {
+			if (!shouldPlot(click) || !clickInMarkedArea(click)) {
+				continue;
+			}
+			if (dataSelector != null && dataSelector.scoreData(click) == 0) {
 				continue;
 			}
 			return click;
@@ -3735,7 +3951,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			return true;
 		}
 		Point clickPoint = clickXYPos(click);
-		if (shouldPlot(click) == false) {
+		if (!shouldPlot(click)) {
 			return false;
 		}
 		return zoomer.isInMark(btPlot, clickPoint);
@@ -3758,16 +3974,21 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		if (zoomer == null) {
 			return;
 		}
+		if (zoomer.getTopMostShape() == null) {
+			// added 2025-11-20 to get an empty list when there is no mark. 
+			return;
+		}
 		PamDataBlock<ClickDetection> cdb = clickControl.getClickDataBlock();
-		ListIterator<ClickDetection> clickIterator = cdb.getListIterator(0);
+		ListIterator<ClickDetection> clickIterator = getPlottableClicksIterator(0);
 		ClickDetection click;
 		while (clickIterator.hasNext()) {
 			click = clickIterator.next();
-			if (shouldPlot(click) == false || clickInMarkedArea(click) == false) {
+			if (!shouldPlot(click) || !clickInMarkedArea(click)) {
 				continue;
 			}
 			markedClicks.add(click);
 		}
+//		System.out.printf("Number of clicks in mark is %d of %d\n", markedClicks.size(), cdb.getUnitsCount());
 	}
 
 	/**
@@ -3777,6 +3998,24 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 	public ArrayList<PamDataUnit> getMarkedClicks() {
 
 		return markedClicks;
+	}
+	
+	/**
+	 * horrible mess of types. Get the marked clicks that are actually
+	 * click detections
+	 * @return
+	 */
+	public ArrayList<ClickDetection> getMarkedClickClicks() {
+		if (markedClicks == null) {
+			return null;
+		}
+		ArrayList<ClickDetection> clickClicks = new ArrayList<>();
+		for (PamDataUnit aUnit : markedClicks) {
+			if (aUnit instanceof ClickDetection) {
+				clickClicks.add((ClickDetection) aUnit);
+			}
+		}
+		return clickClicks;
 	}
 
 	/**
@@ -3926,7 +4165,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			double[][] clickWave = null;
 			int clickLen = 0;
 			try {
-				clickIterator = clickData.getListIterator(0);
+				clickIterator = getPlottableClicksIterator(0);
 
 				click = getFirstClick(startMillis);
 				if (click != null) {
@@ -4007,10 +4246,10 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		}
 
 		boolean wantClick(ClickDetection click) {
-			if (shouldPlot(click) == false) {
+			if (!shouldPlot(click)) {
 				return false;
 			}
-			if (clickInMarkedArea(click) == false) {
+			if (!clickInMarkedArea(click)) {
 				return false;
 			}
 			if (offlineEvent != null) {
@@ -4025,7 +4264,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			ClickDetection click;
 			while (clickIterator.hasNext()) {
 				click = clickIterator.next();
-				if (wantClick(click) == false){
+				if (!wantClick(click)){
 					continue;
 				}
 				if (click.getTimeMilliseconds() < startMillis) {
@@ -4040,7 +4279,7 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 			ClickDetection click;
 			while (clickIterator.hasNext()) {
 				click = clickIterator.next();
-				if (wantClick(click) == false){
+				if (!wantClick(click)){
 					continue;
 				}
 				return click;
@@ -4081,11 +4320,11 @@ public class ClickBTDisplay extends ClickDisplay implements PamObserver, PamSett
 		if (amplitudeSelectorLabel == null) {
 			return;
 		}
-		if (btDisplayParameters.amplitudeSelect == false) {
+		if (!btDisplayParameters.amplitudeSelect) {
 			amplitudeSelectorLabel.setText("");
 		}
 		else {
-			String txt = String.format("  Amplitude Selector showing clicks > %3.1fdB", btDisplayParameters.minAmplitude);
+			String txt = String.format("  Amplitude Selector showing clicks > %3.1fdB", getClickDataSelector().getParams().minimumAmplitude);
 			amplitudeSelectorLabel.setText(txt);
 		}
 	}

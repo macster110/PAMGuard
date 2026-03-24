@@ -6,17 +6,14 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 
-import dataGram.Datagram;
-import warnings.RepeatWarning;
 import PamUtils.PamCalendar;
 import PamguardMVC.DataUnitBaseData;
 import PamguardMVC.PamDataBlock;
-import PamguardMVC.debug.Debug;
 import PamguardMVC.uid.DataBlockUIDHandler;
-import binaryFileStorage.BinaryStore.BinaryDataMapMaker;
+import dataGram.Datagram;
+import warnings.RepeatWarning;
 
 /**
  * Handles writing of an actual binary data file. 
@@ -29,7 +26,7 @@ import binaryFileStorage.BinaryStore.BinaryDataMapMaker;
  */
 public class BinaryOutputStream {
 
-	private static RepeatWarning repeatWarning;
+	private RepeatWarning repeatWarning;
 
 	private PamDataBlock parentDataBlock;
 
@@ -49,7 +46,7 @@ public class BinaryOutputStream {
 	
 	private DataOutputStream noiseOutputStream;
 
-	private int storedObjects;
+	private int storedObjects, storedNoiseCount;
 
 	private String mainFileName, indexFileName;
 
@@ -60,7 +57,7 @@ public class BinaryOutputStream {
 	private BinaryOfflineDataMapPoint currentDataMapPoint;
 	
 	private int lastObjectType = Integer.MIN_VALUE;
-
+	
 	public BinaryOutputStream(BinaryStore binaryStore,
 			PamDataBlock parentDataBlock) {
 		super();
@@ -183,7 +180,8 @@ public class BinaryOutputStream {
 			dataOutputStream = new DataOutputStream(new BufferedOutputStream(fileOutputStream = new 
 					FileOutputStream(outputFile)));
 		} catch (FileNotFoundException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
+			reportStreamError(e);
 			return false;
 		}
 		
@@ -211,7 +209,8 @@ public class BinaryOutputStream {
 			try {
 				noiseOutputStream = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(noiseFile)));
 			} catch (FileNotFoundException e) {
-				e.printStackTrace();
+//				e.printStackTrace();
+				reportStreamError(e);
 				noiseOutputStream = null;
 				return false;
 			}
@@ -219,6 +218,7 @@ public class BinaryOutputStream {
 		else {
 			noiseOutputStream = null;
 		}
+		storedNoiseCount = 0;
 		return true;
 	}
 
@@ -270,7 +270,8 @@ public class BinaryOutputStream {
 			try {
 				dataOutputStream.close();
 			} catch (IOException e) {
-				e.printStackTrace();
+//				e.printStackTrace();
+				reportStreamError(e);
 				ok = false;
 			}
 			dataOutputStream = null;
@@ -279,7 +280,8 @@ public class BinaryOutputStream {
 			try {
 				noiseOutputStream.close();
 			} catch (IOException e) {
-				e.printStackTrace();
+//				e.printStackTrace();
+				reportStreamError(e);
 				ok = false;
 			}
 		}
@@ -362,7 +364,8 @@ public class BinaryOutputStream {
 				outputStream.write(headerData);
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
+			reportStreamError(e);
 			return false;
 		}
 
@@ -426,7 +429,8 @@ public class BinaryOutputStream {
 				outputStream.write(footerData);
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
+			reportStreamError(e);
 			return false;
 		}
 		lastObjectType = BinaryTypes.MODULE_FOOTER;
@@ -450,6 +454,7 @@ public class BinaryOutputStream {
 		footer.setHighestUID(parentDataBlock.getUidHandler().getCurrentUID());
 		boolean ok = footer.writeFooter(dataOutputStream, BinaryStore.getCurrentFileFormat());
 		if (noiseOutputStream != null) {
+//			footer.setnObjects(storedNoiseCount);
 			ok &= footer.writeFooter(noiseOutputStream, BinaryStore.getCurrentFileFormat());
 		}
 		lastObjectType = BinaryTypes.FILE_FOOTER;
@@ -487,12 +492,20 @@ public class BinaryOutputStream {
 //	}
 	
 	public synchronized boolean storeData(int objectId, DataUnitBaseData baseData, BinaryObjectData binaryObjectData) {
+		boolean ok;
 		if (objectId == BinaryTypes.BACKGROUND_DATA & noiseOutputStream != null) {
-			return storeData(noiseOutputStream, objectId, baseData, binaryObjectData);
+			ok = storeData(noiseOutputStream, objectId, baseData, binaryObjectData);
+			if (ok) {
+				storedNoiseCount++;
+			}
 		}
 		else {
-			return storeData(dataOutputStream, objectId, baseData, binaryObjectData);
+			ok = storeData(dataOutputStream, objectId, baseData, binaryObjectData);
+			if (ok) {
+				storedObjects++;
+			}
 		}
+		return ok;
 	}
 	/**
 	 * Writes data to a file. Note that the length of data may be greater than
@@ -505,7 +518,9 @@ public class BinaryOutputStream {
 	 */
 	public synchronized boolean storeData(DataOutputStream outputStream, int objectId, DataUnitBaseData baseData, BinaryObjectData binaryObjectData) {
 		if (lastObjectType == BinaryTypes.MODULE_FOOTER) {
-			System.out.printf("Storing binary object type %d in file %s with no module header\n", objectId, outputStream == null ? null : outputStream.toString());
+			System.out.printf("Storing binary object at %s from %s in file %s with no module header\n", 
+					PamCalendar.formatDBDateTime(baseData.getTimeMilliseconds()),
+					parentDataBlock.getDataName(), outputStream == null ? null : outputStream.toString());
 		}
 		byte[] data = binaryObjectData.getData();
 		int objectLength = binaryObjectData.getDataLength();
@@ -532,7 +547,7 @@ public class BinaryOutputStream {
 
 		int newLength = outputStream.size() + lengthInFile + BinaryFooter.getStandardLength();
 
-		if (binaryStore.binaryStoreSettings.limitFileSize && binaryStore.isViewer() == false &&
+		if (binaryStore.binaryStoreSettings.limitFileSize && !binaryStore.isViewer() &&
 				newLength > binaryStore.binaryStoreSettings.getMaxSizeMegas()) {
 			reOpen(PamCalendar.getTimeInMillis(), System.currentTimeMillis(), BinaryFooter.END_FILETOOBIG);
 		}
@@ -549,7 +564,7 @@ public class BinaryOutputStream {
 //				dataOutputStream.writeInt(baseData.getChannelBitmap());
 //			}
 //			else {
-			baseData.writeBaseData(outputStream, binaryStore.getCurrentFileFormat());
+			baseData.writeBaseData(outputStream, BinaryStore.getCurrentFileFormat());
 //			}
 			outputStream.writeInt(dataLength);
 			outputStream.write(data, 0, objectLength);
@@ -562,7 +577,6 @@ public class BinaryOutputStream {
 			return false;
 		}
 
-		storedObjects++;
 
 
 		return true;
@@ -572,10 +586,10 @@ public class BinaryOutputStream {
 	 * Report stream error counts. 
 	 * @param e
 	 */
-	private static synchronized void reportStreamError(IOException e) {
+	private synchronized void reportStreamError(IOException e) {
 		// TODO Auto-generated method stub
 		if (repeatWarning == null) {
-			repeatWarning = new RepeatWarning("Binary Output Stream");
+			repeatWarning = new RepeatWarning("Binary Output Stream " + parentDataBlock.getDataName());
 		}
 		repeatWarning.showWarning(e, 2);
 	}
@@ -593,8 +607,7 @@ public class BinaryOutputStream {
 			opStream = new DataOutputStream(new BufferedOutputStream(new 
 					FileOutputStream(indexFile)));
 		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			reportStreamError(e);
 			return false;
 		}
 
@@ -608,12 +621,13 @@ public class BinaryOutputStream {
 		}
 
 		writeModuleFooter(opStream, moduleFooterData);
-		footer.writeFooter(opStream, binaryStore.getCurrentFileFormat());
+		footer.writeFooter(opStream, BinaryStore.getCurrentFileFormat());
 
 		try {
 			opStream.close();
 		} catch (IOException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
+			reportStreamError(e);
 		}
 
 		return true;
@@ -641,7 +655,7 @@ public class BinaryOutputStream {
 		if (dataOutputStream == null || footer == null) {
 			return false;
 		}
-		return footer.writeFooter(dataOutputStream, binaryStore.getCurrentFileFormat());
+		return footer.writeFooter(dataOutputStream, BinaryStore.getCurrentFileFormat());
 	}
 
 	/**

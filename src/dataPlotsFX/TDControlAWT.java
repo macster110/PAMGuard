@@ -1,6 +1,12 @@
 package dataPlotsFX;
 
 import java.awt.Component;
+
+import PamController.PAMStartupEnabler;
+import PamController.PamController;
+import PamguardMVC.PamObservable;
+import PamguardMVC.PamObserverAdapter;
+import PamguardMVC.PamRawDataBlock;
 import dataPlotsFX.layout.TDDisplayFX;
 import dataPlotsFX.scroller.TDAcousticScroller;
 import javafx.application.Platform;
@@ -13,11 +19,6 @@ import javafx.scene.paint.Color;
 import pamViewFX.fxStyles.PamStylesManagerFX;
 import userDisplay.UserDisplayComponent;
 import userDisplay.UserDisplayControl;
-import PamController.PAMStartupEnabler;
-import PamController.PamController;
-import PamguardMVC.PamObservable;
-import PamguardMVC.PamObserverAdapter;
-import PamguardMVC.PamRawDataBlock;
 
 /**
  * TDControlFX acts as a wrapper class for a time base display programmed in JavaFX.
@@ -79,13 +80,14 @@ public class TDControlAWT  extends TDControl implements UserDisplayComponent {
 		 * button and other controls until this thread has completed.
 		 */
 		PAMStartupEnabler.addDisableCount();
+		
 		Platform.runLater(new Runnable() {
 			@Override
 			public void run() {
 				Group root=  new  Group();
 				Scene scene  =  new  Scene(root, Color.GRAY);
 				scene.getStylesheets().clear();
-				scene.getStylesheets().add(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getGUICSS());    
+				scene.getStylesheets().addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getGUICSS());    
 
 				setTDDisplay(new TDDisplayFX(tdControlfx));
 				root.getChildren().add(getTDDisplay());
@@ -215,6 +217,7 @@ public class TDControlAWT  extends TDControl implements UserDisplayComponent {
 	 * Get the data observer- monitors incoming real time data an updates graphs. 
 	 * @return data observer
 	 */
+	@Override
 	public DataObserver getDataObserver() {
 		return dataObserver;
 	}
@@ -236,17 +239,22 @@ public class TDControlAWT  extends TDControl implements UserDisplayComponent {
 	public void notifyModelChanged(int changeType) {
 		//		System.out.println("TDControlAWT: Notify model changed: " + changeType );
 		//need to push onto fx thread. 
-		Platform.runLater(()->{
-			if (tdMainDisplay!=null){
-				tdMainDisplay.notifyModelChanged(changeType);
-			}
-		});
+		if (!Platform.isFxApplicationThread()) {
+			Platform.runLater(()->{
+				if (tdMainDisplay!=null) tdMainDisplay.notifyModelChanged(changeType);
+				
+			});
+		}
+		else {
+			if (tdMainDisplay!=null) tdMainDisplay.notifyModelChanged(changeType);
+		}
 	}
 
 	/**
 	 * In real time mode check if PAMGUARD is paused. 
 	 * @return true if paused. 
 	 */
+	@Override
 	public boolean isPaused(){
 		if (PamController.getInstance().getPamStatus()==PamController.PAM_RUNNING) return false; 
 		else return true; 

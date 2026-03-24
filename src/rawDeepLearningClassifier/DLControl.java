@@ -15,36 +15,58 @@ import PamController.PamGUIManager;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamController.SettingsPane;
+import PamView.PamDetectionOverlayGraphics;
 import PamView.PamSidePanel;
 import PamView.WrapperControlledGUISwing;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamRawDataBlock;
 import PamguardMVC.dataSelector.DataSelector;
-import ai.djl.engine.Engine;
+import annotation.handler.AnnotationHandler;
+import clipgenerator.ClipDataUnit;
+import clipgenerator.ClipDisplayDataBlock;
+import clipgenerator.clipDisplay.ClipDisplayDecorations;
+import clipgenerator.clipDisplay.ClipDisplayParent;
+import clipgenerator.clipDisplay.ClipDisplayUnit;
 import dataPlotsFX.data.TDDataProviderRegisterFX;
 import detectionPlotFX.data.DDPlotRegister;
+import generalDatabase.SQLLoggingAddon;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX2AWT;
 import rawDeepLearningClassifier.dataPlotFX.DLDetectionPlotProvider;
+import rawDeepLearningClassifier.dataPlotFX.DLGroupSymbolManager;
 import rawDeepLearningClassifier.dataPlotFX.DLPredictionProvider;
 import rawDeepLearningClassifier.ddPlotFX.RawDLDDPlotProvider;
+import rawDeepLearningClassifier.defaultModels.DLDefaultModelManager;
 import rawDeepLearningClassifier.dlClassification.DLClassName;
 import rawDeepLearningClassifier.dlClassification.DLClassNameManager;
 import rawDeepLearningClassifier.dlClassification.DLClassiferModel;
+import rawDeepLearningClassifier.dlClassification.DLClassifierChooser;
 import rawDeepLearningClassifier.dlClassification.DLClassifyProcess;
 import rawDeepLearningClassifier.dlClassification.animalSpot.SoundSpotClassifier;
+import rawDeepLearningClassifier.dlClassification.archiveModel.PamZipModelClassifier;
+import rawDeepLearningClassifier.dlClassification.deepAcoustics.DeepAcousticsClassifier;
+import rawDeepLearningClassifier.dlClassification.delphinID.DelphinIDClassifier;
 import rawDeepLearningClassifier.dlClassification.genericModel.GenericDLClassifier;
-import rawDeepLearningClassifier.dlClassification.ketos.KetosClassifier;
+import rawDeepLearningClassifier.dlClassification.ketos.KetosClassifier2;
+import rawDeepLearningClassifier.dlClassification.koogu.KooguClassifier;
+import rawDeepLearningClassifier.layoutFX.DLDetectionGraphics;
+import rawDeepLearningClassifier.layoutFX.DLGraphics;
+import rawDeepLearningClassifier.layoutFX.DLSettingsPane;
 import rawDeepLearningClassifier.layoutFX.DLSidePanelSwing;
 import rawDeepLearningClassifier.layoutFX.DLSymbolManager;
 import rawDeepLearningClassifier.layoutFX.PredictionSymbolManager;
-import rawDeepLearningClassifier.layoutFX.RawDLSettingsPane;
 import rawDeepLearningClassifier.logging.DLAnnotationType;
 import rawDeepLearningClassifier.logging.DLDataUnitDatagram;
 import rawDeepLearningClassifier.logging.DLDetectionBinarySource;
 import rawDeepLearningClassifier.logging.DLDetectionDatagram;
+import rawDeepLearningClassifier.logging.DLGroupDetectionLogging;
+import rawDeepLearningClassifier.logging.DLGroupSubLogging;
 import rawDeepLearningClassifier.logging.DLResultBinarySource;
+import rawDeepLearningClassifier.logging.DLResultLogging;
 import rawDeepLearningClassifier.offline.DLOfflineProcess;
 import rawDeepLearningClassifier.segmenter.SegmenterProcess;
+import rawDeepLearningClassifier.swing.DLClipDecorations;
+import rawDeepLearningClassifier.swing.DLClipDisplayProvider;
+import userDisplay.UserDisplayControl;
 
 /**
  * Module which uses an external deep learning classifier to identify any data
@@ -64,7 +86,7 @@ import rawDeepLearningClassifier.segmenter.SegmenterProcess;
  * Currently the jdl4pam library supports three types of deep learning model,
  * Generic, AnimalSpot and Ketos.
  * <p>
- * <li>Generic</li>
+ * Generic<br>
  * Generic models allows users to load almost any type of model and manually
  * assign the types of data transform and input shape. This means that the user
  * has to get the settings exactly right or the model will not work. It is the
@@ -72,14 +94,14 @@ import rawDeepLearningClassifier.segmenter.SegmenterProcess;
  * However, users can export a settings file which makes it easier to set up for
  * another user.
  * <p><p>
- * <li>AnimalSpot </li>
+ * AnimalSpot <br>
  * AnimalSpot is a framework for training acoustic deep learning
  * models using Pytorch. Users can load a .py model which contains embedded
  * metadata so that PMAGuard knows the exact transforms required for the model
- * input. This makes deployin models in PAMGuard very easy - users require little
+ * input. This makes deploying models in PAMGuard very easy - users require little
  * or no experience to get this working.
  * <p>
- * <li>Ketos</li>
+ * Ketos<br>
  * Ketos is a framework for training acoustic deep learning models
  * using TensorFlow. Users can load a .ktpb model which contains embedded
  * metadata so that PMAGuard knows the exact transforms required for the model
@@ -89,7 +111,7 @@ import rawDeepLearningClassifier.segmenter.SegmenterProcess;
  * @author Jamie Macaulay
  *
  */
-public class DLControl extends PamControlledUnit implements PamSettings {
+public class DLControl extends PamControlledUnit implements PamSettings, ClipDisplayParent {
 	
 	/**
 	 * PLUGIN_BUILD boolean is set to true so that the class loader isn't changed.  When
@@ -117,11 +139,12 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	 * List of different deep learning models that are available.
 	 */
 	private ArrayList<DLClassiferModel> dlModels = new ArrayList<DLClassiferModel>();
+	
 
 	/**
 	 * The settings pane.
 	 */
-	private RawDLSettingsPane settingsPane;
+	private DLSettingsPane settingsPane;
 
 	/**
 	 * The settings dialog
@@ -167,6 +190,18 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	 * The binary data source for detection data
 	 */
 	private DLDetectionBinarySource dlDetectionBinarySource;
+	
+	/**
+	 * DL Group detection logging to database
+	 */
+	private DLGroupDetectionLogging dlGroupDetLogging;
+	
+	
+	/**
+	 * Logging for raw predictions to database
+	 */
+	private DLResultLogging dlResultLogging;
+
 
 	/**
 	 * The DL offline process.
@@ -179,6 +214,30 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	 * The current data selector. 
 	 */
 	private DataSelector dataSelector;
+	
+	/**
+	 * Figure out which model type has been imported. 
+	 */
+	private DLClassifierChooser dlClassifierChooser;
+
+	/**
+	 * Handles downloading models from the internet
+	 */
+	private DLDownloadManager modelDownloadManager;
+
+
+	/**
+	 * Handles downloading models from the internet
+	 */
+	private DLDefaultModelManager defaultModelManager;
+	
+
+	/**
+	 * If true then detections are saved to a group and all detections within a segment are then
+	 * passed to the deep learning classifier.
+	 */
+	private boolean groupDetections = false;
+
 
 	/**
 	 * Constructor for the DL Control.
@@ -191,41 +250,96 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 		PamRawDataBlock rawDataBlock = PamController.getInstance()
 				.getRawDataBlock(rawDLParmas.groupedSourceParams.getDataSource());
 		
-		/**
-		 * In the latest release of djl (0.11.0) there is a bug with the dll's of tensorflow and 
-		 * pytorch. If tensorflow is loaded before pytorch there is a conglict in dll's and 
-		 * pytorch models will not load. This is a workaround for now and the bug has been logged and 
-		 * will bne fixed in subsequent djl releases. 
-		 */
-		Engine.getEngine("PyTorch"); 
+		
+//		/**
+//		 * In the latest release of djl (0.11.0) there is a bug with the dll's of tensorflow and 
+//		 * pytorch. If tensorflow is loaded before pytorch there is a conglict in dll's and 
+//		 * pytorch models will not load. This is a workaround for now and the bug has been logged and 
+//		 * will been fixed in subsequent djl releases. 
+//		 */
+//		Engine.getEngine("PyTorch"); 
 
 		// segment the raw sound data
 		addPamProcess(segmenterProcess = new SegmenterProcess(this, rawDataBlock));
 
 		// classify the raw data segments.
 		addPamProcess(dlClassifyProcess = new DLClassifyProcess(this, segmenterProcess.getSegmenterDataBlock()));
+		//also add group data - rare to have to into datablocks  but this will work.  
+		dlClassifyProcess.addMultiPlexDataBlock(segmenterProcess.getSegmenteGroupDataBlock());
 
+		//manages the names assigned to different output classes. 
 		dlClassNameManager = new DLClassNameManager(this);
+		
+		//manages default models
+		defaultModelManager = new DLDefaultModelManager(this);
+				
+		//manages downloading models
+		modelDownloadManager = new DLDownloadManager(); 
+		
 
 		// add storage options etc.
 		dlBinaryDataSource = new DLResultBinarySource(dlClassifyProcess);
 		dlClassifyProcess.getDLPredictionDataBlock().setBinaryDataSource(dlBinaryDataSource);
+		dlClassifyProcess.getDLPredictionDataBlock().SetLogging(dlResultLogging = new DLResultLogging(this, dlClassifyProcess.getDLPredictionDataBlock()));
 		dlClassifyProcess.getDLPredictionDataBlock().setDatagramProvider(new DLDataUnitDatagram(this));
 
 		dlDetectionBinarySource = new DLDetectionBinarySource(this, dlClassifyProcess.getDLDetectionDatablock());
 		dlClassifyProcess.getDLDetectionDatablock().setBinaryDataSource(dlDetectionBinarySource);
 		dlClassifyProcess.getDLDetectionDatablock().setDatagramProvider(new DLDetectionDatagram(this));
+		
+//		//set database logging for group detections
+		dlClassifyProcess.getDLGroupDetectionDataBlock().SetLogging(dlGroupDetLogging = new DLGroupDetectionLogging(this, dlClassifyProcess.getDLGroupDetectionDataBlock()));
+		dlGroupDetLogging.setSubLogging(new DLGroupSubLogging(dlGroupDetLogging, dlClassifyProcess.getDLGroupDetectionDataBlock()));
+//		int maxndays = 1; //maximum days to load. 
+//		AbstractScrollManager.getScrollManager().addToSpecialDatablock(dlClassifyProcess.getDLGroupDetectionDataBlock(), maxndays*24*60*60*1000L , maxndays*24*60*60*1000L);
 
+		
+		//a little strange this is not automatic but seems you have to add SQL add ons explicitly. 
+		AnnotationHandler annotationHandler = dlClassifyProcess.getDLGroupDetectionDataBlock().getAnnotationHandler();
+		annotationHandler.addAnnotationType(dlClassifyProcess.getDLAnnotionType());
+		SQLLoggingAddon sqlAddon = dlClassifyProcess.getDLAnnotionType().getSQLLoggingAddon();
+		if (sqlAddon != null) {
+			dlGroupDetLogging.addAddOn(sqlAddon);
+		}
+		
+		//add custom graphics
+		PamDetectionOverlayGraphics overlayGraphics = new DLGraphics(dlClassifyProcess.getDLPredictionDataBlock());
+		overlayGraphics.setDetectionData(true);
+		dlClassifyProcess.getDLPredictionDataBlock().setOverlayDraw(overlayGraphics);
+
+		overlayGraphics = new DLDetectionGraphics(	dlClassifyProcess.getDLDetectionDatablock());
+		overlayGraphics.setDetectionData(true);
+		dlClassifyProcess.getDLDetectionDatablock().setOverlayDraw(overlayGraphics);
+		
+		overlayGraphics = new DLDetectionGraphics(dlClassifyProcess.getDLGroupDetectionDataBlock());
+		overlayGraphics.setDetectionData(true);
+		dlClassifyProcess.getDLGroupDetectionDataBlock().setOverlayDraw(overlayGraphics);
+
+		
+		//set the symbol managers. 
 		dlClassifyProcess.getDLDetectionDatablock()
 				.setPamSymbolManager(new DLSymbolManager(this, dlClassifyProcess.getDLDetectionDatablock()));
+		
+		dlClassifyProcess.getDLGroupDetectionDataBlock().setPamSymbolManager(new DLGroupSymbolManager(dlClassifyProcess.getDLGroupDetectionDataBlock()));
+
 		dlClassifyProcess.getDLPredictionDataBlock()
 				.setPamSymbolManager(new PredictionSymbolManager(this, dlClassifyProcess.getDLDetectionDatablock()));
-
+		
+	
 		/***** Add new deep learning models here ****/
 
-		dlModels.add(new GenericDLClassifier(this));
 		dlModels.add(new SoundSpotClassifier(this));
-		dlModels.add(new KetosClassifier(this));
+		dlModels.add(new KetosClassifier2(this));
+		dlModels.add(new KooguClassifier(this));
+		dlModels.add(new PamZipModelClassifier(this));
+		dlModels.add(new DelphinIDClassifier(this));
+		dlModels.add(new DeepAcousticsClassifier(this));
+
+		
+		//it is important the Generic Model is last because we need to check 
+		//for PG metadata in all other models before resorting to manually 
+		//setting up a model. 
+		dlModels.add(new GenericDLClassifier(this));
 
 		// dlModels.add(new DummyClassifier());
 		// dlModels.add(new OrcaSpotClassifier(this)); //removed soon.
@@ -233,13 +347,15 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 		if (this.isViewer) {
 			dlOfflineProcess = new DLOfflineProcess(this);
 		}
-		;
 
 		// register click detector for the javafx display.
 		TDDataProviderRegisterFX.getInstance()
-				.registerDataInfo(new DLDetectionPlotProvider(this, dlClassifyProcess.getDLDetectionDatablock()));
+				.registerDataInfo(new DLDetectionPlotProvider(this, dlClassifyProcess.getDLDetectionDatablock(), false));
 		TDDataProviderRegisterFX.getInstance()
-				.registerDataInfo(new DLPredictionProvider(this, dlClassifyProcess.getDLDetectionDatablock()));
+				.registerDataInfo(new DLPredictionProvider(this, dlClassifyProcess.getDLPredictionDataBlock()));
+		TDDataProviderRegisterFX.getInstance()
+				.registerDataInfo(new DLDetectionPlotProvider(this, dlClassifyProcess.getDLGroupDetectionDataBlock(), true));
+
 
 		// register the DD display
 		DDPlotRegister.getInstance()
@@ -251,10 +367,16 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 		// serialized
 		if (rawDLParmas.classNameMap == null)
 			rawDLParmas.classNameMap = new ArrayList<DLClassName>();
-
+		
+		//create the classiifer chooser. 
+		dlClassifierChooser = new DLClassifierChooser(this); 
+		
+		UserDisplayControl.addUserDisplayProvider(new DLClipDisplayProvider(this));
+		
 		// ensure everything is updated.
 		updateParams(rawDLParmas);
 	}
+
 
 	/**
 	 * Get the available deep learning models
@@ -264,6 +386,22 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	public ArrayList<DLClassiferModel> getDLModels() {
 		return dlModels;
 	}
+	
+	
+	/**
+	 * Get a model by it's name. 
+	 * @param the name the model. 
+	 * @return the corresponding model object or null if no model with the name exists.  
+	 */
+	public DLClassiferModel getDLModel(String string) {
+		for (int i=0; i< this.dlModels.size(); i++) {
+			if (dlModels.get(i).getName().equals(string)) {
+				return dlModels.get(i); 
+			}
+		}
+		return null;
+	}
+
 
 	/**
 	 * Get the current deep learning model.
@@ -271,7 +409,12 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	 * @return the current deep learning model.
 	 */
 	public DLClassiferModel getDLModel() {
-		return dlModels.get(rawDLParmas.modelSelection);
+		if (this.rawDLParmas.modelSelection<0 || this.rawDLParmas.modelSelection>=dlModels.size()) {
+			return null;
+		}
+		else {
+			return dlModels.get(this.rawDLParmas.modelSelection);
+		}
 	}
 
 	/**
@@ -284,6 +427,7 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 
 		this.segmenterProcess.setupSegmenter();
 		this.dlClassifyProcess.setupProcess();
+		this.checkModelParams();
 
 		// this is a bit of a hack. Annotations are added to data units but the
 		// datablock knows nothing about them
@@ -320,7 +464,7 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 		RawDLParams newParameters = (RawDLParams) pamControlledUnitSettings.getSettings();
-		;
+		
 		rawDLParmas = newParameters.clone();
 		return true;
 	}
@@ -342,11 +486,12 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	 * 
 	 * @return the settings pane.
 	 */
-	public RawDLSettingsPane getSettingsPane() {
+	public DLSettingsPane getSettingsPane() {
 
 		if (this.settingsPane == null) {
-			settingsPane = new RawDLSettingsPane(this);
+			settingsPane = new DLSettingsPane(this);
 		}
+		
 		return settingsPane;
 	}
 
@@ -363,8 +508,9 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	public void showSettingsDialog(Frame parentFrame) {
 		if (settingsDialog == null || parentFrame != settingsDialog.getOwner()) {
 			SettingsPane<RawDLParams> setPane = (SettingsPane<RawDLParams>) getSettingsPane();
-			setPane.setParams(this.rawDLParmas);
+			//setPane.setParams(this.rawDLParmas);
 			settingsDialog = new PamDialogFX2AWT<RawDLParams>(parentFrame, setPane, false);
+			settingsDialog.setHelpPoint("classifiers.rawDeepLearningHelp.docs.rawDeepLearning");
 			settingsDialog.setResizable(true);
 		}
 		RawDLParams newParams = settingsDialog.showDialog(rawDLParmas);
@@ -372,6 +518,13 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 		// if cancel button is pressed then new params will be null.
 		if (newParams != null) {
 			updateParams(newParams);
+		}
+	}
+	
+	
+	public void settingsDialogChange() {
+		if (settingsDialog!=null) {
+			settingsDialog.pack();
 		}
 	}
 
@@ -387,7 +540,7 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	public JMenuItem createDetectionMenu(Frame parentFrame) {
 		JMenuItem menu;
 		if (this.isViewer) {
-			menu = new JMenu("Raw Deep Learning Classifier");
+			menu = new JMenu(getUnitName() + "...");
 
 			JMenuItem menuItem = new JMenuItem("Settings...");
 			menuItem.addActionListener((action) -> {
@@ -405,7 +558,7 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 		else {
 			menu = new JMenuItem();
 			// no need for nested menus if there is only one option.
-			menu.setText("Raw Deep Learning Classifier...");
+			menu.setText(getUnitName() + "...");
 			menu.addActionListener((action) -> {
 				showSettingsDialog(parentFrame);
 			});
@@ -431,6 +584,7 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	 * @param flag. The GUI type flag defined in PAMGuiManager.
 	 * @return the GUI for the PamControlledUnit unit.
 	 */
+	@Override
 	public PamControlledUnitGUI getGUI(int flag) {
 		if (flag == PamGUIManager.FX) {
 			if (rawGUIFX == null) {
@@ -449,6 +603,34 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 
 	public void setParams(RawDLParams newParams) {
 		this.rawDLParmas = newParams;
+		checkModelParams();
+	}
+
+	/**
+	 * Called when setParams is called, which should have new model params 
+	 * after the dialog was closed. Puts these into dlParams so they get serialised
+	 * with rest of XML. 
+	 */
+	public void checkModelParams() {
+		RawDLParams dlParams = getDLParams();
+		DLClassiferModel model = getDLModel();
+		Serializable modelParams = null;
+		if (model != null) {
+			modelParams = model.getDLModelSettings();
+		}
+		dlParams.setModelParameters(modelParams);
+		
+		// see what else we can find in the model in terms of metadata. 
+//		if (model == null) {
+//			return;
+//		}
+//		try {
+//			String modelName = model.getName();
+//			System.out.println("Model name: " + modelName);
+//		}
+//		catch (Exception e) {
+//			e.printStackTrace();
+//		}
 	}
 
 	/**
@@ -467,6 +649,7 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 	 * @return the number of classes.
 	 */
 	public int getNumClasses() {
+		if (getDLModel()==null) return 0;
 		return getDLModel().getNumClasses();
 
 	}
@@ -518,7 +701,7 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 			//create the data selector
 			//System.out.println("Data selector: " + dataSelector); 
 			if (source!=null) {
-				dataSelector=source.getDataSelectCreator().getDataSelector(this.getUnitName() +"_clicks", false, null);
+				dataSelector=source.getDataSelectCreator().getDataSelector(this.getUnitName() +"_" + source.getDataName(), false, null);
 				//System.out.println("Data selector: " + dataSelector); 
 			}
 			else {
@@ -526,6 +709,93 @@ public class DLControl extends PamControlledUnit implements PamSettings {
 			}
 		}
 	}
+	
+	/**
+	 * Get the classifier chooser. The classifier chooser chooses which classifier use
+	 * based on a selected file or URL. 
+	 * @return the classifier chooser.
+	 */
+	public DLClassifierChooser getDlClassifierChooser() {
+		return dlClassifierChooser;
+	}
+
+	/**
+	 * Get the download manager for downloading models offline. 
+	 * @return the download manager. 
+	 */
+	public DLDownloadManager getDownloadManager() {
+		return modelDownloadManager;
+	}
+
+	/**
+	 * Get the default model manager. This handles the default models that can be downloaded. 
+	 * @return the default model manager. 
+	 */
+	public DLDefaultModelManager getDefaultModelManager() {
+		return this.defaultModelManager;
+	}
+
+	/**
+	 * Check whether group detections are being used. 
+	 * If true then detections are saved to a group and all detections within a segment are then
+	 * passed to the deep learning classifier.
+	 */
+	public boolean isGroupDetections() {
+		return groupDetections;
+	}
+	
+	/**
+	 * Set whether to use group detections. 
+	 * If true then detections are saved to a group and all detections within a segment are then
+	 * passed to the deep learning classifier.
+	 * @param groupDetections - true to use group detections. 
+	 */
+	public void setGroupDetections(boolean groupDetections) {
+		this. groupDetections=groupDetections;
+	}
+
+
+	@Override
+	public ClipDisplayDataBlock<ClipDataUnit> getClipDataBlock() {
+		
+		Object dlBlock = dlClassifyProcess.getDLDetectionDatablock();
+		ClipDisplayDataBlock<ClipDataUnit> clipBlock = (ClipDisplayDataBlock<ClipDataUnit>) dlBlock;
+		return clipBlock;
+	}
+
+
+	@Override
+	public String getDisplayName() {
+		return getUnitName() + " Clips";
+	}
+
+
+	@Override
+	public ClipDisplayDecorations getClipDecorations(ClipDisplayUnit clipDisplayUnit) {
+		return new DLClipDecorations(this, clipDisplayUnit);
+	}
+
+
+	@Override
+	public void displaySettingChange() {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	
+	public void notifyModelChanged(int changeType) {
+		super.notifyModelChanged(changeType);
+//		
+//		if (PamController.PAM_STOPPING) {
+//		
+//		}
+	}
+	
+	
+
+
+
+
 
 
 }

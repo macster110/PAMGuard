@@ -5,6 +5,7 @@ import java.util.LinkedList;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 
 public class EffortParams implements Cloneable, Serializable, ManagedParameters {
 
@@ -29,7 +30,7 @@ public class EffortParams implements Cloneable, Serializable, ManagedParameters 
 	 * @return The most recently selected observer
 	 */
 	public String getObserver() {
-		if (isSet == false) {
+		if (!isSet) {
 			return null;
 		}
 		if (recentObservers.size() > 0) {
@@ -43,7 +44,7 @@ public class EffortParams implements Cloneable, Serializable, ManagedParameters 
 	 * @return The most recently selected observer
 	 */
 	public String getObjective() {
-		if (isSet == false) {
+		if (!isSet) {
 			return null;
 		}
 		if (recentObjectives.size() > 0) {
@@ -100,7 +101,7 @@ public class EffortParams implements Cloneable, Serializable, ManagedParameters 
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 

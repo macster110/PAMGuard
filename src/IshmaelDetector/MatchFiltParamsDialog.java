@@ -47,6 +47,7 @@ public class MatchFiltParamsDialog extends IshDetParamsDialog implements ActionL
 
 	private MatchFiltParamsDialog(Frame parentFrame, Class inputDataClass) {
 		super(parentFrame, "Matched Filter Parameters", inputDataClass);
+		setHelpPoint("detectors.ishmael.docs.ishmael_matchedfilter");
 	}
 
 	public static MatchFiltParams showDialog2(Frame parentFrame, MatchFiltParams oldParams) 
@@ -89,6 +90,7 @@ public class MatchFiltParamsDialog extends IshDetParamsDialog implements ActionL
 			kernelFilenameBox.setSelectedIndex(0);
 	}
 
+	@Override
 	public void actionPerformed(ActionEvent e) {
 		if (e.getSource() == kernelFileButton)		//user clicked "Select file"
 			selectFile();

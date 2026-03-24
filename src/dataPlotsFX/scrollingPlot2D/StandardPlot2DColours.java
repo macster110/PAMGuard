@@ -15,9 +15,12 @@ import pamViewFX.fxNodes.utilsFX.ColourArray.ColourArrayType;
  */
 public class StandardPlot2DColours implements Plot2DColours {
 	
+	private static final int NCOLOUR_DEFUALT = 256;
+
 	private ColourArrayType colourArrayType=ColourArrayType.HOT; 
 	
-	private Color[] colourArray=ColourArray.createStandardColourArray(256, colourArrayType=ColourArrayType.HOT).getColours();
+	private Color[] colourArray=ColourArray.createStandardColourArray(NCOLOUR_DEFUALT, colourArrayType=ColourArrayType.HOT).getColours();
+	
 	
 	/**
 	 * The amplitude limits 
@@ -49,11 +52,18 @@ public class StandardPlot2DColours implements Plot2DColours {
 	 * 
 	 */
 	public StandardPlot2DColours(PlotParams2D spectParams) {
-		amplitudeLimits[0]=new SimpleDoubleProperty(84); 
-		amplitudeLimits[1]=new SimpleDoubleProperty(115); 
+//		amplitudeLimits[0]=new SimpleDoubleProperty(84); 
+//		amplitudeLimits[1]=new SimpleDoubleProperty(115); 
 		DoubleProperty[] al = spectParams.getAmplitudeLimits();
-		amplitudeLimits[0].bind(al[0]);
-		amplitudeLimits[1].bind(al[1]);
+		for (int i = 0; i < 2; i++) {
+			amplitudeLimits[i] = new SimpleDoubleProperty(al[i].doubleValue());
+			amplitudeLimits[i].bind(al[i]);
+//			amplitudeLimits[i].addListener((obsVal, oldVal, newVal)->{
+//				System.out.println("Color ampligude update to " + newVal);
+//			});
+//			amplitudeLimits[i].set(al[i].doubleValue());
+//		amplitudeLimits[1].bind(al[1]);
+		}
 		this.setColourMap(spectParams.getColourMap());
 		this.spectParams=spectParams; 
 	}
@@ -115,15 +125,27 @@ public class StandardPlot2DColours implements Plot2DColours {
 	public ColourArrayType getColourMap() {
 		return this.colourArrayType;
 	}
-
+	
 	/**
 	 * Set the current colour map. 
-	 * @param colourMap
+	 * @param colourMap - the colour map to set.
 	 */
 	public void setColourMap(ColourArrayType colourMap) {
 		this.colourArrayType=colourMap; 
 		if (spectParams!=null) spectParams.setColourMap(colourMap);
-		ColourArray colourArray = ColourArray.createStandardColourArray(256, colourArrayType);
+		ColourArray colourArray = ColourArray.createStandardColourArray(NCOLOUR_DEFUALT, colourArrayType);
+		this.colourArray=colourArray.getColours();
+	}
+
+	/**
+	 * Set the current colour map. 
+	 * @param ncolours - the number of colours in the colour map. 
+	 * @param colourMap - the colour map to set.
+	 */
+	public void setColourMap(ColourArrayType colourMap, int ncolours) {
+		this.colourArrayType=colourMap; 
+		if (spectParams!=null) spectParams.setColourMap(colourMap);
+		ColourArray colourArray = ColourArray.createStandardColourArray(ncolours, colourArrayType);
 		this.colourArray=colourArray.getColours();
 	}
 
@@ -143,4 +165,5 @@ public class StandardPlot2DColours implements Plot2DColours {
 	public  DoubleProperty[]  getAmplitudeLimits() {
 		return this.amplitudeLimits;
 	}
+
 }

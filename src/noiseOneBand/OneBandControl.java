@@ -10,29 +10,25 @@ import javax.swing.JButton;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 
+import PamController.*;
+import PamController.soundMedium.GlobalMediumManager;
+import PamView.PamTabPanel;
 import noiseOneBand.offline.OneBandSummaryTask;
 import offlineProcessing.DataCopyTask;
 import offlineProcessing.OLProcessDialog;
 import offlineProcessing.OfflineTaskGroup;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
-import PamController.PamControlledUnit;
-import PamController.PamControlledUnitSettings;
-import PamController.PamControllerInterface;
-import PamController.PamSettingManager;
-import PamController.PamSettings;
-import PamView.PamTabPanel;
-
 public class OneBandControl extends PamControlledUnit implements PamSettings {
-
+	/**
+	 * The number of measures taken by {@link OneBandControl}.
+	 * See {@link OneBandControl#getMeasurementName(int)} for description and units of each measure.
+	 */
 	public static final int NMEASURES = 4;
-	public static final String[] measureNames = {"RMS", "0-Peak", "Peak-Peak", "Integrated SEL"};
-	private OneBandProcess oneBandProcess;
-	private OneBandPulseProcess pulseProcess;
+
+	private final OneBandProcess oneBandProcess;
+	private final OneBandPulseProcess pulseProcess;
 	protected OneBandParameters oneBandParameters = new OneBandParameters();
-	private OneBandTabPanel dBHtTabPanel;
+	private final OneBandTabPanel dBHtTabPanel;
 	private OfflineTaskGroup offlineTaskGroup;
 	private OLProcessDialog olProcessDialog;
 	
@@ -68,6 +64,32 @@ public class OneBandControl extends PamControlledUnit implements PamSettings {
 	@Override
 	public PamTabPanel getTabPanel() {
 		return dBHtTabPanel;
+	}
+
+	/**
+	 * Gets the measurement name for a given index (0 <= index < {@link OneBandControl#NMEASURES}).
+	 * This requires access to the Global Medium Manager to report on the correct units.
+	 *
+	 * @param index The index of the measure.
+	 * @return The text representation of the  relevant measure, including units.
+	 */
+	public static String getMeasurementName(int index) {
+		GlobalMediumManager gmm = PamController.getInstance().getGlobalMediumManager();
+		String dbRef = gmm.getdBRefString();
+		String selDbRef = gmm.getdBSELString();
+
+        switch (index) {
+            case 0:
+                return String.format("RMS (%s)", dbRef);
+            case 1:
+                return String.format("0-Peak (%s)", dbRef);
+            case 2:
+                return String.format("Peak-Peak (%s)", dbRef);
+            case 3:
+                return String.format("Integrated SEL (%s)", selDbRef);
+            default:
+                throw new IllegalStateException("Unexpected value: " + index);
+        }
 	}
 
 	/* (non-Javadoc)

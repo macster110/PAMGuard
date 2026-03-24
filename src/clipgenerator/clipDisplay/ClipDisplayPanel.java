@@ -47,6 +47,8 @@ import PamguardMVC.dataSelector.DataSelectorChangeListener;
 import clipgenerator.ClipDataUnit;
 import clipgenerator.ClipDisplayDataBlock;
 import clipgenerator.ClipProcess;
+import pamScrollSystem.ScrollPaneAddon;
+import soundPlayback.ClipPlayback;
 
 /**
  * Clip display panel. Can be incorporated into a tab panel or stand alone in 
@@ -64,7 +66,7 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 
 	protected ClipDisplayParameters clipDisplayParameters = new ClipDisplayParameters();
 	
-	private ClipDisplayProjector clipDisplayProjector;
+//	private ClipDisplayProjector clipDisplayProjector;
 	
 	private ClipDisplayMarker clipDisplayMarker;
 
@@ -99,7 +101,7 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 		clipFont = new Font("Arial", Font.PLAIN, 10);
 		displayPanel = new ClipMainPanel(new BorderLayout());
 
-		clipDisplayProjector = new ClipDisplayProjector(this);
+//		clipDisplayProjector = new ClipDisplayProjector(this);
 		
 		unitsPanel = new PamPanel(clipLayout = new ClipLayout(FlowLayout.LEFT));
 		unitsPanel.addMouseListener(unitsMouse = new UnitsMouse());
@@ -125,6 +127,8 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 		
 		PamDataBlock<ClipDataUnit> dataBlock = clipDisplayParent.getClipDataBlock();
 		if (dataBlock != null) {
+			// this sets the display panel sample rate, which might be 
+			// incorrect. 
 			dataBlock.addObserver(new ClipObserver());
 		}
 
@@ -137,17 +141,17 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 //		selectedClips = new ArrayList<>();
 		
 		clipDisplayMarker = new ClipDisplayMarker(this);
-//		clipDisplayMarker.addObserver(new ClipMarkObserver());
-		OverlayMarkProviders.singleInstance().addProvider(clipDisplayMarker);
+//		clipDisplayMarker.addObserver(new ClipMarkObserver()); // not this
+		OverlayMarkProviders.singleInstance().addProvider(clipDisplayMarker); // restore this to use this feature when debugged
 //		OverlayMarkerManager.
 	}
 
-	/**
-	 * @return the clipDisplayProjector
-	 */
-	public ClipDisplayProjector getClipDisplayProjector() {
-		return clipDisplayProjector;
-	}
+//	/**
+//	 * @return the clipDisplayProjector
+//	 */
+//	public ClipDisplayProjector getClipDisplayProjector() {
+//		return clipDisplayProjector;
+//	}
 	
 //	private class ClipMarkObserver implements OverlayMarkObserver {
 //
@@ -204,6 +208,7 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 
 		@Override
 		public void setSampleRate(float sampleRate, boolean notify) {
+//			clipDisplayParent.ge
 			newSampleRate(sampleRate);
 		}
 
@@ -222,6 +227,10 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 
 		@Override
 		public void updateData(PamObservable observable, PamDataUnit pamDataUnit) {
+			if (pamDataUnit.isDeleted() && pamDataUnit instanceof ClipDataUnit) {
+				removeClip((ClipDataUnit) pamDataUnit);
+				return;
+			}
 			repaintUnits();
 			SwingUtilities.invokeLater(new Runnable() {
 				// can't do this here or we get a tree lock. 
@@ -242,7 +251,23 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 		synchronized (unitsPanel.getTreeLock()) {
 			//TODO: Add logic to sort by time of (manual) selection, clip start time, and maybe by hydrophone 
 			if (PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW) {
-				unitsPanel.add(clipDisplayUnit.getComponent(), -1);
+				// see if we're actually in the time for this. 
+				if (shouldDisplayClip(clipDisplayUnit)) {
+					int componentPosition = -1;
+					int nComp = unitsPanel.getComponentCount();
+					long thisT = clipDisplayUnit.getClipDataUnit().getTimeMilliseconds();
+					for (int i = 0; i < nComp; i++) {
+						Component c = unitsPanel.getComponent(i);
+						if (c instanceof ClipDisplayUnit == false) {
+							continue;
+						}
+						ClipDisplayUnit othUnit = (ClipDisplayUnit) c;
+						if (thisT > othUnit.getClipDataUnit().getTimeMilliseconds()) {
+							componentPosition = i+1;
+						}
+					}
+					unitsPanel.add(clipDisplayUnit.getComponent(), componentPosition);
+				}
 			}
 			else {
 				unitsPanel.add(clipDisplayUnit.getComponent(), clipDisplayParameters.newClipOrder);
@@ -254,6 +279,21 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 			removeOldClips();
 			updatePanel();
 		}
+	}
+
+	private boolean shouldDisplayClip(ClipDisplayUnit clipDisplayUnit) {
+		if (isViewer == false) {
+			return true;
+		}
+		ScrollPaneAddon scrollButts = displayControlPanel.getScrollButtons();
+		if (scrollButts == null) {
+			return true;
+		}
+		long maxMillis = scrollButts.getMaximumMillis();
+		long minMillis = scrollButts.getMinimumMillis();
+		ClipDataUnit clipUnit = clipDisplayUnit.getClipDataUnit();
+		long t = clipUnit.getTimeMilliseconds();
+		return t>=minMillis && t <= maxMillis;
 	}
 
 	/**
@@ -320,9 +360,10 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 
 	public void newViewerTimes(long start, long end) {
 		removeAllClips();
-		ListIterator<ClipDataUnit> it = clipDisplayParent.getClipDataBlock().getListIterator(0);
-		while (it.hasNext()) {
-			ClipDataUnit cdu = it.next();
+//		ListIterator<ClipDataUnit> it = clipDisplayParent.getClipDataBlock().getListIterator(0);
+		ArrayList<ClipDataUnit> clipUnits = clipDisplayParent.getClipDataBlock().getDataCopy();
+		for (ClipDataUnit cdu : clipUnits) {
+//			ClipDataUnit cdu = it.next();
 			long clipTime = cdu.getTimeMilliseconds();
 			if (clipTime >= start && clipTime <= end){
 				newDataUnit(cdu);
@@ -333,48 +374,10 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 
 	private PamDataUnit findTriggerDataUnit(ClipDataUnit clipDataUnit) {
 		return clipDataUnit.findTriggerDataUnit();
-//		if (clipDataUnit.getTriggerDataUnit())
-//		String trigName = clipDataUnit.triggerName;
-//		long trigMillis = clipDataUnit.triggerMilliseconds;
-//		long startMillis = clipDataUnit.getTimeMilliseconds();
-//		PamDataBlock<PamDataUnit> dataBlock = findTriggerDataBlock(trigName);
-//		if (dataBlock == null) {
-//			return null;
-//		}
-////		PamDataUnit trigUnit = dataBlock.findDataUnit(trigMillis, 0);
-////		if (trigUnit == null) {
-//			PamDataUnit trigUnit = findTriggerDataUnit2(dataBlock, clipDataUnit, 200);
-////		}
-//		return trigUnit;
+
 	}
 
-//	/**
-//	 * Bespoke search for finding the trig data unit, since the times don't always 
-//	 * seem to be matching up correctly. This seems to be more a problem for old data from old file
-//	 * format which didn't store the trigger time than it is for newer data. 
-//	 * @param dataBlock datablock to search
-//	 * @param clipDataUnit clip to match to
-//	 * @param timeJitter allowable time jitter (+ or -)
-//	 * @return found data unit with overlapping channel map and time close to the clip trigger time. 
-//	 */
-//	private PamDataUnit findTriggerDataUnit2(PamDataBlock<PamDataUnit> dataBlock, ClipDataUnit clipDataUnit, int timeJitter) {
-//		long trigMillis = clipDataUnit.triggerMilliseconds;
-//		long t1 = trigMillis - timeJitter;
-//		long t2 = trigMillis + timeJitter;
-//		int channels = clipDataUnit.getChannelBitmap();
-//		synchronized (dataBlock.getSynchLock()) {
-//			ListIterator<PamDataUnit> iter = dataBlock.getListIterator(PamDataBlock.ITERATOR_END);
-//			while (iter.hasPrevious()) {
-//				PamDataUnit trigUnit = iter.previous();
-//				long trigTime = trigUnit.getTimeMilliseconds();
-//				if (trigTime >= t1 && trigTime <= t2 && (trigUnit.getChannelBitmap() & channels) != 0) {
-//					return trigUnit;
-//				}
-//			}
-//			
-//		}
-//		return null;
-//	}
+
 
 	private String lastFoundName;
 	private PamDataBlock<PamDataUnit> lastFoundBlock;
@@ -462,7 +465,7 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 		updatePanelLater();
 	}
 
-	private void newSampleRate(float sampleRate) {
+	protected void newSampleRate(float sampleRate) {
 		this.setSampleRate(sampleRate);
 	}
 
@@ -532,7 +535,7 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 	 * Play the clip (called from mouse double click)
 	 * @param clipDataUnit
 	 */
-	private void playClip(ClipDataUnit clipDataUnit) {
+	public void playClip(ClipDataUnit clipDataUnit) {
 		if (clipDataUnit == null) {
 			return;
 		}
@@ -542,6 +545,15 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 		if (process instanceof ClipProcess) {
 			ClipProcess clipProc = (ClipProcess) process;
 			clipProc.playClip(clipDataUnit);
+		}
+		else {
+			ClipPlayback clipPlayback = ClipPlayback.getInstance();
+			if (clipPlayback.isPlaying()) {
+				clipPlayback.stopPlayback();
+			}
+			else {
+				clipPlayback.playClip(clipDataUnit.getRawData(), clipDataUnit.getParentDataBlock().getSampleRate(), true);
+			}
 		}
 	}
 
@@ -945,6 +957,20 @@ public class ClipDisplayPanel extends UserDisplayComponentAdapter implements Pam
 				clipDisplayUnit.setBorderColour();
 			}
 		}
+	}
+
+	/**
+	 * @return the displayControlPanel
+	 */
+	public DisplayControlPanel getDisplayControlPanel() {
+		return displayControlPanel;
+	}
+
+	/**
+	 * @return the clipDisplayMarker
+	 */
+	public ClipDisplayMarker getClipDisplayMarker() {
+		return clipDisplayMarker;
 	}
 
 }

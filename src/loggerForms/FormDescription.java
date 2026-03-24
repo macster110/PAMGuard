@@ -1,14 +1,5 @@
 package loggerForms;
 
-import generalDatabase.DBControlUnit;
-import generalDatabase.EmptyTableDefinition;
-import generalDatabase.PamConnection;
-import generalDatabase.PamTableDefinition;
-import generalDatabase.SQLLogging;
-import generalDatabase.SQLTypes;
-import generalDatabase.pamCursor.PamCursor;
-import generalDatabase.pamCursor.PamCursorManager;
-
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -32,6 +23,10 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JSplitPane;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -45,36 +40,40 @@ import Array.streamerOrigin.HydrophoneOriginMethods;
 import Array.streamerOrigin.OriginIterator;
 import Array.streamerOrigin.StaticOriginSystem;
 import GPS.GpsData;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-
-//import com.sun.org.apache.xerces.internal.dom.DocumentImpl;
-
-import pamScrollSystem.AbstractPamScrollerAWT;
-import pamScrollSystem.ScrollPaneAddon;
-import PamView.PamTabPanel;
-import PamView.panel.PamPanel;
-import PamView.symbol.StandardSymbolManager;
-import PamguardMVC.PamDataBlock;
-import PamguardMVC.PamDataUnit;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamUtils.PamCalendar;
 import PamUtils.XMLUtils;
+import PamView.PamTabPanel;
+import PamView.panel.PamPanel;
+import PamView.panel.PamSplitPane;
+import PamguardMVC.PamDataBlock;
+import PamguardMVC.PamDataUnit;
+import generalDatabase.DBControlUnit;
+import generalDatabase.EmptyTableDefinition;
+import generalDatabase.PamConnection;
+import generalDatabase.PamTableDefinition;
+import generalDatabase.SQLLogging;
+import generalDatabase.SQLTypes;
+import generalDatabase.pamCursor.PamCursor;
+import generalDatabase.pamCursor.PamCursorManager;
+import loggerForms.controlDescriptions.ControlDescription;
 import loggerForms.controlDescriptions.ControlTypes;
 import loggerForms.controlDescriptions.InputControlDescription;
-import loggerForms.PropertyTypes;
-import loggerForms.controlDescriptions.ControlDescription;
 import loggerForms.formdesign.FormEditDialog;
 import loggerForms.formdesign.FormEditor;
 import loggerForms.formdesign.FormList;
 import loggerForms.propertyInfos.BEARINGinfo;
 import loggerForms.propertyInfos.HEADINGinfo;
 import loggerForms.propertyInfos.RANGEinfo;
+import loggerForms.symbol.LoggerSymbolManager;
+
+//import com.sun.org.apache.xerces.internal.dom.DocumentImpl;
+
+import pamScrollSystem.AbstractPamScrollerAWT;
+import pamScrollSystem.ScrollPaneAddon;
 /**
  * 
  * @author Graham Weatherup - SMRU
@@ -242,7 +241,7 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 		formsDataBlock = new FormsDataBlock(this, getFormName(), formsControl.getFormsProcess(), 0);
 		formsDataBlock.SetLogging(new FormsLogging(this,formsDataBlock));
 		formsDataBlock.setOverlayDraw(new LoggerFormGraphics(formsControl, this));
-		formsDataBlock.setPamSymbolManager(new StandardSymbolManager(formsDataBlock, LoggerFormGraphics.defaultSymbol, false));
+		formsDataBlock.setPamSymbolManager(new LoggerSymbolManager(formsDataBlock));
 
 
 		setTimeOfNextSave();
@@ -420,7 +419,7 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 		 * want to look into the db at this point to see what's going on 
 		 * and will get very confused if changes are not committed
 		 */
-		if (DBControlUnit.findDatabaseControl().commitChanges() == false) {
+		if (!DBControlUnit.findDatabaseControl().commitChanges()) {
 			System.out.println("Error Commiting logger form form changes to database");
 		}
 
@@ -1068,9 +1067,9 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 				normalForm = createForm();
 				formComponent = normalForm.getComponent();
 			}
-			formsDataDisplayTable = new FormsDataDisplayTable(this);
+			formsDataDisplayTable = new FormsDataDisplayTable(formsControl, this);
 
-			splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, formComponent, formsDataDisplayTable.getMainPanel());
+			splitPane = new PamSplitPane(JSplitPane.VERTICAL_SPLIT, formComponent, formsDataDisplayTable.getMainPanel(), formsControl.getUnitName());
 			if (formSettingsControl.getFormSettings().splitPanelPosition != null) {
 				splitPane.setDividerLocation(formSettingsControl.getFormSettings().splitPanelPosition);
 			}
@@ -1122,7 +1121,8 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 	}
 
 	public LoggerForm createForm() {
-		return new LoggerForm(this,LoggerForm.NewDataForm);
+		boolean viewer = PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW;
+		return new LoggerForm(this, viewer ? LoggerForm.NewDataForm : LoggerForm.NewDataForm);
 	}
 
 
@@ -1229,6 +1229,22 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 		public void actionPerformed(ActionEvent arg0) {
 			removeForm(parentFrame);
 		}
+	}
+
+	/**
+	 * Delete a data unit from memory and from database. 
+	 * @param dataUnit
+	 * @return
+	 */
+	public boolean deleteDataUnit(FormsDataUnit dataUnit) {
+		if (dataUnit == null) {
+			return false;
+		}
+		boolean ans = getFormsDataBlock().remove(dataUnit, true);
+		if (formsDataDisplayTable != null) {
+			formsDataDisplayTable.dataChanged();
+		}
+		return ans;
 	}
 	/**
 	 * Create a new subtab form on the appropriate sub tab panel. 
@@ -1437,7 +1453,7 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 
 
 				Object timeObject = outputTableDef.getTimeStampItem().getValue();
-				Long timestamp = sqlTypes.millisFromTimeStamp(timeObject);
+				Long timestamp = SQLTypes.millisFromTimeStamp(timeObject);
 				if (timestamp != null && timestamp > timestampNewest) {
 					timestampNewest=timestamp;
 				}
@@ -1598,7 +1614,9 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 			normalForm.destroyForm();
 		}
 		if (hiddenForm != null) {
-			normalForm.destroyForm();
+			if (normalForm != null) {
+				normalForm.destroyForm();
+			}
 		}
 		if (subtabForms != null) {
 			for (LoggerForm aForm:subtabForms) {
@@ -1642,6 +1660,15 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 	public void viewDataUnit(FormsDataUnit formsDataUnit) {
 		if (normalForm != null) {
 			normalForm.restoreData(formsDataUnit);
+		}
+	}
+	
+	public void optionsChange() {
+		if (normalForm != null) {
+			normalForm.optionsChange();
+		}
+		if (formsDataDisplayTable != null) {
+			formsDataDisplayTable.optionsChange();
 		}
 	}
 
@@ -1717,7 +1744,7 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 			return null;
 		}
 
-		if (formName.equals(getFormName()) == false) {
+		if (!formName.equals(getFormName())) {
 			return null;
 		}
 		Object[] formData = new Object[inputControlDescriptions.size()];
@@ -1741,7 +1768,7 @@ public class FormDescription implements Cloneable, Comparable<FormDescription> {
 				continue;
 			}
 			ControlDescription cd = getInputControlDescriptions().get(itemIndex);
-			if (cd.getType().equals(ctrlType) == false) {
+			if (!cd.getType().equals(ctrlType)) {
 				continue;
 			}
 			Object data = cd.extractXMLElementData(dataElement, dataElement.getAttribute("Value"));

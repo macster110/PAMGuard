@@ -4,9 +4,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.ListIterator;
 
-import PamModel.parametermanager.ManagedParameters;
-import PamModel.parametermanager.PamParameterSet;
-
 /**
  * Training contours from a single file, each contour representing
  * one whistle. 
@@ -17,7 +14,7 @@ import PamModel.parametermanager.PamParameterSet;
  * @author Doug Gillespie
  *	@see TrainingDataGroup
  */
-public class TrainingDataSet implements Serializable, ManagedParameters {
+public class TrainingDataSet implements Serializable {
 	
 	static public final long serialVersionUID = 0;
 
@@ -162,10 +159,4 @@ public class TrainingDataSet implements Serializable, ManagedParameters {
 //		nContours = contours;
 //	}
 	
-	@Override
-	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
-		return ps;
-	}
-
 }

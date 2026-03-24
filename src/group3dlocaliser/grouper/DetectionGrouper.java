@@ -18,6 +18,7 @@ import PamUtils.PamUtils;
 import PamView.GroupedSourceParameters;
 import PamguardMVC.AcousticDataUnit;
 import PamguardMVC.PamDataUnit;
+import PamguardMVC.dataSelector.DataSelectParams;
 import PamguardMVC.dataSelector.DataSelector;
 import PamguardMVC.debug.Debug;
 
@@ -93,9 +94,9 @@ public class DetectionGrouper {
 	}
 
 	public synchronized void newData(PamDataUnit pamDataUnit) {
-		if (pamDataUnit.getUID() == 7616002298L) {
-			Debug.out.println("On " + pamDataUnit.getUID());
-		}
+//		if (pamDataUnit.getUID() == 7616002298L) {
+//			Debug.out.println("On " + pamDataUnit.getUID());
+//		}
 		int detChans = pamDataUnit.getChannelBitmap();
 		Long sampleNo = pamDataUnit.getStartSample();
 //		if (pamDataUnit.getUID() == 291039474) {
@@ -242,14 +243,15 @@ public class DetectionGrouper {
 	/**
 	 * Close the existing group and make a new one. 
 	 */
-	private synchronized void closeMotherGroup() {
+	public synchronized void closeMotherGroup() {
 		processFirstGroup(motherGroup);
+		if (maxInterGroupSamples==null) return;
 		motherGroup = new FirstGrouping(maxInterGroupSamples.length, 0, null);
 	
 	}
 
 	public boolean canSelectData(PamDataUnit dataUnit) {
-		if (dataSelector == null) {
+		if (dataSelector == null || dataSelector.getParams().getCombinationFlag() == DataSelectParams.DATA_SELECT_DISABLE) {
 			return true;
 		}
 		else {
@@ -265,6 +267,9 @@ public class DetectionGrouper {
 	 * @param motherGroup
 	 */
 	private void processFirstGroup(FirstGrouping motherGroup) {
+		if (motherGroup == null) {
+			return;
+		}
 		List<PamDataUnit> dataUnits = motherGroup.getDataUnits();
 //		for (int i = 0; i < dataUnits.size(); i++) {
 //			if (dataUnits.get(i).getUID() == 291039474) {

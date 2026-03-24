@@ -15,15 +15,16 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.text.Font;
 import javafx.stage.Window;
-import pamViewFX.PamGuiManagerFX;
 import pamViewFX.fxNodes.PamBorderPane;
 import pamViewFX.fxNodes.PamVBox;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX2AWT;
+import pamViewFX.validator.PamValidator;
+import PamController.PamConfiguration;
 import PamController.PamController;
+import PamController.PamGUIManager;
 import PamDetection.LocalisationInfo;
 import PamUtils.PamUtils;
 import PamView.dialog.SourcePanelMonitor;
@@ -42,7 +43,6 @@ import PamguardMVC.PamDataBlock;
 @SuppressWarnings("rawtypes")
 public class SourcePaneFX extends PamBorderPane {
 
-	private PamBorderPane panel;
 	private ArrayList<SourceSelection> sourceType = new ArrayList<>();
 	private boolean hasChannels;
 	private String borderTitle;
@@ -82,8 +82,16 @@ public class SourcePaneFX extends PamBorderPane {
 	/**
 	 * The title labe. Sits above the combo box. 
 	 */
-	private Label titleLabel;
+	protected Label titleLabel;
 	
+	/**
+	 * Validator for channels 
+	 */
+    protected PamValidator channelValidator;
+	private Label channelLabel;
+	
+	private PamConfiguration pamConfiguration;
+
 	/**
 	 * Construct a panel with a titles border
 	 * @param borderTitle Title to go in border
@@ -95,11 +103,32 @@ public class SourcePaneFX extends PamBorderPane {
 		if (sourceType != null) {
 			this.sourceType.add(new SourceSelection(sourceType, includeSubClasses));
 		}
+		channelValidator = new PamValidator();
 		this.setHasChannels(hasChannels);
 		this.setBorderTitle(borderTitle);
 		createPanel();
 		setSourceList();
 	}
+	/**
+	 * Construct a panel with a titles border
+	 * @param borderTitle Title to go in border
+	 * @param sourceType Data Source type
+	 * @param hasChannels Include a set of checkboxes to list available channels
+	 * @param includeSubClasses include all subclasses of sourceType in the list. 
+	 */
+	public SourcePaneFX(String borderTitle, PamConfiguration pamConfiguration, Class sourceType, boolean hasChannels, boolean includeSubClasses) {
+		if (sourceType != null) {
+			this.sourceType.add(new SourceSelection(sourceType, includeSubClasses));
+		}
+		this.pamConfiguration = pamConfiguration;
+		channelValidator = new PamValidator();
+		this.setHasChannels(hasChannels);
+		this.setBorderTitle(borderTitle);
+		createPanel();
+		setSourceList();
+	}
+	
+	
 
 	/**
 	 * Construct a panel without a border
@@ -109,6 +138,7 @@ public class SourcePaneFX extends PamBorderPane {
 	 */
 	public SourcePaneFX(Class sourceType, boolean hasChannels, boolean includeSubClasses) {
 		this.sourceType.add(new SourceSelection(sourceType, includeSubClasses));
+		channelValidator = new PamValidator();
 		this.setHasChannels(hasChannels);
 		createPanel();
 		setSourceList();
@@ -147,6 +177,7 @@ public class SourcePaneFX extends PamBorderPane {
 	 * Add a listener to the data source drop down list
 	 * @param listener listener 
 	 */
+	@SuppressWarnings("unchecked")
 	public void addSelectionListener(ChangeListener listener) {
 		sourceList.valueProperty().addListener(listener);
 	}
@@ -158,7 +189,7 @@ public class SourcePaneFX extends PamBorderPane {
 	
 	
 	protected void createPanel() {
-		
+				
 		PamVBox comboBoxPane=new PamVBox();
 		comboBoxPane.setSpacing(5);
 		
@@ -183,7 +214,7 @@ public class SourcePaneFX extends PamBorderPane {
 		channelPanel.setSpacing(5);
 		
 		if (isHasChannels()) {
-			Label channelLabel = new Label("Channel");
+			channelLabel = new Label("Channels");
 			//PamGuiManagerFX.titleFont2style(channelLabel);
 //			channelLabel.setFont(PamGuiManagerFX.titleFontSize2);
 			comboBoxPane.getChildren().add(channelLabel);
@@ -191,8 +222,11 @@ public class SourcePaneFX extends PamBorderPane {
 			channelPanel.getChildren().add(selectAll =new CheckBox("All"));
 			channelBoxes =new CheckBox[PamConstants.MAX_CHANNELS];
 			selectAll.setOnAction((action)->{
+	            System.out.println("Stylesheets: 0: " +  getStylesheets().size());
 				if (selectAll.isSelected()) selectAllChannels();
 				else selectNoChannels();
+	            channelValidator.validate(); //makes sure any error signs are removed.
+	            System.out.println("Stylesheets: 1: " +  getStylesheets().size());
 			});
 		}
 		
@@ -204,10 +238,21 @@ public class SourcePaneFX extends PamBorderPane {
 		if (isHasChannels()){
 			for (int i = 0; i < PamConstants.MAX_CHANNELS; i++){
 				channelBoxes[i] = new CheckBox("Channel " + i);
+				 channelValidator.createCheck()
+		          .dependsOn(("channel_" + i +  "_" + this), channelBoxes[i].selectedProperty())
+		          .withMethod(c -> {
+		            if (!isAChannelSelected() ) {
+			              c.error("At least one channel needs to be selected for the module to work");
+		            }
+		          })
+		          .decorates(channelBoxes[i])
+		          .immediate();
+		 
 				//channelPanel.getChildren().add(channelBoxes[i]);
 				final int n=i;
 				channelBoxes[i].setOnAction((action)->{
 					selectionChanged(n);
+		            channelValidator.validate(); //makes sure any error signs are removed.
 				});
 				//System.out.println("SourcePanel.java creatPanel"+i);
 			}
@@ -218,6 +263,31 @@ public class SourcePaneFX extends PamBorderPane {
 		//create source comboBox. 
 		this.setCenter(comboBoxPane);
 		
+	}
+	
+
+	public Label getChannelLabel() {
+		return channelLabel;
+	}
+
+	/**
+	 * Check if a single channel is selected. 
+	 * @return true if at least one channel is selected.
+	 */
+	public boolean isAChannelSelected() {
+		int channels = 0;
+		PamDataBlock sb = getSource();
+		if (sb != null) {
+	//		channels = sb.getChannelMap();
+			channels = sb.getSequenceMap();
+		}
+		int n=0; 
+		//remove all channels from vertical box pane. 
+		for (int i = 0; i < Math.min(PamConstants.MAX_CHANNELS, channelBoxes.length); i++) {
+			if ((channels & 1<<i) != 0 && this.channelBoxes[i].isSelected()) n++;
+		} 
+		if (n==0) return false;
+		else return true;
 	}
 	
 	protected void selectNoChannels() {
@@ -305,11 +375,13 @@ public class SourcePaneFX extends PamBorderPane {
 	private int currentNShown = 0;
 	private Class requiredClassType;
 	
+	
 	/**
 	 * Repack the owner window if the number of channels has changed
 	 * @param channelsMap bitmap of used channels. 
 	 */
 	protected void rePackOwner(int channelsMap) {
+		if (PamGUIManager.isSwing()) {
 //		if (currentNShown != PamUtils.getNumChannels(channelsMap)) {
 			try {
 //				Stage stage = (Stage) this.getScene().getWindow();
@@ -358,6 +430,7 @@ public class SourcePaneFX extends PamBorderPane {
 				System.err.println("SourcePaneFX: Problems packing SourcePanel owner window " + e.getLocalizedMessage());
 			}
 //		}
+		}
 		currentNShown = PamUtils.getNumChannels(channelsMap);
 	}
 	
@@ -368,7 +441,7 @@ public class SourcePaneFX extends PamBorderPane {
 	 */
 	public boolean setSource(String sourceName) {
 		// search the list for the string
-		PamDataBlock dataBlock = PamController.getInstance().getDataBlockByLongName(sourceName);
+		PamDataBlock dataBlock = getConfiguration().getDataBlockByLongName(sourceName);
 		if (dataBlock != null) {
 			setSource(dataBlock);
 			return true;
@@ -385,6 +458,15 @@ public class SourcePaneFX extends PamBorderPane {
 		//sourceList.getSelectionModel().select(0);
 		setSourceIndex(0);
 		return false;
+	}
+	
+	private PamConfiguration getConfiguration() {
+		if (pamConfiguration != null) {
+			return pamConfiguration;
+		}
+		else {
+			return PamController.getInstance().getPamConfiguration();
+		}
 	}
 	
 	/**
@@ -510,7 +592,7 @@ public class SourcePaneFX extends PamBorderPane {
 	protected List<PamDataBlock> getSourceDataBlocks() {
 		ArrayList<PamDataBlock> dataBlocks = new ArrayList<>();
 		for (SourceSelection sourceSel:sourceType) {
-			ArrayList<PamDataBlock> sl = PamController.getInstance().getDataBlocks(sourceSel.sourceType, sourceSel.allowSubClasses);
+			ArrayList<PamDataBlock> sl = getConfiguration().getDataBlocks(sourceSel.sourceType, sourceSel.allowSubClasses);
 			for (PamDataBlock db:sl) {
 				if (dataBlocks.contains(db) == false) {
 					dataBlocks.add(db);
@@ -622,13 +704,6 @@ public class SourcePaneFX extends PamBorderPane {
 		return sourceList.getSelectionModel().getSelectedIndex();
 	}
 	
-	/**
-	 * Get a reference to the JPanel containing the controls
-	 * @return JPanel container
-	 */
-	public Pane getPane() {
-		return panel;
-	}
 	
 	/**
 	 * Exclude specific data blocks from the source list. e.g. a process would normally not
@@ -772,6 +847,47 @@ public class SourcePaneFX extends PamBorderPane {
 	 */
 	public ComboBox<PamDataBlock> getDataBlockBox() {
 		return this.sourceList; 
-		
+	
 	}
+	
+	
+    /**
+     * Get the channel validator for the source pane. 
+     * @return the channel validator
+     */
+	public PamValidator getChannelValidator() {
+		return channelValidator;
+	}
+
+	/**
+	 * Set the title.
+	 * @param titleString - the title text
+	 */
+	public void setTitleText(String titleString) {
+		titleLabel.setText(titleString);
+	}
+	
+	
+	/**
+	 * Clear the source types. 
+	 */
+	public void clearSourceTypeList() {
+		this.sourceType.clear();
+	}
+	
+	/**
+	 * Get the source data block at index i in the source list. 
+	 * @param i - index
+	 * @return the data block at index i, or null if index is out of range. 
+	 */
+	public PamDataBlock getSource(int i) {
+		List<PamDataBlock> dataBlocks  = getSourceDataBlocks() ;
+		if (i<0 || i>=dataBlocks.size()) {
+			System.err.println("SourcePaneFX: getSource index out of range: " + i);
+			return null;
+		}
+		return dataBlocks.get(i);
+	}
+
+
 }

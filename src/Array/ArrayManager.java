@@ -8,15 +8,9 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+
 import javax.swing.JFrame;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
-import pamMaths.PamQuaternion;
-import pamMaths.PamVector;
-import userDisplay.UserDisplayControl;
-import depthReadout.DepthControl;
 import Array.importHydrophoneData.HydrophoneImport;
 import Array.importHydrophoneData.StreamerImport;
 import Array.layoutFX.ArrayGUIFX;
@@ -25,13 +19,16 @@ import Array.sensors.swing.ArraySensorPanelProvider;
 import GPS.GPSControl;
 import GPS.GPSDataBlock;
 import GPS.GpsData;
+import GPS.GpsDataUnit;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitGUI;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
+import PamController.PamControllerInterface;
 import PamController.PamGUIManager;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
+import PamController.masterReference.MasterReferencePoint;
 import PamController.positionreference.PositionReference;
 import PamModel.PamModuleInfo;
 import PamUtils.PamUtils;
@@ -42,6 +39,9 @@ import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
 import PamguardMVC.PamObserver;
 import dataPlotsFX.data.TDDataProviderRegisterFX;
+import pamMaths.PamQuaternion;
+import pamMaths.PamVector;
+import userDisplay.UserDisplayControl;
 
 /**
  * Manager for different array configurations. Each array configuration is 
@@ -89,7 +89,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 
 //	private DepthControl depthControl;
 
-	private ImportDataSystem<ArrayList<Double>> hydrophoneImportManager;
+	private ImportDataSystem<Hydrophone> hydrophoneImportManager;
 
 	private ImportDataSystem<ArrayList<Double>> streamerImportManager;
 	
@@ -138,7 +138,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 
 		//enable importing of time stamped hydrophone and streamer data if in viewer mode. 
 		if (isViewer){
-			hydrophoneImportManager= new ImportDataSystem<ArrayList<Double>>(new HydrophoneImport(hydrophonesProcess.getHydrophoneDataBlock()));
+			hydrophoneImportManager= new ImportDataSystem<Hydrophone>(new HydrophoneImport(hydrophonesProcess.getHydrophoneDataBlock()));
 			hydrophoneImportManager.setName("Hydrophone Data Import");
 			streamerImportManager = new ImportDataSystem<ArrayList<Double>>(new StreamerImport(hydrophonesProcess.getStreamerDataBlock()));
 			streamerImportManager.setName("Streamer Data Import");
@@ -171,32 +171,33 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 	}
 
 	private boolean initComplete = false;
+	@Override
 	public void notifyModelChanged(int changeType) {
-		if (changeType == PamController.INITIALIZATION_COMPLETE) {
+		if (changeType == PamControllerInterface.INITIALIZATION_COMPLETE) {
 			initComplete = true;
 		}
 		getCurrentArray().notifyModelChanged(changeType, initComplete);
 
-		if (changeType == PamController.INITIALIZATION_COMPLETE) {
+		if (changeType == PamControllerInterface.INITIALIZATION_COMPLETE) {
 			// create data units and save - is this needed in the viewer ? 
 			//			if (PamController.getInstance().getRunMode() == PamController.RUN_NORMAL) {
 			hydrophonesProcess.createArrayData();
 			//			}
 		}
 
-		if (changeType == PamController.OFFLINE_DATA_LOADED){
+		if (changeType == PamControllerInterface.OFFLINE_DATA_LOADED){
 			if (isViewer) {
 				getHydrophoneDataBlock().clearChannelIterators();
 			}
 		}
 
-		if (changeType == PamController.HYDROPHONE_ARRAY_CHANGED){
+		if (changeType == PamControllerInterface.HYDROPHONE_ARRAY_CHANGED){
 			if (isViewer) {
 				getHydrophoneDataBlock().clearChannelIterators();
 			}
 		}
 		
-		if (changeType == PamController.GLOBAL_MEDIUM_UPDATE){
+		if (changeType == PamControllerInterface.GLOBAL_MEDIUM_UPDATE){
 			this.getCurrentArray().setSpeedOfSound(this.getPamController().getGlobalMediumManager().getDefaultSoundSpeed());
 			this.getCurrentArray().setDefaultSensitivity(this.getPamController().getGlobalMediumManager().getDefaultRecieverSens()); 
 		}
@@ -223,7 +224,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 	}
 
 	public void showArrayDialog(Frame parentFrame) {
-		PamArray selectedArray = ArrayDialog.showDialog(parentFrame, singleInstance);
+		PamArray selectedArray = ArrayDialog.showDialog(parentFrame, this, null);
 
 		//WARNING: need to make sure that the notify model changed is at the end of this function. It must be called after all hydrophone data loading 
 		//and saving has occured, otherwise we don't clear channel iterators from the hydrophone dateblock and end up with concurrent modification exceptions in 
@@ -231,7 +232,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 		if (selectedArray != null) {
 			hydrophonesProcess.createArrayData();
 			// need to tell all modules that the array may have changed. 
-			PamController.getInstance().notifyModelChanged(PamController.HYDROPHONE_ARRAY_CHANGED);
+			PamController.getInstance().notifyModelChanged(PamControllerInterface.HYDROPHONE_ARRAY_CHANGED);
 		}
 
 	}
@@ -259,6 +260,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 	/* (non-Javadoc)
 	 * @see PamController.PamSettings#GetSettingsReference()
 	 */
+	@Override
 	public Serializable getSettingsReference() {
 		/*
 		 * Save the entire array classes in the serialised file
@@ -277,6 +279,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 	/* (non-Javadoc)
 	 * @see PamController.PamSettings#GetSettingsVersion()
 	 */
+	@Override
 	public long getSettingsVersion() {
 		return ArrayParameters.serialVersionUID;
 	}
@@ -284,6 +287,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 	/* (non-Javadoc)
 	 * @see PamController.PamSettings#GetUnitName()
 	 */
+	@Override
 	public String getUnitName() {
 		return "Array Manager";
 	}
@@ -291,6 +295,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 	/* (non-Javadoc)
 	 * @see PamController.PamSettings#getUnitType()
 	 */
+	@Override
 	public String getUnitType() {
 		return "Array Manager";
 	}
@@ -298,6 +303,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 	/* (non-Javadoc)
 	 * @see PamController.PamSettings#RestoreSettings(PamController.PamControlledUnitSettings)
 	 */
+	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 		try {
 			if (pamControlledUnitSettings.getSettings() != null) {
@@ -305,6 +311,10 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 				Object settings = pamControlledUnitSettings.getSettings();
 				if (settings instanceof ArrayParameters) {
 					oldArrays = ((ArrayParameters) settings).getArrayList();
+				}
+				else if (settings instanceof PamArray) {
+					oldArrays = new ArrayList<>();
+					oldArrays.add((PamArray) settings);
 				}
 				else {
 					oldArrays =  (ArrayList<PamArray>) pamControlledUnitSettings.getSettings();
@@ -328,7 +338,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 		}
 		return true;
 	}
-
+	
 	/**
 	 * @return Returns the currentArray.
 	 */
@@ -387,23 +397,28 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 //		}
 //	}
 
+	@Override
 	public String getObserverName() {
 		return "Array Manager";
 	}
 
+	@Override
 	public long getRequiredDataHistory(PamObservable o, Object arg) {
 		// would be better to work out how long the Gps data are being kept for and do the same
 		return 3600*1000;
 	}
 
+	@Override
 	public void noteNewSettings() {
 
 	}
 
+	@Override
 	public void removeObservable(PamObservable o) {
 
 	}
 
+	@Override
 	public void setSampleRate(float sampleRate, boolean notify) {
 		// TODO Auto-generated method stub
 
@@ -661,10 +676,10 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 		}
 		// need to find the direction vector for the plane. 
 		// can do this by finding any non zero vector product.
-		PamVector planePerpendicular = null;;
+		PamVector planePerpendicular = null;
 		for (int i = 0; i < nPairs; i++) {
 			for (int j = (i+1); j < nPairs; j++) {
-				if (vectorPairs[i].isParallel(vectorPairs[j]) == false) {
+				if (!vectorPairs[i].isParallel(vectorPairs[j])) {
 					planePerpendicular = vectorPairs[i].vecProd(vectorPairs[j]);
 					break;
 				}
@@ -773,7 +788,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 		int nPairs = pvs.length;
 		for (int i = 0; i < nPairs; i++) {
 			for (int j = i+1; j < nPairs; j++) {
-				if (pvs[i].isInLine(pvs[j]) == false) {
+				if (!pvs[i].isInLine(pvs[j])) {
 					return false;
 				}
 			}
@@ -993,6 +1008,7 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 	 * @return geometry data. 
 	 */
 	public SnapshotGeometry getSnapshotGeometry(int hydrophoneMap, long timeMillis) {
+				
 		PamArray currentArray = getCurrentArray();
 		if (currentArray == null) {
 			return null;
@@ -1051,12 +1067,17 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 			/**
 			 * Rotate the hydrophone about the centre of it's streamer. 
 			 */
-			Hydrophone hydrophone = currentArray.getHiddenHydrophone(i);
+//			Hydrophone hydrophone = currentArray.getHiddenHydrophone(i);
+			Hydrophone hydrophone = currentArray.getHydrophone(i, timeMillis);
+			
+			
+			
 			if (hydrophone == null) {
 				continue;
 			}
 			PamVector hydrophoneVec = hydrophone.getVector();
 			PamVector hydrophoneErrorVec = hydrophone.getErrorVector();
+						
 			if (streamerQuaternion != null) {
 				hydrophoneVec = PamVector.rotateVector(hydrophoneVec, streamerQuaternion);
 				hydrophoneErrorVec = PamVector.rotateVector(hydrophoneErrorVec, streamerQuaternion);
@@ -1080,14 +1101,45 @@ public class ArrayManager extends PamControlledUnit implements PamSettings, PamO
 			}
 		}
 
-		if (nGood > 0) for (int p = 0; p < 3; p++) {
-			centre[p] /= nGood;
+		if (nGood > 0) { 
+			for (int p = 0; p < 3; p++) {
+				centre[p] /= nGood;
+			}
+			return new SnapshotGeometry(currentArray, timeMillis, streamerList, hydrophoneList, firstStreamerPos,
+					new PamVector(centre), geometry, streamerError, hydrophoneError);
 		}
-		
-		return new SnapshotGeometry(currentArray, timeMillis, streamerList, hydrophoneList, firstStreamerPos,
-				new PamVector(centre), geometry, streamerError, hydrophoneError);
+		else {
+			return getMasterReferenceGeometry(timeMillis);
+		}	
 		
 	}
+	
+	/**
+	 * Create a snapshot geometry from the master reference position, which will either be the GPS data, or 
+	 * the centre point of the array. Worst case is that it ends up as 0,0,0
+	 * @param timeMillis
+	 * @return
+	 */
+	private SnapshotGeometry getMasterReferenceGeometry(long timeMillis) {
+		GPSControl gpsControl = GPSControl.getGpsControl();
+		GpsData referencePoint = null;
+		if (gpsControl != null) {
+			GpsDataUnit shipPos = gpsControl.getShipPosition(timeMillis, true);
+			if (shipPos != null) {
+				referencePoint = shipPos.getGpsData();
+			}
+		}
+		if (referencePoint == null && MasterReferencePoint.getFixTime() != null && MasterReferencePoint.getLatLong() != null) {
+			// running out of options, so fall back to the master reference point, interpolated (probably has zero speeed)
+			referencePoint = new GpsData(MasterReferencePoint.getFixTime(), MasterReferencePoint.getLatLong()).getPredictedGPSData(timeMillis);
+		}
+		if (referencePoint == null) {
+			return null;
+		}
+		SnapshotGeometry snapgeom = new SnapshotGeometry(getCurrentArray(), timeMillis, null, null, referencePoint, new PamVector(0,0,0), null, null, null);
+		return snapgeom;
+	}
+
 //	
 //	public SnapshotGeometry getSubDetectionGeometry(PamDataUnit superDataUnit) {
 //		/**

@@ -69,19 +69,6 @@ import javax.swing.event.AncestorListener;
 import javax.swing.event.InternalFrameEvent;
 import javax.swing.event.InternalFrameListener;
 
-import pamScrollSystem.AbstractPamScroller;
-import pamScrollSystem.AbstractPamScrollerAWT;
-import pamScrollSystem.PamScrollObserver;
-import pamScrollSystem.PamScroller;
-import pamScrollSystem.PamScrollerData;
-import pamScrollSystem.RangeSpinner;
-import pamScrollSystem.RangeSpinnerListener;
-import pamScrollSystem.jumping.ScrollJumper;
-import soundPlayback.PlaybackControl;
-import soundPlayback.PlaybackProgressMonitor;
-import userDisplay.UserDisplayControl;
-import userDisplay.UserDisplayFrame;
-import userDisplay.UserFramePlots;
 import Acquisition.AcquisitionProcess;
 import Layout.DisplayPanel;
 import Layout.DisplayPanelContainer;
@@ -96,18 +83,17 @@ import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamDetection.RawDataUnit;
 import PamUtils.Coordinate3d;
-import PamUtils.FrequencyFormat;
 import PamUtils.PamCalendar;
 import PamUtils.PamUtils;
 import PamUtils.SIUnitFormat;
 import PamUtils.complex.ComplexArray;
 import PamView.ClipboardCopier;
 import PamView.ColourArray;
-import PamView.GeneralProjector;
 import PamView.ColourArray.ColourArrayType;
-import PamView.dialog.PamLabel;
+import PamView.GeneralProjector;
 import PamView.PamColors;
 import PamView.PamView;
+import PamView.dialog.PamLabel;
 import PamView.hidingpanel.HidingDialogPanel;
 import PamView.panel.CornerLayout;
 import PamView.panel.CornerLayoutContraint;
@@ -117,11 +103,11 @@ import PamView.paneloverlay.overlaymark.ExtMouseAdapter;
 import PamView.paneloverlay.overlaymark.MarkRelationships;
 import PamView.paneloverlay.overlaymark.MarkRelationshipsData;
 import PamView.paneloverlay.overlaymark.OverlayMark;
+import PamView.paneloverlay.overlaymark.OverlayMark.OverlayMarkType;
 import PamView.paneloverlay.overlaymark.OverlayMarkObserver;
 import PamView.paneloverlay.overlaymark.OverlayMarkObservers;
 import PamView.paneloverlay.overlaymark.OverlayMarkProviders;
 import PamView.paneloverlay.overlaymark.OverlayMarker;
-import PamView.paneloverlay.overlaymark.OverlayMark.OverlayMarkType;
 import PamguardMVC.LoadObserver;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
@@ -131,11 +117,25 @@ import PamguardMVC.PamProcess;
 import PamguardMVC.PamRawDataBlock;
 import PamguardMVC.SimpleDataObserver;
 import PamguardMVC.dataOffline.OfflineDataLoading;
+import PamguardMVC.dataSelector.DataSelectParams;
 import PamguardMVC.dataSelector.DataSelector;
 import dataPlotsFX.data.DataTypeInfo;
 import fftManager.FFTDataBlock;
 import fftManager.FFTDataUnit;
 import ltsa.LtsaDataBlock;
+import pamScrollSystem.AbstractPamScroller;
+import pamScrollSystem.AbstractPamScrollerAWT;
+import pamScrollSystem.PamScrollObserver;
+import pamScrollSystem.PamScroller;
+import pamScrollSystem.PamScrollerData;
+import pamScrollSystem.RangeSpinner;
+import pamScrollSystem.RangeSpinnerListener;
+import pamguard.GlobalArguments;
+import soundPlayback.PlaybackControl;
+import soundPlayback.PlaybackProgressMonitor;
+import userDisplay.UserDisplayControl;
+import userDisplay.UserDisplayFrame;
+import userDisplay.UserFramePlots;
 
 public class SpectrogramDisplay extends UserFramePlots implements PamObserver, LoadObserver,
 InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSettings {
@@ -274,7 +274,8 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		// this should result in settings being loaded if they exist. 
 		PamSettingManager.getInstance().registerSettings(this); // always need to register, even if we're using old parameters
 		//		}
-		if (spectrogramParameters == null) {
+		boolean isBatch = GlobalArguments.getParam("-batch") != null;
+		if (spectrogramParameters == null && !isBatch) {
 			this.spectrogramParameters = new SpectrogramParameters();
 			PamView view = userDisplayControl.getPamView();
 			if (view != null) {
@@ -284,6 +285,14 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 					this.spectrogramParameters = newParams;
 				}
 			}
+		}
+		if (spectrogramParameters == null) {
+			/*
+			 *  this can happen in batch mode if a display was added.
+			 *  Hopefully not a problem, but may need to set some parameters to 
+			 *  set display up correctly.  
+			 */
+			spectrogramParameters = new SpectrogramParameters();
 		}
 
 		spectrogramDisplay = this;
@@ -438,23 +447,32 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		if (spectrogramParameters == null || sourceFFTDataBlock == null) {
 			return;
 		}
-		freqBinRange[0] = (int) Math
-				.floor(spectrogramParameters.frequencyLimits[0]
+		double[] freqLimits = spectrogramParameters.frequencyLimits;
+		double freqStart = 0;
+		int nBins = sourceFFTDataBlock.getDataWidth(0);
+		if (sourceFFTDataBlock != null) {
+			freqStart = sourceFFTDataBlock.getMinDataValue();
+			freqLimits[0] = Math.max((double) freqLimits[0], sourceFFTDataBlock.getMinDataValue());
+			freqLimits[1] = Math.min((double) freqLimits[1], sourceFFTDataBlock.getMaxDataValue());
+		}
+		freqBinRange[0] = (int) Math.floor((spectrogramParameters.frequencyLimits[0]-freqStart)
 						* sourceFFTDataBlock.getFftLength() / sampleRate);
-		freqBinRange[1] = (int) Math
-				.ceil(spectrogramParameters.frequencyLimits[1]
-						* sourceFFTDataBlock.getFftLength() / sampleRate);
+		freqBinRange[1] = (int) Math.ceil((spectrogramParameters.frequencyLimits[1]-freqStart)
+				* sourceFFTDataBlock.getFftLength() / sampleRate);
+		if (sourceFFTDataBlock != null) {
+			freqBinRange[1] = Math.min(freqBinRange[1], sourceFFTDataBlock.getDataWidth(0));
+		}
 		for (int i = 0; i < 2; i++) {
 			freqBinRange[i] = Math.min(Math.max(freqBinRange[i], 0),
 					sourceFFTDataBlock.getFftLength() / 2 - 1);
-			freqBinDisplayRange[1-i] = sourceFFTDataBlock.getFftLength()/2-freqBinRange[i];
+			freqBinDisplayRange[1-i] = nBins-freqBinRange[i];
 			//			freqBinDisplayRange[i] = freqBinRange[i];
 		}
 	}
 
 
 	public void setParams(SpectrogramParameters newParameters, boolean fullLayout) {
-		if (PamController.getInstance().isInitializationComplete() == false) {
+		if (!PamController.getInstance().isInitializationComplete()) {
 			return;
 		}
 
@@ -776,7 +794,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		if (sourceFFTDataBlock == null) {
 			return 1;
 		}
-		return sourceFFTDataBlock.getFftLength()/2;
+		return sourceFFTDataBlock.getDataWidth(0);
 	}
 
 	/**
@@ -800,7 +818,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		createColours();
 
 		timeAxis = new PamAxis(10, 0, imageWidth, 0, 0,
-				spectrogramParameters.displayLength, true, "seconds", "%3.1f");
+				spectrogramParameters.displayLength, true, "Time (s)", "%3.1f");
 		spectrogramAxis.setNorthAxis(timeAxis);
 
 		if (rangeSpinner != null) {
@@ -808,13 +826,15 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		}
 
 		double fScale = 1;
+		String westLabel = "Frequency (Hz)";
 		if (spectrogramParameters.frequencyLimits[1] > 2000) {
 			fScale = 1000;
+			westLabel = "Frequency (kHz)";
 		}
 
 		frequencyAxis = new PamAxis(0, 200, 0, 10,
 				spectrogramParameters.frequencyLimits[0] / fScale,
-				spectrogramParameters.frequencyLimits[1] / fScale, true, "",
+				spectrogramParameters.frequencyLimits[1] / fScale, true, westLabel,
 				null);
 		frequencyAxis.setFractionalScale(true);
 		frequencyAxis.setCrampLabels(true);
@@ -830,6 +850,9 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 	}
 
 	private void setAxisLimits() {
+		if (sourceFFTDataBlock == null) {
+			return;
+		}
 		if (frequencyAxis != null && spectrogramParameters != null) {
 			freqAxisScale = 1.;
 			if (spectrogramParameters.frequencyLimits[1] > 2000) {
@@ -853,7 +876,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 					if (maxV < 1) {
 						freqAxisScale = 0.001;
 					}
-					frequencyAxis.setRange(minV, maxV/freqAxisScale);
+					frequencyAxis.setRange(minV/freqAxisScale, maxV/freqAxisScale);
 				}
 			}
 			else {
@@ -861,6 +884,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				frequencyAxis.setRange(spectrogramParameters.frequencyLimits[0]/freqAxisScale,
 						spectrogramParameters.frequencyLimits[1]/freqAxisScale);
 			}
+			frequencyAxis.setLogScale(sourceFFTDataBlock.isLogScale());
 		}
 	}
 
@@ -887,6 +911,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 	}
 
 
+	@Override
 	public void setSampleRate(float sampleRate, boolean notify) {
 		//		System.out.println("samplerate " + sampleRate);
 		this.sampleRate = sampleRate;
@@ -957,6 +982,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 	 * 
 	 * @see SpectrogramMarkObserver
 	 */
+	@Override
 	public long getRequiredDataHistory(PamObservable o, Object arg) {
 
 		// WTF was this line of code doing here ? This is what's been messing up 
@@ -1002,6 +1028,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		return Math.min(history, maxSecs*1000);
 	}
 
+	@Override
 	public String getObserverName() {
 		return "Spectrogam Display";
 	}
@@ -1072,7 +1099,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				if (!viewerMode) {
 					spectrogramProjector.setOffset(newData.getTimeMilliseconds(), spectrogramPanels[panelNumber].imagePos);
 				}
-				if (spectrogramPanels[panelNumber].getSize().equals(panelSize) == false) {
+				if (!spectrogramPanels[panelNumber].getSize().equals(panelSize)) {
 					panelSize = spectrogramPanels[panelNumber].getSize();
 					//				createOverlay(panelSize.width, panelSize.height);
 				}
@@ -1106,16 +1133,19 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 
 
 	private class SettingsAction implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			spectrogramDisplay.setSettings();
 		}
 	}
 	private class MenuCancelPlayback implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			PlaybackControl.getViewerPlayback().stopViewerPlayback();
 		}
 	}
 	private class MenuPlayAll implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			long startMillis = viewerScroller.getValueMillis();
 			long endMillis = startMillis + viewerScroller.getVisibleAmount();
@@ -1130,6 +1160,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			this.channel = channel;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			long startMillis = viewerScroller.getValueMillis();
 			long endMillis = startMillis + viewerScroller.getVisibleAmount();
@@ -1147,6 +1178,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			this.startMillis = startMillis;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			long dispStartMillis = viewerScroller.getValueMillis();
 			long endMillis = dispStartMillis + viewerScroller.getVisibleAmount();
@@ -1202,25 +1234,41 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 	 * and also sets up the range spinner
 	 */
 	private void setupViewScroller() {
-		if (viewerScroller == null) {
+		// store as local variable so it doesn't get nulled in a different thread. 
+		PamScroller vs = viewerScroller;
+		if (vs == null) {
 			return;
 		}
 		long visibleMillis = (long)(spectrogramParameters.displayLength * 1000);
-		viewerScroller.setVisibleMillis(visibleMillis);
-		viewerScroller.setBlockIncrement(visibleMillis * 9 / 10);
-		viewerScroller.setUnitIncrement(visibleMillis * 1 / 10);
+		vs.setVisibleMillis(visibleMillis);
+		vs.setBlockIncrement(visibleMillis * 9 / 10);
+		vs.setUnitIncrement(visibleMillis * 1 / 10);
 
 		if (sourceFFTDataBlock != null) {
 			// now depending on the hop set the minimum step size for the viewerscroller
-			if (viewerScroller != null) {
-				PamScrollerData scrollerData = viewerScroller.getScrollerData();
-				// default step size is only 1000 millis. for LTSA data we want to make
-				// this a LOT longer. 
-				double hopSeconds = sourceFFTDataBlock.getFftHop() / sourceFFTDataBlock.getSampleRate();
-				int minStep = (int) Math.max(1, hopSeconds * 1000);
-				scrollerData.setStepSizeMillis(minStep);
+			PamScrollerData scrollerData = vs.getScrollerData();
+			// default step size is only 1000 millis. for LTSA data we want to make
+			// this a LOT longer. 
+			double hopSeconds = sourceFFTDataBlock.getFftHop() / sourceFFTDataBlock.getSampleRate();
+			int minStep = (int) Math.max(1, hopSeconds * 1000);
+			scrollerData.setStepSizeMillis(minStep);
+		}
+		
+		/**
+		 * And add observing data required by plugins to the scroller. 
+		 */
+		synchronized(displayPanels) {
+			int nD = displayPanels.size();
+			for (int i = 0; i < nD; i++) {
+				DisplayPanel dp = displayPanels.get(i);
+				PamDataBlock dataBlock = dp.getViewerDataBlock();
+				if (dataBlock == null) {
+					continue;
+				}
+				vs.addDataBlock(dataBlock);
 			}
 		}
+
 
 		requestFFTData();
 
@@ -1353,6 +1401,17 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		}
 	}
 
+	/**
+	 * Is the axis set to log frequency scale ? Be null aware !
+	 * @return
+	 */
+	private boolean isLogFreqScale() {
+		PamAxis fa = frequencyAxis;
+		if (fa == null) {
+			return false;
+		}
+		return fa.isLogScale();
+	}
 
 	void newScrollPosition() {
 		if (spectrogramPanels == null) {
@@ -1384,7 +1443,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			return;
 		}
 		long s = viewerScroller.getValueMillis();
-		long e = s + (long) (spectrogramParameters.displayLength * 1100.) + 2000;;
+		long e = s + (long) (spectrogramParameters.displayLength * 1100.) + 2000;
 		requestFFTData(s, e);
 	}
 
@@ -1488,7 +1547,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		@Override
 		public void paintComponent(Graphics g) {
 			//			super.paint(g);
-			if (isShowing() == false) return;
+			if (!isShowing()) return;
 			Rectangle b = g.getClipBounds();
 			g.setColor(getBackground());
 			g.fillRect(b.x, b.y, b.width, b.height);
@@ -1543,7 +1602,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 					 * Try to work out the relative positions of this panel 
 					 * and each of the spectrogram panels. 
 					 */
-					if (spectrogramPanels[i].isShowing() == false) return;
+					if (!spectrogramPanels[i].isShowing()) return;
 					Point panelScreenLoc = null;
 					try {
 						panelScreenLoc = spectrogramPanels[i].getLocationOnScreen();
@@ -1600,7 +1659,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 					if ((axis = dp.getWestAxis()) != null) {
 						// need to work out where the hell the 
 						// window is relative to this one...
-						if (dp.getInnerPanel().isShowing() == false) {
+						if (!dp.getInnerPanel().isShowing()) {
 							return;
 						}
 						dpLoc = dp.getInnerPanel().getLocationOnScreen();
@@ -1642,6 +1701,9 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				return;
 			}
 			long t1 = dataUnit.getTimeMilliseconds()-viewerScroller.getValueMillis();
+			if (timeAxis == null) {
+				return;
+			}
 			int x1 = (int) Math.floor(timeAxis.getPosition(t1/1000));
 			int x2 = x1;
 			if (dataUnit.getDurationInMilliseconds() != null) {
@@ -1676,9 +1738,11 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			// setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 10));
 			setLayout(new BorderLayout());
 			add(new AmplitudeBar(), BorderLayout.CENTER);
+
+			String label = String.format("PSD (%s)", PamController.getInstance().getGlobalMediumManager().getdBPSDString());
 			amplitudeAxis = new PamAxis(0, 200, 0, 10,
 					spectrogramParameters.amplitudeLimits[0],
-					spectrogramParameters.amplitudeLimits[1], false, "", "%3.0f");
+					spectrogramParameters.amplitudeLimits[1], false, label, "%3.0f");
 			setEastAxis(amplitudeAxis);
 		}
 
@@ -1703,9 +1767,20 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 
 			int botInset = axisInsets.bottom;
 			if (spectrogramOuterPanel != null) {
-				botInset += (spectrogramPlotPanel.getHeight() - spectrogramOuterPanel.getHeight());
+				int h = spectrogramOuterPanel.getHeight();
+				if (h > 0) {
+					// gets a bit confused when plots are recreated at startup since h is 0. 
+					botInset += (spectrogramPlotPanel.getHeight() - h);
+				}
+				else {
+					botInset += 2;
+				}
+//				if (spectrogramOuterPanel.getHeight() == 0) {
+//					System.out.println("no outer panel");
+//				}
+//				System.out.printf("Set spec botInset to %d as %d - %d\n", botInset, spectrogramPlotPanel.getHeight(), spectrogramOuterPanel.getHeight());
 			}
-
+//			System.out.printf("Setting spec axis positiong at %d / %d\n", axisInsets.top, botInset);
 			SetBorderMins(axisInsets.top, 0, botInset, 10);
 			//			SetBorderMins(12, 0, 19, 100);
 			// setMinimumSize(new Dimension(300, 20));
@@ -2146,7 +2221,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 						obs = true;
 					}
 				}
-				if (obs == false) {
+				if (!obs) {
 					dataBlock.deleteObserver(this);
 				}
 			}
@@ -2244,7 +2319,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			}
 			lastDataSample = dataUnit.getStartSample();
 			
-			if (spectrogramParameters.timeScaleFixed == false) {
+			if (!spectrogramParameters.timeScaleFixed) {
 				int newWidth = getSpectrogramImageWidth();
 				if (newWidth != specImage.getWidth()) {
 					createAllImages();
@@ -2342,7 +2417,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 					return;
 				}
 			}
-			if (viewerMode ==  false && spectrogramParameters.wrapDisplay) {
+			if (!viewerMode && spectrogramParameters.wrapDisplay) {
 				for (int i = 0; i < len; i++) {
 					writableRaster.setPixel(newPos, i, overlayColour);
 				}
@@ -2535,7 +2610,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		public void repaint(){
 			super.repaint();
 			if (spectrogramPlotPanel!=null) spectrogramPlotPanel.repaintSidePanel();
-		};
+		}
 
 		@Override
 		public void repaint(long time){
@@ -2544,7 +2619,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				spectrogramPlotPanel.repaint(time);
 				spectrogramPlotPanel.repaintSidePanel();
 			}
-		};
+		}
 		
 		/**
 		 * @return the viewedDataBlocks
@@ -2597,7 +2672,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				panelSize = newSize;
 			}
 
-			if (spectrogramParameters.timeScaleFixed == false) {
+			if (!spectrogramParameters.timeScaleFixed) {
 				if (getSpectrogramImageWidth() != specImage.getWidth()) {
 					createAllImages();
 				}
@@ -2620,7 +2695,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			 * If we have a frozenImage object, it means that the user is drawing a box in the spectrogram.  So don't try to update everything,
 			 * just use the image and draw the box
 			 */
-			if (frozenImage != null && viewerMode == false) {
+			if (frozenImage != null && !viewerMode) {
 				//				System.out.println("Drawing frozen image...");
 				//				imageToDraw = frozenImage;
 				g2d.drawImage(frozenImage, 0, 0, getWidth(), getHeight(), 0, 0, frozenImage.getWidth(), frozenImage.getHeight(), this);
@@ -2640,6 +2715,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 					directImagePos = getWidth();
 				}
 				//				System.out.println(" Panel " + String.valueOf(this.panelId) + " directImagePos = " + String.valueOf(directImagePos));
+				directDrawProjector.setLogScale(isLogFreqScale());
 				directDrawProjector.setScales(getWidth(), getHeight(), 
 						displayStartTime,
 						spectrogramParameters.displayLength * 1000 / spectrogramPixelOverlap, 
@@ -2659,6 +2735,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				fillSpectrogramImage(g2d, this);
 
 				double millisPerBin = sampleRate / 1000. / sourceFFTDataBlock.getFftHop();
+				directDrawProjector.setLogScale(isLogFreqScale());
 				spectrogramProjector.setScales(millisPerBin,
 						2. / sourceFFTDataBlock.getFftLength(), specImage.getWidth(),
 						specImage.getHeight());
@@ -2702,6 +2779,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 
 				drawMarkLabel(g);
 
+				directDrawProjector.setLogScale(isLogFreqScale());
 				directDrawProjector.setScales(getWidth(), getHeight(), 
 						displayStartTime,
 						spectrogramParameters.displayLength * 1000 / spectrogramPixelOverlap, 
@@ -2849,7 +2927,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				}
 			}
 
-			if (shouldDrawMarkLabel==false)
+			if (!shouldDrawMarkLabel)
 				return;
 
 			Rectangle2D bounds = getBounds();
@@ -2914,6 +2992,10 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			//							PamCalendar.formatTime(currentTimeMilliseconds)));
 			String name = spectrogramDisplay.getDataSelectorName(panelId);
 			DataSelector dataSelector = usedDataBlock.getDataSelector(name, false);
+			
+			if (dataSelector != null && dataSelector.getParams().getCombinationFlag() == DataSelectParams.DATA_SELECT_DISABLE) {
+				dataSelector = null;
+			}
 			directDrawProjector.setDataSelector(dataSelector);
 			if (usedDataBlock.getPamSymbolManager() != null) {
 				directDrawProjector.setPamSymbolChooser(usedDataBlock.getPamSymbolManager().getSymbolChooser(name, directDrawProjector));
@@ -2921,16 +3003,22 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			else {
 				directDrawProjector.setPamSymbolChooser(null);
 			}
+			boolean cont = usedDataBlock.getOverlayDraw().preDrawAnything(g, usedDataBlock, directDrawProjector);
+			if (cont == false) {
+				return;
+			}
 			try {
 				//				System.out.println("Unlocked" + usedDataBlock.getDataName());
 				iterator = usedDataBlock.getListIterator(PamDataBlock.ITERATOR_END);
+//				int iUn = 0;
 				while(iterator.hasPrevious()) {
 					dataUnit = iterator.previous();
-
+//					System.out.printf("Draw data %d/%d at %s\n", ++iUn, usedDataBlock.getUnitsCount(),
+//							PamCalendar.formatTime(dataUnit.getTimeMilliseconds()));			
 					// decide whether or not to display the data unit based on the current time, unless we have frozen the
 					// image.  In that case, base the decision on the frozen time
 					long timeToUse = currentTimeMilliseconds;
-					if (frozenImage != null && viewerMode == false) {
+					if (frozenImage != null && !viewerMode) {
 						timeToUse = frozenTimeMilliseconds;	
 					}
 
@@ -2941,7 +3029,9 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 					if (dataUnit.getTimeMilliseconds() > timeToUse) {
 						continue;
 					}
-					if ((1<<spectrogramParameters.channelList[panelId] & dataUnit.getSequenceBitmap()) == 0) {
+					int wantedMap = 1<<spectrogramParameters.channelList[panelId];
+					int dataChanMap = dataUnit.getSequenceBitmap();
+					if (dataChanMap != 0 && (wantedMap & dataChanMap) == 0) {
 						continue;
 					}
 					if (dataSelector != null && dataSelector.scoreData(dataUnit) <= 0) {
@@ -2951,7 +3041,9 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				}
 			}
 			catch (Exception e) {
-				// avoid synck lock 
+				// avoid synck lock Occasional exceptions are a concurrentmodifiedexception I think. 
+//				System.out.println("Exception in wsl draw: " + e.getMessage());
+//				e.printStackTrace();
 			}
 
 		}
@@ -3025,6 +3117,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			return detectorMenu;
 		}
 
+		@Override
 		public long getRequiredDataHistory(PamObservable o, Object arg) {
 			return SpectrogramDisplay.this.getRequiredDataHistory(o, arg);
 			//			long history = (long) getXDuration();
@@ -3039,15 +3132,18 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			//			return history + 1000;
 		}
 
+		@Override
 		public String getObserverName() {
 			return "Spectrogram display panel";
 		}
 
+		@Override
 		public void noteNewSettings() {
 			//System.out.println("New spectrogram panel settings");
 			//			setParams(spectrogramParameters);
 		}
 
+		@Override
 		public void setSampleRate(float sampleRate, boolean notify) {
 			//			System.out.println("New spectrogram panel sampleRate");
 		}
@@ -3057,6 +3153,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			spectrogramDisplay.masterClockUpdate(milliSeconds, sampleNumber);
 		}
 
+		@Override
 		public void addData(PamObservable obs, PamDataUnit newData) {
 
 			//for (int i = 0; i < spectrogramPanel.length; i++) {
@@ -3102,8 +3199,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 				return null;
 			}
 			if (viewerMode) {
-				String moreStr = 
-						directDrawProjector.getHoverText(mouseEvent.getPoint());
+				String moreStr = directDrawProjector.getHoverText(mouseEvent.getPoint(), panelId);
 				if (moreStr != null) {
 					str += "<p>" + moreStr;
 				}
@@ -3192,6 +3288,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		//			}
 		//		}
 
+		@Override
 		public void removeObservable(PamObservable o) {
 			// TODO Auto-generated method stub
 
@@ -3432,7 +3529,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			//						System.out.println("Pressed button  = " + e.getButton());
 			currentMousePoint = mouseDownPoint = e.getPoint();
 			freezeImages(spectrogramPanel);
-			if (fireMouseDownEvents(spectrogramPanel, e, mouseDownPoint) == false) {
+			if (!fireMouseDownEvents(spectrogramPanel, e, mouseDownPoint)) {
 				super.mousePressed(e);
 			} 
 		}
@@ -3444,9 +3541,9 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			boolean events = fireMouseUpEvents(spectrogramPanel, e, mouseDownPoint, e.getPoint());
 			unFreezeImages();
 			//			spectrogramPanel.frozenImage = null;
-			if (events == false) {
+			if (!events) {
 				super.mouseReleased(e);
-			};	
+			}	
 			currentMousePoint = mouseDownPoint = null;
 			mousePressedButton = MouseEvent.NOBUTTON;
 			//			if (viewerMode) {
@@ -3467,9 +3564,9 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 			for (int i = 0; i < spectrogramPanels.length; i++) {
 				spectrogramPanels[i].repaint();
 			}
-			if (fireMouseDragEvents(spectrogramPanel, e, mouseDownPoint, e.getPoint()) == false) {
+			if (!fireMouseDragEvents(spectrogramPanel, e, mouseDownPoint, e.getPoint())) {
 				super.mouseDragged(e);
-			};		
+			}		
 
 		}
 
@@ -3481,16 +3578,19 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 
 	class SplitPaneListener implements AncestorListener {
 
+		@Override
 		public void ancestorAdded(AncestorEvent event) {
 			//			spectrogramAxis.repaint();		
 			repaintAll();
 		}
 
+		@Override
 		public void ancestorMoved(AncestorEvent event) {
 			//			spectrogramAxis.repaint();		
 			repaintAll();		
 		}
 
+		@Override
 		public void ancestorRemoved(AncestorEvent event) {
 			//			spectrogramAxis.repaint();			
 			repaintAll();	
@@ -3498,6 +3598,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 
 	}
 
+	@Override
 	public SpectrogramParameters getSpectrogramParameters() {
 		if (getFrame() != null) {
 			spectrogramParameters.boundingRectangle = getFrame().getBounds();
@@ -3619,12 +3720,14 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		}
 	}
 
+	@Override
 	public void noteNewSettings() {
 		setParams(spectrogramParameters, true);
 
 		subscribeDataBlocks();
 	}
 
+	@Override
 	public void removeObservable(PamObservable o) {
 		// TODO Auto-generated method stub
 
@@ -3726,6 +3829,7 @@ InternalFrameListener, DisplayPanelContainer, SpectrogramParametersUser, PamSett
 		return spectrogramParameters.displayLength * 1000.;
 	}
 
+	@Override
 	public void panelNotify(int noteType) {
 		switch (noteType) {
 		case DRAW_BORDER:

@@ -3,13 +3,7 @@ package whistleClassifier;
 import java.io.File;
 import java.util.LinkedList;
 import java.util.ListIterator;
-import classifier.Classifier;
 
-import whistleClassifier.training.FileTrainingStore;
-import whistleClassifier.training.TrainingDataSet;
-import whistleClassifier.training.TrainingDataStore;
-import whistlesAndMoans.AbstractWhistleDataBlock;
-import whistlesAndMoans.AbstractWhistleDataUnit;
 import Acquisition.AcquisitionProcess;
 import Acquisition.FileInputSystem;
 import PamController.PamController;
@@ -17,6 +11,13 @@ import PamUtils.FileParts;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
 import PamguardMVC.PamProcess;
+import classifier.Classifier;
+import whistleClassifier.logging.WhistleClassifierLogging;
+import whistleClassifier.training.FileTrainingStore;
+import whistleClassifier.training.TrainingDataSet;
+import whistleClassifier.training.TrainingDataStore;
+import whistlesAndMoans.AbstractWhistleDataBlock;
+import whistlesAndMoans.AbstractWhistleDataUnit;
 
 /**
  * Whistle Classifier process <p>
@@ -45,7 +46,7 @@ public class WhistleClassifierProcess extends PamProcess {
 
 	private HistoFragmentStore fragmentStore;
 
-	protected WhistleClasificationDataBlock whistleClasificationDataBlock;
+	protected WhistleClassificationDataBlock whistleClasificationDataBlock;
 
 	private WhistleClassifierLogging whistleClassifierLogging;
 
@@ -57,7 +58,7 @@ public class WhistleClassifierProcess extends PamProcess {
 	 * Need to keep a list of recent whistle times so that the system can be cleared
 	 * if there are no longer any whistles. 
 	 */
-	private LinkedList<Long> whistleTimes = new LinkedList<Long>();;
+	private LinkedList<Long> whistleTimes = new LinkedList<Long>();
 
 	public WhistleClassifierProcess(WhistleClassifierControl whistleClassifierControl) {
 
@@ -65,9 +66,9 @@ public class WhistleClassifierProcess extends PamProcess {
 
 		this.whistleClassifierControl  = whistleClassifierControl;
 
-		whistleClasificationDataBlock = new WhistleClasificationDataBlock(whistleClassifierControl, this, 3);
+		whistleClasificationDataBlock = new WhistleClassificationDataBlock(whistleClassifierControl, this, 3);
 
-		addOutputDataBlock(whistleClasificationDataBlock);
+		addOutputDataBlock(getWhistleClasificationDataBlock());
 
 		fragmentStore = new HistoFragmentStore(this.getSampleRate());
 
@@ -81,8 +82,8 @@ public class WhistleClassifierProcess extends PamProcess {
 	 * correct table can be created.
 	 */
 	public void setupLogging() {
-		whistleClassifierLogging = new WhistleClassifierLogging(this, whistleClasificationDataBlock);
-		whistleClasificationDataBlock.SetLogging(whistleClassifierLogging);
+		whistleClassifierLogging = new WhistleClassifierLogging(this, getWhistleClasificationDataBlock());
+		getWhistleClasificationDataBlock().SetLogging(whistleClassifierLogging);
 
 	}
 
@@ -108,7 +109,7 @@ public class WhistleClassifierProcess extends PamProcess {
 	 * @return true if it's in the process of collecting training data. 
 	 */
 	public boolean isTraining() {
-		return (whistleClassifierControl.getWhistleClassificationParameters().operationMode == 
+		return (getWhistleClassifierControl().getWhistleClassificationParameters().operationMode == 
 			WhistleClassificationParameters.COLLECT_TRAINING_DATA);
 	}
 
@@ -142,7 +143,7 @@ public class WhistleClassifierProcess extends PamProcess {
 		try {
 			AcquisitionProcess sourceProcess = (AcquisitionProcess) getSourceProcess();
 			Acquisition.DaqSystem daqSystem = sourceProcess.getAcquisitionControl().findDaqSystem(null);
-			if (daqSystem != null & daqSystem.isRealTime() == false) {
+			if (daqSystem != null & !daqSystem.isRealTime()) {
 				// assume it's a file name.
 				Acquisition.FileInputSystem fileSystem = (FileInputSystem) daqSystem;
 				soundFile = fileSystem.getCurrentFile();
@@ -167,16 +168,16 @@ public class WhistleClassifierProcess extends PamProcess {
 		//		}
 		String storeName = 
 			String.format("%s\\%s%s",
-					whistleClassifierControl.getWhistleClassificationParameters().trainingDataFolder, nameBit,
+					getWhistleClassifierControl().getWhistleClassificationParameters().trainingDataFolder, nameBit,
 					WhistleClassifierControl.trainingFileEnd);
 		//		System.out.println("Open training store " + storeName);
 		trainingDataStore = new FileTrainingStore();
 		trainingDataStore.openStore(storeName);
-		String trainingSpecies = whistleClassifierControl.getWhistleClassificationParameters().trainingSpecies;
-		if (whistleClassifierControl.getWhistleClassificationParameters().wavFolderNameAsSpecies &&
+		String trainingSpecies = getWhistleClassifierControl().getWhistleClassificationParameters().trainingSpecies;
+		if (getWhistleClassifierControl().getWhistleClassificationParameters().wavFolderNameAsSpecies &&
 				wavFolder != null) {
 			trainingSpecies = wavFolder;
-			whistleClassifierControl.getWhistleClassificationParameters().trainingSpecies = trainingSpecies;
+			getWhistleClassifierControl().getWhistleClassificationParameters().trainingSpecies = trainingSpecies;
 		}
 
 		trainingDataSet = new TrainingDataSet(whistleSourceData.getUnitClass(),
@@ -202,15 +203,15 @@ public class WhistleClassifierProcess extends PamProcess {
 	{
 
 		whistleSourceData = (AbstractWhistleDataBlock) PamController.getInstance().
-		getDataBlock(AbstractWhistleDataUnit.class, whistleClassifierControl.getWhistleClassificationParameters().dataSource);
+		getDataBlock(AbstractWhistleDataUnit.class, getWhistleClassifierControl().getWhistleClassificationParameters().dataSource);
 		if (whistleSourceData == null) {
 			return;
 		}
 
 		setParentDataBlock(whistleSourceData);
 
-		whistleClasificationDataBlock.setChannelMap(whistleSourceData.getChannelMap());
-		whistleClasificationDataBlock.setSequenceMap(whistleSourceData.getSequenceMapObject());
+		getWhistleClasificationDataBlock().setChannelMap(whistleSourceData.getChannelMap());
+		getWhistleClasificationDataBlock().setSequenceMap(whistleSourceData.getSequenceMapObject());
 
 
 	}
@@ -239,7 +240,7 @@ public class WhistleClassifierProcess extends PamProcess {
 
 	private void checkNeedForClear(long timeMilliseconds) {
 		long whileBack = timeMilliseconds - 
-		whistleClassifierControl.getWhistleClassificationParameters().lowWhistleClearTime * 1000;
+		getWhistleClassifierControl().getWhistleClassificationParameters().lowWhistleClearTime * 1000;
 		if (lastStoreClearTime == 0) {
 			lastStoreClearTime = timeMilliseconds; // happens on first call 1
 		}
@@ -260,21 +261,25 @@ public class WhistleClassifierProcess extends PamProcess {
 				}
 			}
 			int n = whistleTimes.size();
-			if (n < whistleClassifierControl.getWhistleClassificationParameters().lowWhistleNumber) {
-				if (whistleClassifierControl.getWhistleClassificationParameters().alwaysClassify) {
+			if (n < getWhistleClassifierControl().getWhistleClassificationParameters().lowWhistleNumber) {
+				if (getWhistleClassifierControl().getWhistleClassificationParameters().alwaysClassify) {
 					runClassification(timeMilliseconds);
 				}
 				clearFragmentStore(timeMilliseconds);
-				System.out.println("Clear Whistle Classifier store due to low whistle rate");
+//				System.out.println("Clear Whistle Classifier store due to low whistle rate");
 			}
 		}
 	}
 
 
 	private void newWhistleData(AbstractWhistleDataUnit shapeDataUnit) {
+		FragmentClassifierParams fragClassParams = getWhistleClassifierControl().getWhistleClassificationParameters().
+				fragmentClassifierParams;
+		if (fragClassParams == null) {
+			return;
+		}
 		if (!isTraining() && shapeDataUnit.getSliceCount() <
-				whistleClassifierControl.getWhistleClassificationParameters().
-				fragmentClassifierParams.minimumContourLength) {
+				fragClassParams.minimumContourLength) {
 			return;
 		}
 		int nFrags = fragmentWhistle(shapeDataUnit);
@@ -299,7 +304,7 @@ public class WhistleClassifierProcess extends PamProcess {
 		}
 		
 		
-		WhistleFragment[] fragments = whistleClassifierControl.getWhistleFragmenter().
+		WhistleFragment[] fragments = getWhistleClassifierControl().getWhistleFragmenter().
 		getFragments(abstractWhistle);
 
 		if (fragments == null) {
@@ -325,7 +330,7 @@ public class WhistleClassifierProcess extends PamProcess {
 		 * in which case, don't use it !
 		 */
 		double[] f = fragment.getFreqsHz();
-		double[] fLims = whistleClassifierControl.getWhistleClassificationParameters().fragmentClassifierParams.getFrequencyRange();
+		double[] fLims = getWhistleClassifierControl().getWhistleClassificationParameters().fragmentClassifierParams.getFrequencyRange();
 		for (int i = 0; i < f.length; i++) {
 			if (f[i] < fLims[0]) {
 				return false;
@@ -335,13 +340,13 @@ public class WhistleClassifierProcess extends PamProcess {
 			}
 		}
 
-		fragmentStore.addFragemnt(fragment);
+		fragmentStore.addFragemnt(fragment, time);
 
 		if (isTraining()) {
 			return false;
 		}
 
-		FragmentClassifierParams fp = whistleClassifierControl.getWhistleClassificationParameters().fragmentClassifierParams;
+		FragmentClassifierParams fp = getWhistleClassifierControl().getWhistleClassificationParameters().fragmentClassifierParams;
 		if (fp == null) {
 			return false;
 		}
@@ -367,6 +372,7 @@ public class WhistleClassifierProcess extends PamProcess {
 	}
 
 	/**
+	 * Called once enough fragments have accumulated. 
 	 * Run the classification model. 
 	 * @return true if model ran without errors. 
 	 */
@@ -376,9 +382,9 @@ public class WhistleClassifierProcess extends PamProcess {
 		if (params == null) {
 			return false;
 		}
-		Classifier classifier = whistleClassifierControl.getFragmentClassifier();
+		Classifier classifier = getWhistleClassifierControl().getFragmentClassifier();
 		int species = classifier.runClassification(params);
-		String[] speciesList = whistleClassifierControl.getWhistleClassificationParameters().fragmentClassifierParams.getSpeciesList();
+		String[] speciesList = getWhistleClassifierControl().getWhistleClassificationParameters().fragmentClassifierParams.getSpeciesList();
 		String bestSpecies;
 		if (species < 0 || species >= speciesList.length) {
 			bestSpecies = "??";
@@ -388,23 +394,49 @@ public class WhistleClassifierProcess extends PamProcess {
 		}
 		double[] speciesProbabilities = classifier.getProbabilities1();
 
-		WhistleClassificationDataUnit newData = new WhistleClassificationDataUnit(timeMillis, whistleClasificationDataBlock.getChannelMap(),
-				this.absMillisecondsToSamples(timeMillis), 0);
+		/** 
+		 * Up to March 2025, this was outputting the end time of the classification as the time. It would 
+		 * be better if we recorded the start time of the classification (i.e. first fragment) and correctly stored
+		 * the duration / end time.  
+		 */
+		long startMillis = fragmentStore.getStartTimeMillis();
+		long endMillis = fragmentStore.getEndTimeMillis();
+		WhistleClassificationDataUnit newData = new WhistleClassificationDataUnit(startMillis, getWhistleClasificationDataBlock().getChannelMap(),
+				this.absMillisecondsToSamples(startMillis), 0);
+		newData.setDurationInMilliseconds(endMillis-startMillis);
+		// set the frequency range
+		double[] fR = {fragmentStore.getLowFreq(), fragmentStore.getHighFreq()};
+		newData.setFrequency(fR);
+		
 		//		newData.setSpeciesLikelyhoods(fudge);
-		newData.setSequenceBitmap(whistleClasificationDataBlock.getSequenceMapObject());
+		newData.setSequenceBitmap(getWhistleClasificationDataBlock().getSequenceMapObject());
 		newData.setSpeciesProbabilities(speciesProbabilities);
 		newData.setSpecies(bestSpecies);
 		newData.setNFragments((int)fragmentStore.getFragmentCount());
-		whistleClasificationDataBlock.addPamData(newData);
+		getWhistleClasificationDataBlock().addPamData(newData);
 
 
-		whistleClassifierControl.updateClassification(true);
+		getWhistleClassifierControl().updateClassification(true);
 
 		return true;
 	}
 
 	public FragmentStore getFragmentStore() {
 		return fragmentStore;
+	}
+
+	/**
+	 * @return the whistleClassifierControl
+	 */
+	public WhistleClassifierControl getWhistleClassifierControl() {
+		return whistleClassifierControl;
+	}
+
+	/**
+	 * @return the whistleClasificationDataBlock
+	 */
+	public WhistleClassificationDataBlock getWhistleClasificationDataBlock() {
+		return whistleClasificationDataBlock;
 	}
 
 

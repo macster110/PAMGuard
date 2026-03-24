@@ -65,19 +65,33 @@ public class ClickTabPanel extends JDesktopPane implements ComponentListener {
 	}
 	
 	
+	@Override
 	public void componentHidden(ComponentEvent e) {
 //		System.out.println("componentHidden");
 	}
 	
+	@Override
 	public void componentMoved(ComponentEvent e) {
 	}
 	
+	/**
+	 * This get's called during startup when the window is created and will 
+	 * automatically resize everything. IT may get called 2 or 3 times at startup
+	 * as components such as the side bar sort themselves out. 
+	 */
+	@Override
 	public void componentResized(ComponentEvent e) {
 		// if (++resizeCount < 5) {
-		arrangeWindows();
+		if (!clickTabPanelControl.clickDisplayManager.cdmp.isManualWindowSizes()) {
+			arrangeWindows();
+		}
+		else {
+			clickTabPanelControl.clickDisplayManager.restoreWindowSizes();
+		}
 		// }
 	}
 	
+	@Override
 	public void componentShown(ComponentEvent e) {
 	}
 	
@@ -112,7 +126,7 @@ public class ClickTabPanel extends JDesktopPane implements ComponentListener {
 				h = (int) (d.height * r);
 			}
 			for (int i = 0; i < dw.size(); i++) {
-				if (dw.get(i).getClickDisplayInfo().isSmallWindow() == true) continue;
+				if (dw.get(i).getClickDisplayInfo().isSmallWindow()) continue;
 				dw.get(i).getFrame().setLocation(x, y);
 				dw.get(i).getFrame().setSize(w, h);
 				x += w;
@@ -130,7 +144,7 @@ public class ClickTabPanel extends JDesktopPane implements ComponentListener {
 				h = d.height;
 			}
 			for (int i = 0; i < dw.size(); i++) {
-				if (dw.get(i).getClickDisplayInfo().isSmallWindow() == false) continue;
+				if (!dw.get(i).getClickDisplayInfo().isSmallWindow()) continue;
 				dw.get(i).getFrame().setLocation(x, y);
 				dw.get(i).getFrame().setSize(w, h);
 				x += w;

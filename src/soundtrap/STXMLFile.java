@@ -20,15 +20,12 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import PamUtils.PamCalendar;
 import soundtrap.xml.CDETInfo;
 import soundtrap.xml.DWVInfo;
 import soundtrap.xml.SoundTrapXMLTools;
 import soundtrap.xml.TimeInformation;
 import soundtrap.xml.WAVInfo;
-import PamUtils.FileParts;
-import PamUtils.PamCalendar;
-import d3.D3XMLFile;
-import d3.SoundTrapTime;
 
 public class STXMLFile {
 
@@ -150,12 +147,23 @@ public class STXMLFile {
 		// sensible structure. 
 		String utcStart = timeHash.get("SamplingStartTimeUTC");
 		if (utcStart == null) return null;
+		
+
 		timeInfo.samplingStartTimeUTC = stDateToMillis(utcStart);
 		String utcStop = timeHash.get("SamplingStopTimeUTC");
 		if (utcStop == null) return null;
 		timeInfo.samplingStopTimeUTC = stDateToMillis(utcStop);
 //		System.out.printf("From %s to %s\n", PamCalendar.formatDBDateTime(timeInfo.samplingStartTimeUTC)
 //				, PamCalendar.formatDBDateTime(timeInfo.samplingStopTimeUTC));
+		
+		String samplingStart = timeHash.get("SamplingStartTimeSubS");
+		if (samplingStart != null) {
+			samplingStart=samplingStart.replace("us","").stripTrailing();
+			//add millis to start time.
+			long millis = Long.parseLong(samplingStart);
+			millis=millis/1000; //convert to millis from micros
+			timeInfo.samplingStartTimeUTC=timeInfo.samplingStartTimeUTC+millis;
+		}
 		
 		return timeInfo;
 	}
@@ -214,7 +222,7 @@ public class STXMLFile {
 	 * @return an XML file, from which additional information can then be extracted. 
 	 */
 	public static STXMLFile openXMLFile(File xmlFile, String dateTimeFormat) {
-		if (xmlFile == null || xmlFile.exists() == false) {
+		if (xmlFile == null || !xmlFile.exists()) {
 			return null;
 		}
 		/*
@@ -268,7 +276,7 @@ public class STXMLFile {
 		return wavInfo;
 	}
 
-	/**
+	/**2453
 	 * @return the xmlFile
 	 */
 	public File getXmlFile() {

@@ -5,6 +5,7 @@ import java.lang.reflect.Field;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 import binaryFileStorage.BinaryHeader;
 import binaryFileStorage.BinaryObjectData;
@@ -13,7 +14,7 @@ import binaryFileStorage.ModuleHeader;
 class DaqStatusModuleHeader extends ModuleHeader implements Serializable, ManagedParameters {
 
 	private static final long serialVersionUID = 1L;
-	
+
 	public DaqStatusModuleHeader(int moduleVersion) {
 		super(moduleVersion);
 	}
@@ -30,7 +31,7 @@ class DaqStatusModuleHeader extends ModuleHeader implements Serializable, Manage
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("daqName");
 			ps.put(new PrivatePamParameterData(this, field) {

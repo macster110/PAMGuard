@@ -2,7 +2,6 @@ package PamController;
 
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamProcess;
-import PamguardMVC.PamRawDataBlock;
 import dataMap.filemaps.OfflineFileServer;
 
 /**
@@ -11,7 +10,7 @@ import dataMap.filemaps.OfflineFileServer;
  * @author dg50
  *
  */
-public interface OfflineFileDataStore extends OfflineDataStore {
+public interface OfflineFileDataStore extends OfflineDataStore{
 	/**
 	 * 
 	 * @return The offline file server which will do the actual work
@@ -22,6 +21,6 @@ public interface OfflineFileDataStore extends OfflineDataStore {
 	
 	public PamProcess getParentProcess();
 	
-	public String getUnitName();
+	public String getUnitName();	
 	
 }

@@ -79,7 +79,7 @@ public class SweepClassifierWorker {
 		int passn=0; 
 		for (int i = 0; i < n; i++) {
 			scs = sweepClassifier.sweepClassifierParameters.getSet(i);
-			if (scs.enable) {
+			if (scs.getEnable()) {
 				passed = classify(click, scs); 
 				if (passed && sweepClassifier.sweepClassifierParameters.checkAllClassifiers) {
 					if (clickInfo==null) clickInfo = new ClickIdInformation(scs.getSpeciesCode(), scs.getDiscard());
@@ -629,7 +629,8 @@ public class SweepClassifierWorker {
 	 * @return true if bearing limits are passed
 	 */
 	private boolean testBearings(ClickDetection click, SweepClassifierSet scs) {
-
+		if (click.getLocalisation()==null) return true;
+		
 		if (click.getLocalisation().getAngles()==null) return true; //passes the test if there is no bearing info. 
 
 		double bearing = click.getLocalisation().getAngles()[0]; 

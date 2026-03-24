@@ -54,7 +54,9 @@ public class DataSelectDialog extends PamDialog {
 		}
 		if (symbolChooser != null) {
 			symbolPanel = symbolChooser.getSwingOptionsPanel(symbolChooser.getProjector());
-			tabPane.addTab("Symbols", new PamNorthPanel(symbolPanel.getDialogComponent()));
+			if (symbolPanel != null) {
+				tabPane.addTab("Symbols", new PamNorthPanel(symbolPanel.getDialogComponent()));
+			}
 		}
 		setDialogComponent(tabPane);
 		if (tabPane.getComponentCount() > currentTab) {
@@ -74,6 +76,22 @@ public class DataSelectDialog extends PamDialog {
 //		else{
 //			setDialogComponent(dataSelector.getDialogPanel().getDialogComponent());
 //		}
+	}
+	
+	public boolean setTab(int tabIndex) {
+		if (tabPane == null) {
+			return false;
+		}
+		if (tabIndex < 0 || tabIndex >= tabPane.getTabCount()) {
+			return false;
+		}
+		try {
+			tabPane.setSelectedIndex(tabIndex);
+		}
+		catch (Exception e) {
+			return false;
+		}
+		return true;
 	}
 	
 	public boolean showDialog() {

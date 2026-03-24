@@ -30,10 +30,12 @@ package PamguardMVC;
 import java.util.ListIterator;
 
 import Acquisition.AcquisitionProcess;
+import Acquisition.DCFilter;
 import Acquisition.RawDataBinaryDataSource;
 import PamController.PamController;
 import PamDetection.RawDataUnit;
 import PamUtils.PamUtils;
+import effort.EffortProvider;
 
 /**
  * Extension of RecyclingDataBlock that is used for Raw audio data. 
@@ -55,6 +57,8 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 	private double[] summaryTotals2 = new double[PamConstants.MAX_CHANNELS];
 	private double[] summaryMaxVal = new double[PamConstants.MAX_CHANNELS];
 	private int[] summaryCount = new int[PamConstants.MAX_CHANNELS];
+	
+	private DCFilter dcFilter;
 
 	/**
 	 * Keep a record of the last sample added. 
@@ -67,7 +71,15 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 		if (pamDataUnits.isEmpty())
 			return 0;
 		int n = super.removeOldUnitsT(getLastUnitMillis());
+//		System.out.printf("%d units removed from %s in removeOldUnitsT\n", n, getLongDataName());
 //		checkIntegrity();
+		return n;
+	}
+
+	@Override
+	protected int removeOldUnitsS(long mastrClockSample) {
+		int n = super.removeOldUnitsS(mastrClockSample);
+//		System.out.printf("%d units removed from %s in removeOldUnitsS\n", n, getLongDataName());
 		return n;
 	}
 
@@ -145,6 +157,19 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 		}
 	}
 	
+	/**
+	 * Reset data integrity checking counters. 
+	 */
+	@Override
+	public void reset() {
+		desiredSample = -1;
+		prevChannelSample = new long[PamConstants.MAX_CHANNELS];
+		summaryTotals = new double[PamConstants.MAX_CHANNELS];
+		summaryTotals2 = new double[PamConstants.MAX_CHANNELS];
+		summaryMaxVal = new double[PamConstants.MAX_CHANNELS];
+		summaryCount = new int[PamConstants.MAX_CHANNELS];
+	}
+	
 	@Override
 	public void addPamData(RawDataUnit pamDataUnit) {
 		/*
@@ -165,11 +190,19 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 		}
 		else if (desiredSample != pamDataUnit.getStartSample()) {
 			// don't add this data unit since its probably out of synch
-			System.out.println(String.format("Sample %d channel %d in %s out of synch - expected sample %d, previously got %d",
-					pamDataUnit.getStartSample(), thisChannel, getDataName(), desiredSample, prevChannelSample[thisChannel]));
+//			System.out.println(String.format("Sample %d channel %d in %s out of synch - expected sample %d, previously got %d",
+//					pamDataUnit.getStartSample(), thisChannel, getDataName(), desiredSample, prevChannelSample[thisChannel]));
 //			return; add the data anyway, may get back into synch !!!! 
 		}
 		prevChannelSample[thisChannel] = pamDataUnit.getStartSample();
+		if (dcFilter != null) {
+			int callCount = dcFilter.getChannelCallCount(thisChannel);
+			dcFilter.filterData(thisChannel, pamDataUnit.getRawData());
+			if (callCount == 0) {
+				// run again for luck now that it should have settled. 
+				dcFilter.filterData(thisChannel, pamDataUnit.getRawData());
+			}
+		}
 //		System.out.println(String.format("Sample %d channel %d in %s is in  synch - expected sample %d",
 //				pamDataUnit.getStartSample(), thisChannel, getDataName(), desiredSample));
 		addSummaryData(thisChannel, pamDataUnit);
@@ -193,13 +226,13 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 	 * @throws RawDataUnavailableException
 	 */
 	synchronized public RawDataUnit[] getAvailableSamples(long startMillis, long durationMillis, int channelMap, boolean offlineLoad) throws RawDataUnavailableException {
-		if (hasDataSamples(startMillis, durationMillis) == false) {
+		if (!hasDataSamples(startMillis, durationMillis)) {
 			if (offlineLoad && 
 					PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW) {
 				// try to load some data !
 				if (parentProcess != null) {
 					this.clearAll();
-					parentProcess.getOfflineData(this, null, startMillis, startMillis+durationMillis, 1);
+					parentProcess.getOfflineData(this, null, startMillis, startMillis+durationMillis, 20);
 				}
 			}
 		}
@@ -246,12 +279,13 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 	synchronized public RawDataUnit[] getAvailableSamples(long startMillis, long durationMillis, int channelMap) throws RawDataUnavailableException {
 		RawDataUnit firstUnit = getFirstUnit();
 		if (firstUnit == null) {
-			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_NOT_ARRIVED, startMillis, (int) durationMillis);
+			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_NOT_ARRIVED, 0,0, startMillis, (int) durationMillis);
 		}
 		long firstMillis = firstUnit.getTimeMilliseconds();
 		long firstSamples = firstUnit.getStartSample();
 		RawDataUnit lastUnit = getLastUnit();
 		long lastMillis = lastUnit.getEndTimeInMilliseconds();
+		long lastSample = lastUnit.getStartSample()+lastUnit.getSampleDuration();
 		
 		
 		long firstAvailableMillis = Math.max(firstMillis, startMillis);
@@ -261,7 +295,8 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 		double[][] data = getSamplesForMillis(firstAvailableMillis, lastAvailableMillis-firstAvailableMillis, channelMap);
 		if (data == null) {
 			// this shouldn't happen. If an exception wasn't thrown from getSamples... then data should no tb enull
-			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_NOT_ARRIVED, startMillis, (int) durationMillis);
+			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_NOT_ARRIVED,
+					firstSamples, lastSample,	startMillis, (int) durationMillis);
 		}
 		RawDataUnit[] dataUnits = new RawDataUnit[data.length];
 		for (int i = 0; i < data.length; i++) {
@@ -287,7 +322,7 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 	synchronized public double[][] getSamplesForMillis(long startMillis, long durationMillis, int channelMap) throws RawDataUnavailableException {
 		RawDataUnit firstUnit = getFirstUnit();
 		if (firstUnit == null) {
-			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_NOT_ARRIVED, startMillis, (int) durationMillis);
+			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_NOT_ARRIVED, 0, 0, startMillis, (int) durationMillis);
 		}
 		long firstMillis = firstUnit.getTimeMilliseconds();
 		long firstSamples = firstUnit.getStartSample();
@@ -306,23 +341,28 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 		// run  a few tests ...
 		int chanOverlap = channelMap & getChannelMap();
 		if (chanOverlap != channelMap) {
-			throw new RawDataUnavailableException(this, RawDataUnavailableException.INVALID_CHANNEL_LIST, startSample, duration);
+			throw new RawDataUnavailableException(this, RawDataUnavailableException.INVALID_CHANNEL_LIST, 0,0,startSample, duration);
 		}
 		if (duration < 0) {
-			throw new RawDataUnavailableException(this, RawDataUnavailableException.NEGATIVE_DURATION, startSample, duration);
+			throw new RawDataUnavailableException(this, RawDataUnavailableException.NEGATIVE_DURATION,0,0, startSample, duration);
 		}
 		
 		RawDataUnit dataUnit = getFirstUnit();
 		if (dataUnit == null) {
 			return null;
 		}
-		if (dataUnit.getStartSample() > startSample) {
+		RawDataUnit lastUnit = getLastUnit();
+		long firstSample = dataUnit.getStartSample();
+		long lastSample = lastUnit.getStartSample()+lastUnit.getSampleDuration();
+		if (firstSample > startSample) {
 //			System.out.println("Earliest start sample : " + dataUnit.getStartSample());
-			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_ALREADY_DISCARDED, startSample, duration);
+			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_ALREADY_DISCARDED, 
+					firstSample, lastSample, startSample, duration);
 		}
 		dataUnit = getLastUnit();
-		if (hasLastSample(dataUnit, startSample+duration, channelMap) == false)  {
-			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_NOT_ARRIVED, startSample, duration);
+		if (!hasLastSample(dataUnit, startSample+duration, channelMap))  {
+			throw new RawDataUnavailableException(this, RawDataUnavailableException.DATA_NOT_ARRIVED,
+					firstSample, lastSample, startSample, duration);
 		}
 		
 		int nChan = PamUtils.getNumChannels(channelMap);
@@ -416,7 +456,7 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 //				break;
 //			}
 ////		}
-		if (foundStart == false) {
+		if (!foundStart) {
 			return false;
 		}
 //		if (blockNo < 0) {
@@ -489,7 +529,7 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 			 * if we get here, then we still need more data, but there
 			 * may not be any, so may have to bail out. 
 			 */
-			if (rawIterator.hasNext() == false) {
+			if (!rawIterator.hasNext()) {
 				return false;
 			}
 			unit = rawIterator.next();
@@ -583,6 +623,49 @@ public class PamRawDataBlock extends AcousticDataBlock<RawDataUnit> {
 			}
 		}
 	}
+
+	@Override
+	public EffortProvider autoEffortProvider() {
+		return null;
+	}
+
+	/**
+	 * DC filter to use on all incoming data. Don't probably want this in 
+	 * normal mode since it's already done in the acquisition thread, but 
+	 * have option to do it in viewer mode if it's set from the 
+	 * process owning this data block. 
+	 * @param dcFilter
+	 */
+	public void setDcFilter(DCFilter dcFilter) {
+		this.dcFilter = dcFilter;
+	}
+
+	/**	 
+	 * DC filter to use on all incoming data. Don't probably want this in 
+	 * normal mode since it's already done in the acquisition thread, but 
+	 * have option to do it in viewer mode if it's set from the 
+	 * process owning this data block. 
+	 * @return
+	 */
+	public DCFilter getDcFilter() {
+		return dcFilter;
+	}
+
+	@Override
+	public void clearAll() {
+//		StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+//		System.out.printf("ClearAll() in %s called from %s\n", getLongDataName(), stack[2].toString());
+		super.clearAll();
+	}
+
+	@Override
+	public void clearAll(boolean andDownStream) {
+//		System.out.printf("ClearAll(%s) called in %s\n", Boolean.valueOf(andDownStream).toString(), getLongDataName());
+		super.clearAll(andDownStream);
+	}
+
+
+
 
 //	@Override
 //	protected void findParentSource() {

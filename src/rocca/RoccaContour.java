@@ -23,17 +23,14 @@
 
 package rocca;
 
+import java.util.ListIterator;
+
 import PamUtils.PamUtils;
 import PamUtils.complex.ComplexArray;
 import PamguardMVC.PamRawDataBlock;
 import PamguardMVC.RawDataUnavailableException;
-import fftManager.Complex;
 import fftManager.FFTDataBlock;
 import fftManager.FFTDataUnit;
-import java.util.ListIterator;
-import whistleDetector.ShapeDataUnit;
-import whistleDetector.WhistlePeak;
-import whistleDetector.WhistleShape;
 
 /**
  *
@@ -341,6 +338,13 @@ public class RoccaContour {
                     // calculate the energy spectrum in a bin +/- energyBinSize around currentPeakFreq
                     int lowerFreqBinIndex = currentPeakFreqIndex - energyBinDelta;
                     int upperFreqBinIndex = currentPeakFreqIndex + energyBinDelta;
+                    /*
+                     * These two lines required to stop the values going out of range when
+                     * the extra energyBinDelta is subtracted / added. 
+                     */
+                    lowerFreqBinIndex = Math.max(lowerFreqBinIndex, 0);
+                    upperFreqBinIndex = Math.min(upperFreqBinIndex, currentFFT.length()/2);
+                    
                     currentEnergy = energySum(currentFFT, lowerFreqBinIndex, upperFreqBinIndex);
 //                    System.out.println(String.format("time, lower, upper, energy = %d, %d, %d, %f", currentMeanTime, lowerFreqBinIndex, upperFreqBinIndex, currentEnergy));
                     //System.out.println(String.format(" Freq, Magic = %f, %f", currentPeakFreq, currentEnergy));

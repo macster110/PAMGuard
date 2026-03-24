@@ -2,15 +2,12 @@ package alarm;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 
 import javax.swing.Timer;
 
-import Acquisition.AcquisitionControl;
-import PamController.PamControlledUnit;
 import PamController.PamController;
 import PamUtils.PamCalendar;
 import PamguardMVC.PamDataBlock;
@@ -59,7 +56,7 @@ public class AlarmProcess extends PamProcess {
 //		}
 //		// still return true if we're not actually running yet. 
 //		if (PamController.getInstance().)
-		return hasMasterClockData == false;
+		return !hasMasterClockData;
 	}
 
 	@Override
@@ -231,7 +228,7 @@ public class AlarmProcess extends PamProcess {
 	}
 
 	public boolean setupAlarm() {
-		dataSource = PamController.getInstance().getDataBlock(PamDataUnit.class, alarmControl.alarmParameters.dataSourceName);
+		dataSource = alarmControl.getPamConfiguration().getDataBlock(PamDataUnit.class, alarmControl.alarmParameters.dataSourceName);
 		if (dataSource == null) {
 			return false;
 		}
@@ -248,6 +245,9 @@ public class AlarmProcess extends PamProcess {
 		}
 		resetCount();
 		alarmDataBlock.setNaturalLifetime(alarmControl.alarmParameters.getHoldSeconds());
+		if (alarmControl.alarmOfflineTask != null) {
+			alarmControl.alarmOfflineTask.setParentDataBlock(dataSource);
+		}
 
 		return true;
 	}

@@ -7,7 +7,6 @@ import java.lang.reflect.Field;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
 import PamModel.parametermanager.PrivatePamParameterData;
-import simulatedAcquisition.SimProcess;
 
 /**
  * Control parameters for FolderInputSystem
@@ -18,11 +17,14 @@ import simulatedAcquisition.SimProcess;
 public class FolderInputParameters extends FileInputParameters implements Serializable, Cloneable, ManagedParameters {
 
 	static public final long serialVersionUID = 1;
-	
-	public boolean subFolders;
-	
+
+	/**
+	 * Default this to true. 
+	 */
+	public boolean subFolders = true;
+
 	public boolean mergeFiles;
-	
+
 	private String[] selectedFileNames;
 
 	/**
@@ -38,9 +40,9 @@ public class FolderInputParameters extends FileInputParameters implements Serial
 	}
 
 	/**
-	 * Get the list of selected files as strings. If you want them as 
+	 * Get the list of selected files as strings. If you want them as
 	 * Files, call getselectedFileFiles()
-	 * @return List of file paths in String format. 
+	 * @return List of file paths in String format.
 	 */
 	public String[] getSelectedFiles() {
 		return selectedFileNames;
@@ -53,7 +55,7 @@ public class FolderInputParameters extends FileInputParameters implements Serial
 	public void setSelectedFiles(String[] selectedFiles) {
 		this.selectedFileNames = selectedFiles;
 	}
-	
+
 	/**
 	 * Set the list of selected files. Note that these are now stored as strings
 	 * to avoid some serialisation problems with some subclasses of io.File
@@ -69,11 +71,11 @@ public class FolderInputParameters extends FileInputParameters implements Serial
 			selectedFileNames[i] = files[i].getAbsolutePath();
 		}
 	}
-	
+
 	/**
-	 * Get the list of selected Files, converted back to File objects 
+	 * Get the list of selected Files, converted back to File objects
 	 * from strings
-	 * @return list of selected files. 
+	 * @return list of selected files.
 	 */
 	public File[] getSelectedFileFiles() {
 		if (selectedFileNames == null) {

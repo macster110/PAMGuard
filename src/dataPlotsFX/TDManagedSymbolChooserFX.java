@@ -2,13 +2,12 @@ package dataPlotsFX;
 
 import PamView.symbol.PamSymbolChooser;
 import PamguardMVC.PamDataUnit;
-import clickDetector.tdPlots.ClickSymbolChooser;
 import dataPlotsFX.clickPlotFX.ClickSymbolChooserFX;
 import dataPlotsFX.data.TDDataInfoFX;
 import pamViewFX.fxNodes.PamSymbolFX;
 
 /**
- * Default symbol chooser for the display. 
+ * Default symbol chooser for the display. This based on the data blocks symbol chooser. 
  * 
  * @author Jamie Maaulay 
  *
@@ -54,9 +53,9 @@ public class TDManagedSymbolChooserFX implements TDSymbolChooserFX{
 			symbol =pamSymbolChooser.getPamSymbolFX(dataInfoFX.getTDGraph().getGraphProjector(), dataUnit);
 		}
 		else if (type==TDSymbolChooserFX.HIGHLIGHT_SYMBOL) {
-			symbol=ClickSymbolChooserFX.highLightClick; 
-			
+			symbol=ClickSymbolChooserFX.highLightClick;
 		}
+		
 		return symbol; 
 	}
 	

@@ -9,12 +9,13 @@ import dataModelFX.DataModelModulePane.ModuleRectangle;
 import dataModelFX.connectionNodes.ModuleConnectionNode;
 import javafx.event.EventHandler;
 import javafx.geometry.Point2D;
+import javafx.scene.input.DataFormat;
 import javafx.scene.input.DragEvent;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
-import pamViewFX.fxNodes.connectionPane.StandardConnectionNode;
 import pamViewFX.fxNodes.connectionPane.ConnectionNode;
 import pamViewFX.fxNodes.connectionPane.ConnectionPane;
+import pamViewFX.fxNodes.connectionPane.StandardConnectionNode;
 
 /**
  * Sub class of ConnectionPane to deal with modules being dragged from 
@@ -44,23 +45,54 @@ public class DataModelConnectPane extends ConnectionPane {
 	 */
 	private DataModelPaneFX dataModelPaneFX; 
 
+    private static final DataFormat NODE_DATA_FORMAT = new DataFormat("application/x-java-custom-node");
 
 	public DataModelConnectPane (DataModelPaneFX dataModelPaneFX){
 		super();
 		this.dataModelPaneFX=dataModelPaneFX; 
+		
+		//4k display size 3840 x 2160
+		//This important because the pane is only the size of the module postions
+		//unless the size is explicitly set. 
+		this.setPrefSize(3840, 2160);
+		
+		  // Optional: Visual feedback when mouse enters/exits target
+        this.setOnDragEntered(event -> {
+        	
+			final Dragboard dragboard = event.getDragboard();
+            if (event.getGestureSource() != this &&
+            		dataModelPaneFX.getModuleDragKey().equals(dragboard.getString())) {
+                this.setStyle("-fx-background-color: #e0ffe0;");
+            }
+            event.consume();
+        });
+        
+        this.setOnDragExited(event -> {
+            // Reset background
+           this.setStyle("");
+           event.consume();
+       });
+
 
 		//set what happens when mouse is dragged over pane
 		this.setOnDragOver(new EventHandler<DragEvent>(){
+			
+			
 			@Override
 			public void handle(DragEvent event)
 			{
+				
+				//System.out.println("START drag over node drag dropped" + dataModelPaneFX.getDraggingStructure());
+
 				final Dragboard dragboard = event.getDragboard();
 				if (dragboard.hasString()
 						&& dataModelPaneFX.getModuleDragKey().equals(dragboard.getString())
 						&& dataModelPaneFX.getDraggingModule().get() != null || dataModelPaneFX.getDraggingStructure()!=null)
 				{
-					event.acceptTransferModes(TransferMode.MOVE);
-					event.consume();
+					//System.out.println("ACCEPT drag over node drag dropped" + dataModelPaneFX.getDraggingStructure());
+	
+					event.acceptTransferModes(TransferMode.ANY);
+					event.consume(); //causesd issues with dropping nodes not being detected
 				}
 			}
 		});
@@ -70,6 +102,9 @@ public class DataModelConnectPane extends ConnectionPane {
 			@Override
 			public void handle(DragEvent event)
 			{
+				
+				//System.out.println("Add Some Node drag dropped: " + dataModelPaneFX.getDraggingStructure());
+
 				final Dragboard dragboard = event.getDragboard();
 				if (dragboard.hasString()
 						&& dataModelPaneFX.getModuleDragKey().equals(dragboard.getString())
@@ -80,6 +115,7 @@ public class DataModelConnectPane extends ConnectionPane {
 
 					ModuleRectangle moduleRect = dataModelPaneFX.getDraggingModule().get();
 
+//					System.out.println("Add Connection Node drag dropped");
 					dataModelPaneFX.getDraggingModule().set(null);
 					dataModelPaneFX.getConnectionNodeFactory().addNewModule(moduleRect.getPamModuleInfo(), event.getX(), event.getY()); 
 
@@ -88,6 +124,7 @@ public class DataModelConnectPane extends ConnectionPane {
 				if (dragboard.hasString()
 						&& dataModelPaneFX.getModuleDragKey().equals(dragboard.getString())
 						&& dataModelPaneFX.getDraggingStructure().get() != null){
+//					System.out.println("Add Structure Node drag dropped");
 
 					dataModelPaneFX.getConnectionNodeFactory().addNewStructure(dataModelPaneFX.getDraggingStructure().get(), event.getX(), event.getY()); 
 					dataModelPaneFX.getDraggingStructure().set(null);
@@ -174,7 +211,7 @@ public class DataModelConnectPane extends ConnectionPane {
 		PamController pamController = PamController.getInstance();
 		ArrayList<ConnectionNode> connectionNodes = getAllConnectionNodes(); 
 
-		System.out.println("checkModulesAdded: Number of controlled units: " + pamController.getNumControlledUnits() ); 
+		//System.out.println("checkModulesAdded: Number of controlled units: " + pamController.getNumControlledUnits() ); 
 		for (int i = 0; i <= pamController.getNumControlledUnits(); i++) {
 			checkModuleAdded(pamController.getControlledUnit(i), connectionNodes); 
 		}
@@ -190,7 +227,7 @@ public class DataModelConnectPane extends ConnectionPane {
 	 */
 	public boolean checkModuleAdded(PamControlledUnit pamControlledUnit, ArrayList<ConnectionNode> connectionNodes) {
 
-		System.out.println("datamodelConnectPane: checkModuleAdded: " + pamControlledUnit + " No. nodes: " + connectionNodes.size()); 
+		//System.out.println("datamodelConnectPane: checkModuleAdded: " + pamControlledUnit + " No. nodes: " + connectionNodes.size()); 
 
 		if (pamControlledUnit==null) return false; 
 
@@ -204,17 +241,17 @@ public class DataModelConnectPane extends ConnectionPane {
 		ModuleConnectionNode moduleConnectionNode; 
 		for (int j = 0; j < connectionNodes.size(); j++) {
 			moduleConnectionNode = (ModuleConnectionNode) connectionNodes.get(j); 
-			System.out.println("Looking for node: " + moduleConnectionNode.getPamControlledUnit());
+			//System.out.println("Looking for node: " + moduleConnectionNode.getPamControlledUnit());
 			
 			if (moduleConnectionNode.getPamControlledUnit()!=null && moduleConnectionNode.getPamControlledUnit().equals(pamControlledUnit)) {
-				System.out.println("There is already a node for : " + moduleConnectionNode.getPamControlledUnit().getUnitName()); 
+				//System.out.println("There is already a node for : " + moduleConnectionNode.getPamControlledUnit().getUnitName()); 
 				return true; 
 			}
 			else if (moduleConnectionNode.getConnectionNodeParams()!=null && moduleConnectionNode.getConnectionNodeParams().unitName!=null 
 					&& moduleConnectionNode.getConnectionNodeParams().unitName.equals(pamControlledUnit.getUnitName())){
 				//set the pamcontrolled unit reference within the connection node. node. 
 				moduleConnectionNode.setPamControlledUnit(pamControlledUnit);
-				System.out.println("There is already a node waiting for : " + moduleConnectionNode.getPamControlledUnit().getUnitName()); 
+				//System.out.println("There is already a node waiting for : " + moduleConnectionNode.getPamControlledUnit().getUnitName()); 
 
 				if (PamController.getInstance().isInitializationComplete()) {
 					//only to be used on drag and dropped nodes.
@@ -224,7 +261,7 @@ public class DataModelConnectPane extends ConnectionPane {
 			}
 		}
 		
-		System.out.println("Could not find the node: " + pamControlledUnit.getUnitName()); 
+		//System.out.println("Could not find the node: " + pamControlledUnit.getUnitName()); 
 
 		//possibility 3
 		ModuleConnectionNode newNode;
@@ -309,7 +346,7 @@ public class DataModelConnectPane extends ConnectionPane {
 	 * Check module connections. Attempts to make the GUI data model reflect the current pamDataModel. For example 
 	 * use this function if source data is changed in external dialogs. 
 	 */
-	protected void dataModeltoPamModel(){
+	public void dataModeltoPamModel(){
 		dataModelPaneFX.dataModeltoPamModel();
 	}
 

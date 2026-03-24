@@ -7,6 +7,7 @@ import java.awt.GridBagLayout;
 import java.awt.Window;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -16,12 +17,14 @@ import javax.swing.JRadioButton;
 import javax.swing.SwingConstants;
 import javax.swing.border.TitledBorder;
 
+import PamController.PamController;
 import PamDetection.RawDataUnit;
 import PamUtils.SelectFolder;
 import PamView.dialog.PamDialog;
 import PamView.dialog.PamGridBagContraints;
 import PamView.dialog.SourcePanel;
 import PamguardMVC.PamDataBlock;
+import PamguardMVC.PamRawDataBlock;
 
 public class ClipDialog extends PamDialog {
 
@@ -70,7 +73,19 @@ public class ClipDialog extends PamDialog {
 	}
 
 	private void setParams() {
-		sourcePanel.setSource(clipSettings.dataSourceName);
+
+		boolean found = sourcePanel.setSource(clipSettings.dataSourceName);
+		if (!found) {
+			PamRawDataBlock rawDataBlock = (PamRawDataBlock) PamController.getInstance().getDataBlockByLongName(clipControl.clipSettings.dataSourceName);
+			if (rawDataBlock == null) {
+				// have changed dialog to use long data name. More robust. Old configs will get null
+				// from that, so use this instead. 
+				rawDataBlock = PamController.getInstance().getRawDataBlock(clipControl.clipSettings.dataSourceName);
+			}
+			if (rawDataBlock != null) {
+				sourcePanel.setSource(rawDataBlock);
+			}
+		}
 		storagePanel.setParams();
 		clipPanel.setParams();
 		enableControls();
@@ -78,12 +93,12 @@ public class ClipDialog extends PamDialog {
 
 	@Override
 	public boolean getParams() {
-		clipSettings.dataSourceName = sourcePanel.getSource().getDataName();
+		clipSettings.dataSourceName = sourcePanel.getSource().getLongDataName();
 		if (clipSettings.dataSourceName == null) {
 			return showWarning("No data source");
 		}
-		if (storagePanel.getParams() == false) return showWarning("Error in storage location");
-		if (clipPanel.getParams() == false) return showWarning("Error in clip generator settings");
+		if (!storagePanel.getParams()) return showWarning("Error in storage location");
+		if (!clipPanel.getParams()) return showWarning("Error in clip generator settings");
 		return true;
 	}
 

@@ -8,19 +8,14 @@ import java.io.Serializable;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
 import Filters.layoutFX.FilterGUIFX;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitGUI;
 import PamController.PamControlledUnitSettings;
-import PamController.PamController;
 import PamController.PamControllerInterface;
 import PamController.PamGUIManager;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
-import fftManager.layoutFX.FFTGuiFX;
 
 /**
  * Filters raw data using a specified filter. 
@@ -48,40 +43,41 @@ public class FilterControl extends PamControlledUnit implements PamSettings {
 
 	@Override
 	public JMenuItem createDetectionMenu(Frame parentFrame) {
-		JMenu menu = new JMenu(getUnitName());
+//		JMenu menu = new JMenu(getUnitName());
 		JMenuItem menuItem;
 		
-		menuItem = new JMenuItem("Data source...");
-		menuItem.addActionListener(new DataSourceAction(parentFrame));
-		menu.add(menuItem);
+//		menuItem = new JMenuItem("Data source...");
+//		menuItem.addActionListener(new DataSourceAction(parentFrame));
+//		menu.add(menuItem);
 		
-		menuItem = new JMenuItem("Filter Settings...");
+		menuItem = new JMenuItem(getUnitName() + " Settings...");
 		menuItem.addActionListener(new DetectionMenuAction(parentFrame));
-		menu.add(menuItem);
+//		menu.add(menuItem);
 		
-		return menu;
+		return menuItem;
 	}
 
-	class DataSourceAction implements ActionListener {
-
-		Frame parentFrame;
-		
-		public DataSourceAction(Frame parentFrame) {
-			super();
-			this.parentFrame = parentFrame;
-		}
-
-		public void actionPerformed(ActionEvent e) {
-
-			FilterParameters_2 newParams = FilterDataSourceDialog.showDialog(filterParams, parentFrame, filterProcess.outputData);
-			
-			if (newParams != null) {
-				filterParams = newParams.clone();
-				filterProcess.setupProcess();
-			}
-		}
-		
-	}
+//	class DataSourceAction implements ActionListener {
+//
+//		Frame parentFrame;
+//		
+//		public DataSourceAction(Frame parentFrame) {
+//			super();
+//			this.parentFrame = parentFrame;
+//		}
+//
+//		@Override
+//		public void actionPerformed(ActionEvent e) {
+//
+//			FilterParameters_2 newParams = FilterDataSourceDialog.showDialog(filterParams, parentFrame, filterProcess.outputData);
+//			
+//			if (newParams != null) {
+//				filterParams = newParams.clone();
+//				filterProcess.setupProcess();
+//			}
+//		}
+//		
+//	}
 	class DetectionMenuAction implements ActionListener {
 
 		Frame parentFrame;
@@ -90,12 +86,13 @@ public class FilterControl extends PamControlledUnit implements PamSettings {
 			super();
 			this.parentFrame = parentFrame;
 		}
+		@Override
 		public void actionPerformed(ActionEvent e) {
 
-			FilterParams newParams = FilterDialog.showDialog(parentFrame,
-					filterParams.filterParams, filterProcess.getSampleRate());
+			FilterParameters_2 newParams = FilterDialog.showDialog(parentFrame,
+					filterParams, filterProcess.getSampleRate());
 			if (newParams != null) {
-				filterParams.filterParams = newParams.clone();
+				filterParams = newParams;
 				filterProcess.setupProcess();
 			}
 		}
@@ -109,7 +106,7 @@ public class FilterControl extends PamControlledUnit implements PamSettings {
 	public void notifyModelChanged(int changeType) {
 		//System.out.println("FFTControl: notifyModelChanged : " +changeType);
 		super.notifyModelChanged(changeType);
-		if (changeType == PamController.INITIALIZATION_COMPLETE) {
+		if (changeType == PamControllerInterface.INITIALIZATION_COMPLETE) {
 			filterProcess.setupProcess();
 		}
 		if (filterGUIFX!=null) {
@@ -117,14 +114,17 @@ public class FilterControl extends PamControlledUnit implements PamSettings {
 		}
 	}
 	
+	@Override
 	public Serializable getSettingsReference() {
 		return filterParams;
 	}
 
+	@Override
 	public long getSettingsVersion() {
 		return FilterParams.serialVersionUID;
 	}
 
+	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 		filterParams = ((FilterParameters_2) pamControlledUnitSettings.getSettings()).clone();
 		return true;

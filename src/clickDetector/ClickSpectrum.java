@@ -36,6 +36,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.GeneralPath;
+import java.awt.geom.Path2D;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,8 +47,6 @@ import javax.swing.JPopupMenu;
 import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 
-import fftManager.FastFFT;
-import soundtrap.STClickControl;
 import Filters.SmoothingFilter;
 import Layout.PamAxis;
 import Layout.PamAxisPanel;
@@ -65,6 +64,8 @@ import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
 import PamguardMVC.PamObserver;
 import PamguardMVC.superdet.SuperDetection;
+import fftManager.FastFFT;
+import soundtrap.STClickControl;
 
 public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSettings {
 
@@ -190,7 +191,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 	public ClickSpectrum(STClickControl clickControl, ClickDisplayManager clickDisplayManager, ClickDisplayManager.ClickDisplayInfo clickDisplayInfo) {
 		this((ClickControl) clickControl, clickDisplayManager, clickDisplayInfo);
 	}
-	
+
 	@Override
 	public PamObserver getObserverObject() {
 		return this;
@@ -279,10 +280,10 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 		GeneralPath polygon=null;
 
 		polygon = 
-				new GeneralPath(GeneralPath.WIND_NON_ZERO  ,
+				new GeneralPath(Path2D.WIND_NON_ZERO  ,
 						data.length+2);
 		x1 = 0;
-		if (log == true){
+		if (log){
 			y1 = (int) (yScale *(maxVal- data[0]));}
 		else{
 			y1 = r.height - (int) (yScale * data[0]);}
@@ -296,7 +297,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 				//y1=0; 
 				continue; 
 			}
-			else if (log == true){
+			else if (log){
 				y1 = (int) (yScale *(maxVal- data[i]));
 			}
 			else{
@@ -365,7 +366,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 		@Override
 		public void paintPanel(Graphics g, Rectangle clipRect) {
 			//only allow antialiasing in pamguard viewer mode. Want drawing to be as fast as possible in online mode
-			if (isViewer==true){
+			if (isViewer){
 				Graphics2D g2 = (Graphics2D) g;
 				g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 						RenderingHints.VALUE_ANTIALIAS_ON);
@@ -408,15 +409,22 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 					eventLineData = eventSpectrum;
 				}
 
+				if (!isEventClick(storedClick)) {
+					eventLineData = null;
+				}
+
 				// work out the scales, mins and max's, etc.
 				maxVal = 0;
 
 				for (int iChan = 0; iChan < clickLineData.length; iChan++) {
 					for (int i = 0; i < clickLineData[iChan].length; i++){
 						maxVal = Math.max(maxVal, clickLineData[iChan][i]);
-						if (eventLineData!=null && eventLineData[iChan]!=null && isViewer==true && clickSpectrumParams.showEventInfo==true ){
-							if( i<eventLineData[iChan].length){
-								maxVal = Math.max(maxVal, eventLineData[iChan][i]);
+//						System.out.println(eventLineData == null ? "Event is null" : ("Event length is " + eventLineData.length));
+						if (!clickSpectrumParams.plotCepstrum && eventLineData!=null) {
+							if (eventLineData[iChan]!=null && isViewer && clickSpectrumParams.showEventInfo ){
+								if( i<eventLineData[iChan].length){
+									maxVal = Math.max(maxVal, eventLineData[iChan][i]);
+								}
 							}
 						}
 					}
@@ -443,13 +451,16 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 			double[] scaledData;
 
 			double scale = 1./(maxVal*1.1);
-			if (isViewer==true ){
+			if (isViewer ){
 
-				if (eventLineData!=null && clickSpectrumParams.showEventInfo==true){	
+				if (eventLineData!=null && clickSpectrumParams.showEventInfo && !clickSpectrumParams.plotCepstrum){	
 
 					g2.setStroke(dashed);
 
 					for (int iChan = 0; iChan < eventLineData.length; iChan++) {
+						if (eventLineData[iChan] == null) {
+							continue; // fix bug report Liz F 3/10/2025. 
+						}
 						scaledData = new double[eventLineData[iChan].length];
 						for (int i = 0; i < scaledData.length; i++) {
 							scaledData[i] = r.getHeight()-amplitudeAxis.getPosition(eventLineData[iChan][i]*scale);
@@ -465,7 +476,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 					}
 				}
 
-				if (clickSpectrumParams.plotCepstrum == false && 
+				if (!clickSpectrumParams.plotCepstrum && 
 						clickTemplateParams.clickTemplateArray.size()>0 && 
 						eventSpectrumTemplates !=null) {
 
@@ -515,8 +526,8 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 		 */
 		private void paintLogSpectrum(Graphics g, Rectangle clipRect) {
 
-			double[][] clickLineData;
-			double[][] eventLineData;
+			double[][] clickLineData = null;
+			double[][] eventLineData = null;
 			synchronized (storedSpectrumLock) {
 				if (storedSpectrum == null || storedSpectrum.length == 0 || storedSpectrum[0].length == 0) return;
 
@@ -529,16 +540,20 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 					eventLineData = eventSpectrum;
 				}
 
+				if (!isEventClick(storedClick)) {
+					eventLineData = null;
+				}
+
 				//System.out.println("paintLogSpectrum.eventLineData: 1" + eventLineData[0].length);
 
 
 				if (logSpectrum == null || clickSpectrumParams.plotCepstrum != lastCepChoice || eventSpectrumTemplatesLog!=null) {
 					double temp;
 					logSpectrum = new double[clickLineData.length][clickLineData[0].length];
-					if (eventSpectrum!=null && isViewer==true ){
+					if (eventLineData!=null && isViewer ){
 						logEventSpectrum = new double[eventLineData.length][eventLineData[0].length];
 					}
-					if (eventSpectrumTemplatesLog!=null && isViewer==true ){
+					if (eventSpectrumTemplatesLog!=null && isViewer ){
 						logTemplateSpectrum = new double[eventSpectrumTemplatesLog.length][];
 					}
 					maxLogVal = 10*Math.log10(clickLineData[0][0]);
@@ -553,8 +568,8 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 							}
 						}
 
-						//sperated this out and the spectrums can be different lengths. 
-						if (eventLineData!=null && isViewer==true &&clickSpectrumParams.showEventInfo==true){
+						//seperated this out and the spectrums can be different lengths. 
+						if (eventLineData!=null && isViewer &&clickSpectrumParams.showEventInfo){
 							for (int i = 0; i < eventLineData[iChan].length; i++){
 								if( i<eventLineData[iChan].length){
 									logEventSpectrum[iChan][i] = temp = 10 * Math.log10(eventLineData[iChan][i]);
@@ -570,7 +585,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 					//System.out.println("paintLogSpectrum.eventLineData: 2 " + eventLineData[0].length);
 
 
-					if (clickSpectrumParams.plotCepstrum == false && eventSpectrumTemplatesLog!=null && isViewer==true ){
+					if (!clickSpectrumParams.plotCepstrum && eventSpectrumTemplatesLog!=null && isViewer ){
 
 						for(int i=0; i<eventSpectrumTemplatesLog.length;i++){
 							double[] logTemplate=new double[eventSpectrumTemplatesLog[i].length];
@@ -580,8 +595,8 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 							logTemplateSpectrum[i]=logTemplate;
 						}
 					}
-					
 				}
+
 				lastCepChoice = clickSpectrumParams.plotCepstrum;
 				drawLogSpectrum(g,clipRect,clickLineData, eventLineData);
 			}
@@ -607,7 +622,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 
 
 			//show an average log spectrum
-			if (eventLineData!=null && isViewer==true && clickSpectrumParams.showEventInfo==true){
+			if (eventLineData!=null && isViewer && clickSpectrumParams.showEventInfo && !clickSpectrumParams.plotCepstrum){
 
 				xScale = (double) r.width / (double) (eventLineData[0].length - 1);
 				scaleLim = Math.abs(clickSpectrumParams.logRange);
@@ -628,7 +643,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 			}
 
 			//show custim templates
-			if (clickTemplateParams.clickTemplateArray.size()>0 && eventLineData !=null){
+			if (clickTemplateParams.clickTemplateArray.size()>0 && logTemplateSpectrum !=null){
 				g2.setStroke(dashedtmplate);
 				for (int i = 0; i < logTemplateSpectrum.length; i++) {
 					if (logTemplateSpectrum[i]!=null && clickTemplateParams.clickTempVisible.get(i)==true){
@@ -666,7 +681,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 
 		private FastFFT cepFFT;
 		private double[][] getLineData(double[][] spectrogramData) {
-			if (clickSpectrumParams.plotCepstrum == false) {
+			if (!clickSpectrumParams.plotCepstrum) {
 				return spectrogramData;
 			}
 			else {
@@ -775,18 +790,18 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 				logScale.setSelected(clickSpectrumParams.logScale);
 				logScale.addActionListener(new LogScale());
 
-				if (isViewer==true){
+				if (isViewer){
 					menu.add(logScale);
 					menuItem = new JMenuItem("Manage templates...");
 					menuItem.addActionListener(new EditTemplates());
 					menu.add(menuItem);
 				}
-				
-				
+
+
 				menuItem = new JMenuItem("Add template...");
 				menuItem.addActionListener(new AddTemplate());
 				menu.add(menuItem);
-				
+
 				menuItem = new JMenuItem("Clear templates");
 				menuItem.addActionListener(new ClearTemplates());
 				menu.add(menuItem);
@@ -806,15 +821,15 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 			repaint(10);
 		}
 	}
-	
-	
+
+
 	private class AddTemplate implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
 			addTemnplateDialog();
 		}
 	}
-	
+
 	private class ClearTemplates implements ActionListener {
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
@@ -881,7 +896,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 		}
 
 	}
-	
+
 	public void clearTemplates(){
 		clickTemplateParams.clickTemplateArray=new ArrayList<ClickTemplate>();
 		clickTemplateParams.clickTempVisible=new ArrayList<Boolean>();
@@ -951,7 +966,8 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 					storedSpectrum[i] = SmoothingFilter.smoothData(storedSpectrum[i], clickSpectrumParams.plotSmoothing);
 				}
 			}
-			//calculating an event spectrum can take a very long time. 
+			//calculating an event spectrum can take a very long time so we don't delete the last event incase a user
+			//is clicking between one event and un-annotated clicks so whether to draw an event is handled in the paint functions
 			if (isViewer && this.clickSpectrumParams.showEventInfo){
 				getEventClick(newClick);
 			}
@@ -961,6 +977,16 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 
 		spectrumPlotPanl.repaint(100);
 		spectrumAxisPanel.repaint(100);
+	}
+
+	/**
+	 * Does the click belong to an event.
+	 */
+	private boolean isEventClick(ClickDetection newClick) {
+		if (newClick.getSuperDetection(0)==null || !newClick.getSuperDetection(0).equals(lastEvent) ) {
+			return false;
+		}
+		return true;
 	}
 
 
@@ -1217,7 +1243,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 			return null;
 		}
 
-		double max=-Double.MAX_VALUE;;
+		double max=-Double.MAX_VALUE;
 		double val;
 
 		for (int i=0; i<Spectrum.length; i++){
@@ -1275,10 +1301,12 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 
 
 
+	@Override
 	public String getObserverName() {
 		return getName();
 	}
 
+	@Override
 	public long getRequiredDataHistory(PamObservable o, Object arg) {
 		return 0;
 	}
@@ -1288,10 +1316,12 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 
 	}
 
+	@Override
 	public void removeObservable(PamObservable o) {
 
 	}
 
+	@Override
 	public void setSampleRate(float sampleRate, boolean notify) {
 		this.sampleRate = sampleRate;
 		sortSouthAxis();
@@ -1304,6 +1334,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 	}
 
 
+	@Override
 	public void addData(PamObservable o, PamDataUnit arg) {
 
 		if (clickDisplayManager.isBAutoScroll() && !isViewer) {
@@ -1317,7 +1348,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 	@Override
 	public void updateData(PamObservable observable, PamDataUnit pamDataUnit) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	public ClickDetection getStoredClick(){
@@ -1369,7 +1400,7 @@ public class ClickSpectrum extends ClickDisplay implements PamObserver , PamSett
 		clickSpectrumParams = ((ClickSpectrumParams) pamControlledUnitSettings.getSettings()).clone();
 		return true;
 	}
-	
+
 	@Override
 	public void receiveSourceNotification(int type, Object object) {
 		// don't do anything by default

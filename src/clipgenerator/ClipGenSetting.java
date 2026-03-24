@@ -5,6 +5,7 @@ import java.lang.reflect.Field;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 
 /**
@@ -101,7 +102,7 @@ public class ClipGenSetting implements Serializable, Cloneable, ManagedParameter
 		try {
 			ClipGenSetting newObj = (ClipGenSetting) super.clone();
 			// force map line length to 1000m for old objects. 
-			if (newObj.hadMapLine == false) {
+			if (!newObj.hadMapLine) {
 				newObj.hadMapLine = true;
 				newObj.mapLineLength = 1000.;
 			}
@@ -115,7 +116,7 @@ public class ClipGenSetting implements Serializable, Cloneable, ManagedParameter
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("hadMapLine");
 			ps.put(new PrivatePamParameterData(this, field) {

@@ -9,6 +9,17 @@ import java.util.HashMap;
  *
  */
 public class GlobalArguments {
+	
+	/**
+	 * Flag to say we're running batch jobs (viewer OR normal) 
+	 */
+	public static final String BATCHFLAG = "-batch";
+	
+	/**
+	 * Flag used when opening the psfx that's going to control viewer offline
+	 * tasks. Used in modules to make sure they load and register tasks. 
+	 */
+	public static final String BATCHVIEW = "-bv";
 
 	static HashMap<String, String> globalFlags = new HashMap<>();
 	
@@ -41,6 +52,14 @@ public class GlobalArguments {
 			return null;
 		}
 		return Integer.valueOf(val);
+	}
+	
+	/**
+	 * Is the batch flag set ?
+	 * @return
+	 */
+	public static boolean isBatch() {
+		return getParam(BATCHFLAG) != null;
 	}
 	
 }

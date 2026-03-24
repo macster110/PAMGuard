@@ -2,12 +2,11 @@ package mapgrouplocaliser;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
-import java.util.Hashtable;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
-import PamView.paneloverlay.OverlayDataInfo;
 import PamView.paneloverlay.overlaymark.MarkDataSelectorParams;
 import PamView.paneloverlay.overlaymark.OverlayMarkDataInfo;
 import PamguardMVC.PamDataBlock;
@@ -64,7 +63,7 @@ public class MapGrouperSettings implements Serializable, Cloneable, ManagedParam
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("markDataSelectorParams");
 			ps.put(new PrivatePamParameterData(this, field) {

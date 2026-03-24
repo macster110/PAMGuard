@@ -1,16 +1,12 @@
 package generalDatabase;
 
-import generalDatabase.pamCursor.NonScrollablePamCursor;
-import generalDatabase.pamCursor.PamCursor;
-
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 
 import PamController.DeserialisationWarning;
 import PamController.PamControlledUnitSettings;
@@ -21,9 +17,11 @@ import PamController.PamSettingsGroup;
 import PamUtils.Ascii6Bit;
 import PamUtils.PamCalendar;
 import PamguardMVC.PamDataUnit;
+import generalDatabase.pamCursor.NonScrollablePamCursor;
+import generalDatabase.pamCursor.PamCursor;
 
 /**
- * Functions for writing Pamguard Settings into any database as character data
+ * Functions for writing serialised Pamguard Settings into any database as character data
  * Runs at DAQ start, goes through the settings manager list and for each
  * set of settings, it serialises the settings data into a binary array, this
  * is then converted from binary data to 6 bit ascii data (using the character set
@@ -66,6 +64,10 @@ public class LogSettings extends DbSpecial {
 		saveAllSettings();
 	}
 
+	/**
+	 * Saves all settings from the standard set of settings that are global to PAMGuard. 
+	 * @return
+	 */
 	boolean saveAllSettings() {
 
 		long now = PamCalendar.getTimeInMillis(); // log all at the same time
@@ -82,7 +84,37 @@ public class LogSettings extends DbSpecial {
 		return errors == 0;
 	}
 
-	boolean logSettings(PamSettings pamSettings, long logTime) {
+	/**
+	 * Save a more specific list of settings. Used by the batck processor to write new configs to 
+	 * the batch processing databases. 
+	 * @param setingsGroup
+	 * @return
+	 */
+	public boolean saveSettings(PamSettingsGroup settingsGroup) {
+		return saveSettings(settingsGroup, settingsGroup.getSettingsTime());
+	}
+	
+	/**
+	 * Save a more specific list of settings. Used by the batck processor to write new configs to 
+	 * the batch processing databases. 
+	 * @param setingsGroup
+	 * @return
+	 */
+	public boolean saveSettings(PamSettingsGroup settingsGroup, long time) {
+		ArrayList<PamControlledUnitSettings> setList = settingsGroup.getUnitSettings();
+		boolean ok = true;
+		for (PamControlledUnitSettings aSet : setList) {
+			ok &= logSettings(aSet, time);
+		}
+		return ok;
+	}
+
+	public boolean logSettings(PamSettings pamSettings, long logTime) {
+		PamControlledUnitSettings pcuSettings = new PamControlledUnitSettings(pamSettings);
+		return logSettings(pcuSettings, logTime);
+	}
+
+	public boolean logSettings(PamControlledUnitSettings pamSettings, long logTime) {
 		/*
 		 * need to serialise the pamSettings data into a byte array, then convert 
 		 * that byte array to 6 bit ascii, then chom it up into bits that aren't
@@ -92,7 +124,7 @@ public class LogSettings extends DbSpecial {
 		ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 		try {
 			ObjectOutputStream out = new ObjectOutputStream(buffer);
-			Object settings = pamSettings.getSettingsReference();
+			Object settings = pamSettings.getSettings();
 			out.writeObject(settings);
 			out.close();
 		}
@@ -109,9 +141,9 @@ public class LogSettings extends DbSpecial {
 		 * data that will fit into the database. 
 		 */  
 		try {
-		if (pamSettings.getUnitName().equals("User TDDisplay")) {
-			System.out.println("Saving user display data");
-		}
+			//		if (pamSettings.getUnitName().equals("User TDDisplay")) {
+			//			System.out.println("Saving user display data");
+			//		}
 		}
 		catch (NullPointerException e) {
 			e.printStackTrace();
@@ -132,7 +164,7 @@ public class LogSettings extends DbSpecial {
 			}
 			subString = dataString.substring(firstChar, lastChar);
 			su = new SettingsDataUnit(logTime, pamSettings.getUnitType(), pamSettings.getUnitName(),
-					(int) pamSettings.getSettingsVersion(), nLines, iString, subString, spareBits);
+					(int) pamSettings.getVersionNo(), nLines, iString, subString, spareBits);
 
 			this.logData(su);
 
@@ -181,10 +213,11 @@ public class LogSettings extends DbSpecial {
 		PamSettingsGroup dbSettingsGroup = null;
 
 		PamControlledUnitSettings pamControlledUnitSettings;
-		
+
 		DeserialisationWarning dsWarning = new DeserialisationWarning(getDbControl().getDatabaseName());
 
 		SQLTypes sqlTypes = con.getSqlTypes();
+
 		boolean haveData;
 		if (result != null) try {
 			haveData = result.next();
@@ -193,9 +226,9 @@ public class LogSettings extends DbSpecial {
 				// transfer data back into the tableItems store.
 				transferDataFromResult(sqlTypes, result);
 
-				tableItem = getTableDefinition().getTimeStampItem();
-//				timestamp = (Timestamp) tableItem.getTimestampValue();
-				timeMillis = sqlTypes.millisFromTimeStamp(tableItem.getValue());
+				tableItem = tableDef.getTimeStampItem();
+				//				timestamp = (Timestamp) tableItem.getTimestampValue();
+				timeMillis = SQLTypes.millisFromTimeStamp(tableItem.getValue());
 
 				nStrings = (Integer) tableDef.getGroupTotal().getValue();
 				iString = (Integer) tableDef.getGroupIndex().getValue();
@@ -234,23 +267,23 @@ public class LogSettings extends DbSpecial {
 					Ascii6Bit newData = new Ascii6Bit(settingString, spares);
 					byte[] byteData = newData.getByteData(); 
 					boolean deserialisationError = false;
-//					ByteArrayInputStream inputBuffer = new ByteArrayInputStream(byteData);
-//					Object readObject = null;
-//					try {
-//						ObjectInputStream in = new ObjectInputStream(inputBuffer);
-//						readObject = in.readObject();
-//						in.close();
-//					}
-//					catch (IOException ex) {
-////						System.out.println("Database deserialisation IOException: " + ex.getMessage());
-//						dsWarning.addMissingClass(ex.getMessage());
-//						deserialisationError = true;
-//						//						continue;
-//					}
-//					catch (ClassNotFoundException cx) {
-//						dsWarning.addMissingClass(cx.getMessage());
-////						cx.printStackTrace();
-//					}
+					//					ByteArrayInputStream inputBuffer = new ByteArrayInputStream(byteData);
+					//					Object readObject = null;
+					//					try {
+					//						ObjectInputStream in = new ObjectInputStream(inputBuffer);
+					//						readObject = in.readObject();
+					//						in.close();
+					//					}
+					//					catch (IOException ex) {
+					////						System.out.println("Database deserialisation IOException: " + ex.getMessage());
+					//						dsWarning.addMissingClass(ex.getMessage());
+					//						deserialisationError = true;
+					//						//						continue;
+					//					}
+					//					catch (ClassNotFoundException cx) {
+					//						dsWarning.addMissingClass(cx.getMessage());
+					////						cx.printStackTrace();
+					//					}
 					if (!deserialisationError) {
 						pamControlledUnitSettings = new PamControlledUnitSettings(unitType, unitName, 
 								null, 

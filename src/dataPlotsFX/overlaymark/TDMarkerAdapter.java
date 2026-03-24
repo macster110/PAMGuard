@@ -14,7 +14,6 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
-import javafx.scene.paint.Color;
 import pamViewFX.PamGuiManagerFX;
 import pamViewFX.fxGlyphs.PamGlyphDude;
 
@@ -30,7 +29,7 @@ public class TDMarkerAdapter extends TDOverlayAdapter {
 	/**
 	 * The overlay marker with hooks into other modules which subscribe to the display.
 	 */
-	private StandardOverlayMarker pamMarker;
+	private TDMarkerFX pamMarker;
 
 	public TDMarkerAdapter(TDGraphFX tdGraphFX){
 		
@@ -51,7 +50,13 @@ public class TDMarkerAdapter extends TDOverlayAdapter {
 			MarkRelationships.getInstance().subscribeObservers(pamMarker);
 		}
 		pamMarker.setProjector(tdGraphFX.getGraphProjector());
+		
+		pamMarker.addDetectionGroupListener((detectionGroup)->{
+			tdGraphFX.getTDDisplay().getTDControl().newSelectedDetectionGroup(detectionGroup, tdGraphFX); 
+		});
 	}
+	
+
 	
 	/**
 	 * Get the selected detections
@@ -59,8 +64,6 @@ public class TDMarkerAdapter extends TDOverlayAdapter {
 	 */
 	public DetectionGroupSummary getSelectedDetectionGroup(){
 		//get the currently selected data units. 
-		
-		//System.out.println("Get selected detection group: " + pamMarker.getCurrentDetectionGroup());
 		return pamMarker.getCurrentDetectionGroup(); 
 	}
 	
@@ -109,7 +112,7 @@ public class TDMarkerAdapter extends TDOverlayAdapter {
 	@Override
 	public Node getIcon() {
 //		return PamGlyphDude.createPamGlyph(MaterialDesignIcon.SELECTION, Color.WHITE, PamGuiManagerFX.iconSize);
-		return PamGlyphDude.createPamIcon("mdi2s-selection", Color.WHITE, PamGuiManagerFX.iconSize);
+		return PamGlyphDude.createPamIcon("mdi2s-selection", PamGuiManagerFX.iconSize);
 	}
 
 	@Override

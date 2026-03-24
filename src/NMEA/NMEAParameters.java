@@ -24,6 +24,7 @@ import java.io.Serializable;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import serialComms.jserialcomm.PJSerialComm;
 
 public class NMEAParameters implements Serializable, Cloneable, ManagedParameters {
@@ -91,7 +92,7 @@ public class NMEAParameters implements Serializable, Cloneable, ManagedParameter
 		public final int multicastValue = 3;
 	}
 	
-	public NmeaSources sourceType = NmeaSources.SIMULATED;
+	public NmeaSources sourceType = NmeaSources.SERIAL;
 
 	public String getName() {
 		return name;
@@ -149,7 +150,7 @@ public class NMEAParameters implements Serializable, Cloneable, ManagedParameter
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 

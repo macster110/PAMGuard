@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioSystem;
 
@@ -15,6 +16,7 @@ import PamModel.parametermanager.FieldNotFoundException;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterData;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 import PamUtils.PamUtils;
 import PamguardMVC.PamRawDataBlock;
@@ -33,7 +35,7 @@ public class RecorderSettings implements Serializable, Cloneable, ManagedParamet
 	/**
 	 * Allowable bit depths. 
 	 */
-	static public final int[] BITDEPTHS = {8, 16, 24};
+	static public final int[] BITDEPTHS = {8, 16, 24, 32};
 	/**
 	 * Name of the raw data source
 	 */
@@ -211,7 +213,7 @@ public class RecorderSettings implements Serializable, Cloneable, ManagedParamet
 			}
 		}
 		for (int i = present.length - 1; i >= 0; i--) {
-			if (present[i] == false) {
+			if (!present[i]) {
 				recorderTriggerDatas.remove(i);
 			}
 		}
@@ -251,7 +253,7 @@ public class RecorderSettings implements Serializable, Cloneable, ManagedParamet
 	public double getLongestHistory() {
 		double t = 0;
 		for (RecorderTriggerData td:recorderTriggerDatas) {
-			if (td.isEnabled() == false) {
+			if (!td.isEnabled()) {
 				continue;
 			}
 			t = Math.max(t, td.getSecondsBeforeTrigger());
@@ -336,7 +338,7 @@ public class RecorderSettings implements Serializable, Cloneable, ManagedParamet
 
 		// check to see if it's in a read only folder of any kind. 
 		File outFolder = new File(folderName);
-		if (outFolder.exists() && outFolder.canWrite() == false) {
+		if (outFolder.exists() && !outFolder.canWrite()) {
 			return true;
 		}
 		
@@ -443,7 +445,7 @@ public class RecorderSettings implements Serializable, Cloneable, ManagedParamet
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("channelBitmap");
 			ps.put(new PrivatePamParameterData(this, field) {

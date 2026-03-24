@@ -16,13 +16,6 @@ import javax.swing.JFileChooser;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
-import classifier.Classifier;
-import classifier.ClassifierParams;
-import classifier.ClassifierTypes;
-import classifier.LinearClassifier;
-
-import whistleClassifier.offline.ClassifierOffline;
-import whistleClassifier.training.ClassifierTrainingDialog;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
@@ -33,6 +26,14 @@ import PamUtils.PamCalendar;
 import PamUtils.PamFileChooser;
 import PamUtils.PamFileFilter;
 import PamView.PamTabPanel;
+import classifier.Classifier;
+import classifier.ClassifierParams;
+import classifier.ClassifierTypes;
+import classifier.LinearClassifier;
+import whistleClassifier.offline.ClassifierOffline;
+import whistleClassifier.swing.WhistleClassificationDialog;
+import whistleClassifier.swing.WhistleClassifierTabPanelControl;
+import whistleClassifier.training.ClassifierTrainingDialog;
 
 /**
  * Whistle Classifier control class. 
@@ -61,7 +62,7 @@ public class WhistleClassifierControl extends PamControlledUnit implements PamSe
 	
 	private WhistleClassifierTabPanelControl whistleClassifierTabPanel;
 	
-	private WhistleClassificationParameters whistleClassificationParameters = new WhistleClassificationParameters();;
+	private WhistleClassificationParameters whistleClassificationParameters = new WhistleClassificationParameters();
 	
 	private WhistleFragmenter whistleFragmenter = new OverlappingFragmenter();
 	
@@ -98,9 +99,9 @@ public class WhistleClassifierControl extends PamControlledUnit implements PamSe
 		whistleClassifierProcess.setupLogging();
 		
 		isViewer = PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW;
-		if (isViewer) {
+//		if (isViewer) { // so it appears in batch!
 			classifierOffline = new ClassifierOffline(this);
-		}
+//		}
 	}
 
 

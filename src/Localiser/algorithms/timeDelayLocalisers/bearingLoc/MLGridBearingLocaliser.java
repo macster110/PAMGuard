@@ -1,15 +1,22 @@
 package Localiser.algorithms.timeDelayLocalisers.bearingLoc;
 
+import java.awt.Window;
+import java.io.Serializable;
 import java.util.Arrays;
 
 import Array.ArrayManager;
 import Array.PamArray;
 import Jama.Matrix;
+import Localiser.LocalisationAlgorithmInfo;
 import Localiser.algorithms.Correlations;
+import PamDetection.LocContents;
 import PamUtils.ArrayDump;
 import PamUtils.PamUtils;
 import PamUtils.SystemTiming;
 import pamMaths.PamVector;
+import tethys.localization.LocalizationBuilder;
+import tethys.localization.LocalizationCreator;
+import tethys.swing.export.LocalizationOptionsPanel;
 
 /**
  * Maximum likelihood bearing localiser to get bearings from a closely 
@@ -59,6 +66,11 @@ public class MLGridBearingLocaliser implements BearingLocaliser {
 	@Override
 	public void prepare(int[] arrayElements, long timMillis, double timingError) {
 		prepare(arrayElements, timMillis, timingError, Math.toRadians(1), Math.toRadians(1));
+	}
+
+	@Override
+	public int getLocalisationContents() {
+		return LocContents.HAS_BEARING | LocContents.HAS_AMBIGUITY;
 	}
 	
 	synchronized private void prepare(int[] arrayElements, long timeMillis, double timingError, double thetaStep, double phiStep) {
@@ -160,7 +172,7 @@ public class MLGridBearingLocaliser implements BearingLocaliser {
 			rotVectors[2] = rotVectors[0].vecProd(rotVectors[1]);
 		}
 		Matrix rotMatrix = PamVector.arrayToMatrix(rotVectors);
-		long nanosStart = SystemTiming.getProcessCPUTime();
+//		long nanosStart = SystemTiming.getProcessCPUTime();
 		PamVector pairVector, pairErrorVector, bearingVector, pV0, pV1;
 		bearingVector = new PamVector();
 		double theta, phi;
@@ -198,7 +210,7 @@ public class MLGridBearingLocaliser implements BearingLocaliser {
 				}
 			}
 		}
-		long nanoEnd = SystemTiming.getProcessCPUTime();
+//		long nanoEnd = SystemTiming.getProcessCPUTime();
 //		System.out.println(String.format("LUT Creation time %3.2f microseconds", (nanoEnd-nanosStart)/1000.));
 		
 		initialiseLLLut();
@@ -629,6 +641,30 @@ public class MLGridBearingLocaliser implements BearingLocaliser {
 	public int getHydrophoneMap() {
 		return hydrophoneMap;
 	}
-	
 
+	@Override
+	public String getAlgorithmName() {
+		return "Maximum likelyhood grid bearing localiser";
+	}
+
+	@Override
+	public Serializable getParameters() {
+		return null;
+	}
+
+	@Override
+	public LocalisationAlgorithmInfo getAlgorithmInfo() {
+		return this;
+	}
+
+	@Override
+	public LocalizationCreator getTethysCreator() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public LocalizationOptionsPanel getLocalizationOptionsPanel(Window parent, LocalizationBuilder locBuilder) {
+		return null;
+	}
 }

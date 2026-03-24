@@ -127,12 +127,12 @@ public class AcousticScrollerFX extends AbstractPamScrollerFX {
 	private ExecutorService executorService;
 
 	/**
-	 * The left arrow
+	 * The left arrow (or top if vertical).
 	 */
 	private PamButton arrowBottomLeft;
 
 	/**
-	 * The right arrow. 
+	 * The right arrow (or top if vertical).
 	 */
 	private PamButton arrowTopRight;
 
@@ -189,6 +189,9 @@ public class AcousticScrollerFX extends AbstractPamScrollerFX {
 				pauseDataload(newVal);
 			}
 		});
+		
+		scrollBarPane.getScrollBox().setPrefWidth(100);
+		scrollBarPane.showVisibleRangeButton(false); 
 
 
 		if (isViewer){
@@ -402,32 +405,39 @@ public class AcousticScrollerFX extends AbstractPamScrollerFX {
 			if (currentCount==0) acousticScrollerGraphics.clearStore(); 
 		
 			@SuppressWarnings("unchecked")
-			ListIterator<PamDataUnit> it = acousticScrollerGraphics.getDataBlock().getListIterator(currentCount);		
+			ListIterator<PamDataUnit> it = acousticScrollerGraphics.getDataBlock().getListIterator(currentCount);	
+			
+			
 			
 			//			int count =0; 
 			//removing the sync lock here was reallt helpful in preventing lock ups - especially because the datagram does not
 			//load wghen the scroller moves. 
 			//synchronized (acousticScrollerGraphics.getDataBlock().getSynchLock()) {
-				while (it.hasNext()) {
+			while (it.hasNext()) {
 
-					//					if (count%500==0){
-					//						AcousticDataGramGraphics acousticDataGramGraphics=(AcousticDataGramGraphics) acousticScrollerGraphics; 
-					//						System.out.println("Hello datagram load: " + count+ " "+ acousticScrollerGraphics.getDataBlock().getUnitsCount() +
-					//								" "+acousticDataGramGraphics.getDataGramStore().currentIndex);
-					//					}
-					//					count++;
-					currentCount++; 
+				//					if (count%500==0){
+				//						AcousticDataGramGraphics acousticDataGramGraphics=(AcousticDataGramGraphics) acousticScrollerGraphics; 
+				//						System.out.println("Hello datagram load: " + count+ " "+ acousticScrollerGraphics.getDataBlock().getUnitsCount() +
+				//								" "+acousticDataGramGraphics.getDataGramStore().currentIndex);
+				//					}
+				//					count++;
+				currentCount++; 
 
+				try {
 					acousticScrollerGraphics.addNewData(it.next());
-
-					if (this.isCancelled()){
-						return;
-					}
-
-					Platform.runLater(()->{
-						repaint(30);
-					});
 				}
+				catch (Exception e) {
+//					System.err.println("Error in AcousticScrollerFX: " + e.getMessage());
+				}
+
+				if (this.isCancelled()){
+					return;
+				}
+
+				Platform.runLater(()->{
+					repaint(30);
+				});
+			}
 			//}
 		}
 

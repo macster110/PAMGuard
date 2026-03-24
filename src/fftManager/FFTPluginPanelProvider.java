@@ -78,10 +78,12 @@ public class FFTPluginPanelProvider implements DisplayPanelProvider {
 		DisplayProviderList.addDisplayPanelProvider(this);
 	}
 
+	@Override
 	public DisplayPanel createDisplayPanel(DisplayPanelContainer displayPanelContainer) {
 		return new FFTPluginPanel(this, displayPanelContainer);
 	}
 
+	@Override
 	public String getDisplayPanelName() {
 		return fftDataBlock.getDataName();
 		//		return "Channel Spectra";
@@ -134,7 +136,8 @@ public class FFTPluginPanelProvider implements DisplayPanelProvider {
 			isViewer = PamController.getInstance().getRunMode() == PamController.RUN_PAMVIEW;
 			setupPanel();
 
-			westAxis = new PamAxis(0, 0, 1, 1, getScaleMin(), getScaleMax(), true, "dB", "%.0f");
+			String label = String.format("PSD (%s)", PamController.getInstance().getGlobalMediumManager().getdBPSDString());
+			westAxis = new PamAxis(0, 0, 1, 1, getScaleMin(), getScaleMax(), true, label, "%.0f");
 			westAxis.setInterval(20);
 			//southAxis = new PamAxis(0, 0, 10, 10, 0, pamFFTProcess.getSampleRate()/2/1000, true, "kHz", "%.0f");
 			southAxis = new PamAxis(0, 0, 1, 1, 0, fftDataBlock.getSampleRate()/2/1000, false, "kHz", "%.0f");
@@ -252,6 +255,7 @@ public class FFTPluginPanelProvider implements DisplayPanelProvider {
 
 		class OptionsListener implements ActionListener {
 
+			@Override
 			public void actionPerformed(ActionEvent e) {
 				showDialog();
 			}
@@ -303,25 +307,30 @@ public class FFTPluginPanelProvider implements DisplayPanelProvider {
 
 		}
 
+		@Override
 		public String getObserverName() {
 			return "Spectra plug in panel";
 		}
 
+		@Override
 		public long getRequiredDataHistory(PamObservable o, Object arg) {
 			return 0;
 		}
 
+		@Override
 		public void noteNewSettings() {
 			prepareChannels();
 			// TODO Auto-generated method stub
 
 		}
 
+		@Override
 		public void removeObservable(PamObservable o) {
 			// TODO Auto-generated method stub
 
 		}
 
+		@Override
 		public void setSampleRate(float sampleRate, boolean notify) {
 			setupSouthAxis(sampleRate);
 		}
@@ -347,6 +356,7 @@ public class FFTPluginPanelProvider implements DisplayPanelProvider {
 			// TODO Auto-generated method stub
 		}
 
+		@Override
 		public void addData(PamObservable o, PamDataUnit arg) {
 			// TODO Auto-generated method stub
 			
@@ -444,27 +454,32 @@ public class FFTPluginPanelProvider implements DisplayPanelProvider {
 			// don't do anything by default
 		}
 
+		@Override
 		public Serializable getSettingsReference() {
 			return plotOptions;
 		}
 
 
+		@Override
 		public long getSettingsVersion() {
 			return FFTDataDisplayOptions.serialVersionUID;
 		}
 
 
+		@Override
 		public String getUnitName() {
 			return getDisplayPanelName();
 			//			return  displayPanelProvider.getDisplayPanelName();
 		}
 
 
+		@Override
 		public String getUnitType() {
 			return "FFTPluginPanelDisplayOptions";
 		}
 
 
+		@Override
 		public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 			plotOptions = ((FFTDataDisplayOptions) pamControlledUnitSettings.getSettings()).clone();
 			return true;

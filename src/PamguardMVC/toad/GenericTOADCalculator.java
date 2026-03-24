@@ -20,6 +20,7 @@ import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamController.SettingsNameProvider;
 import PamController.SettingsPane;
+import PamUtils.PamCalendar;
 import PamUtils.PamUtils;
 import PamUtils.complex.ComplexArray;
 import PamguardMVC.PamDataBlock;
@@ -34,6 +35,8 @@ import group3dlocaliser.Group3DLocaliserControl;
 import group3dlocaliser.algorithm.toadbase.TOADInformation;
 import pamMaths.PamVector;
 import pamViewFX.fxNodes.pamDialogFX.ManagedSettingsPane;
+import warnings.PamWarning;
+import warnings.WarningSystem;
 
 /**
  * Generic TOAD calculator which does it's best by any type of sound. Can be used when 
@@ -134,6 +137,7 @@ public class GenericTOADCalculator implements TOADCalculator, PamSettings {
 				 * to give better timing accuracy. 
 				 */
 				FFTDataList fftData = fftDataOrganiser.createFFTDataList(dataUnit, sampleRate, dataUnit.getChannelBitmap() & channelMap);
+//				System.out.println("fftData: " + fftData);
 				if (fftData == null || fftData.getMaxChannelCount() == 0) {
 					// debug stuff ...
 					System.out.println("No FFT Data for " + dataUnit.getSummaryString());
@@ -256,14 +260,32 @@ public class GenericTOADCalculator implements TOADCalculator, PamSettings {
 		}
 		double c = geometry.getCurrentArray().getSpeedOfSound();
 		double[][] maxDelays = new double[nCh][nCh];
-		for (int i = 0; i < nCh; i++) {
-			for (int j = i+1; j < nCh; j++) {
-				int hi = hIndex == null ? i : hIndex[i];
-				int hj = hIndex == null ? j : hIndex[j];
-				PamVector v = geometry.getGeometry()[geometry.getHydrophoneList()[hi]].
-						sub(geometry.getGeometry()[geometry.getHydrophoneList()[hj]]);
-				maxDelays[i][j] = v.norm()/c;
+		int[] hydroList = geometry.getHydrophoneList();
+		if (hydroList.length < nCh) {
+			String warn = String.format("hydrophone list length %d is less than number of channels %d\n", hydroList.length, nCh);
+			PamWarning warning = new PamWarning("GenericTOADLocaliser.getMaxDelays()", warn , 2);
+			warning.setEndOfLife(PamCalendar.getTimeInMillis() + 10000);
+			WarningSystem.getWarningSystem().addWarning(warning);
+			nCh = hydroList.length;
+		}
+		try {
+			for (int i = 0; i < nCh; i++) {
+				for (int j = i+1; j < nCh; j++) {
+					/*
+					 * don't need this additional lookup since hydroList is 
+					 * already length nCh and has the correct hydrophones already
+					 * in it. 
+					 */
+//					int hi = hIndex == null ? i : hIndex[i];
+//					int hj = hIndex == null ? j : hIndex[j];
+					PamVector v = geometry.getGeometry()[hydroList[i]].
+							sub(geometry.getGeometry()[hydroList[j]]);
+					maxDelays[i][j] = v.norm()/c;
+				}
 			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
 		}
 		return maxDelays;
 	}
@@ -408,7 +430,7 @@ public class GenericTOADCalculator implements TOADCalculator, PamSettings {
 	private double[] getSlidingDelay(FFTDataUnit[] fftListA, FFTDataUnit[] fftListB, int startA, int startB) {
 		int halfFFFTLen = fftListA[0].getFftData().length();
 		int fftLength = halfFFFTLen*2;
-		ComplexArray conjArray = new ComplexArray(fftLength);
+		ComplexArray conjArray = new ComplexArray(fftLength/2);
 		double[] conjData = conjArray.getData();
 		double totPowerA=0, totPowerB=0;
 		int nA = fftListA.length;
@@ -455,16 +477,21 @@ public class GenericTOADCalculator implements TOADCalculator, PamSettings {
 		if (totalOverlap == 0) {
 			return null;
 		}
+		double scale = Math.sqrt(totPowerA*totPowerB)*2/fftLength;
 		/**
 		 * Now fill in the second half of the conj array...
+		 * Don't do this any more since we're now using the realInverse function, so don't
+		 * have to calculate the second half of the input to the inverse FFt. Faster and more accurate. 
 		 */
-		double scale = Math.sqrt(totPowerA*totPowerB)*2;
-		for (int re = 0, im = 1, re2=fftLength*2-2, im2 = fftLength*2-1; re < fftLength; re+=2, im+=2, re2-=2, im2-=2) {
-			conjData[re2] = conjData[re];
-			conjData[im2] = -conjData[im];
-		}
-		correlations.getFastFFT().ifft(conjArray, fftLength);
-		double[] delayAndHeight = correlations.getInterpolatedPeak(conjArray, scale, halfFFFTLen);
+//		for (int re = 0, im = 1, re2=fftLength*2-2, im2 = fftLength*2-1; re < fftLength; re+=2, im+=2, re2-=2, im2-=2) {
+//			conjData[re2] = conjData[re];
+//			conjData[im2] = -conjData[im];
+//		}
+//		double[] newDat = Arrays.copyOf(conjData, fftLength/2);
+//		ComplexArray oth = new ComplexArray(newDat);
+//		double[] xCorr = correlations.getFastFFT().realInverse(oth);
+		double[] xCorr = correlations.getFastFFT().realInverse(conjArray);
+		double[] delayAndHeight = correlations.getInterpolatedPeak(xCorr, scale, halfFFFTLen);
 		delayAndHeight = Arrays.copyOf(delayAndHeight, 3);
 		delayAndHeight[2] = totalOverlap; 
 //		System.out.printf("Offsets %d, %d, corr %3.3f, overlap %d of %d = %3.1f%%\n", 

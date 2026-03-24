@@ -5,6 +5,7 @@ import java.io.Serializable;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 
 /**
  * Information on a file path or folder path that can be used with the 
@@ -42,7 +43,7 @@ public class FileLocation implements Serializable, Cloneable, ManagedParameters 
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 	
@@ -57,10 +58,10 @@ public class FileLocation implements Serializable, Cloneable, ManagedParameters 
 		}
 		try {
 			File fPath = new File(path);
-			if (fPath.exists() == false) {
+			if (!fPath.exists()) {
 				fPath = fPath.getParentFile();
 			}
-			if (fPath.exists() == false) {
+			if (!fPath.exists()) {
 				return null;
 			}
 			return fPath.getFreeSpace();

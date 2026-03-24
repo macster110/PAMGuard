@@ -32,6 +32,11 @@ public class PamWorker<T> {
 
 
 	private BackgroundWorker backgroundWorker;
+	
+	private boolean dumpException = true;
+	
+	private Exception thrownException = null;
+
 
 	private volatile boolean running = false;
 
@@ -82,16 +87,33 @@ public class PamWorker<T> {
 	 */
 	public boolean start() {
 		if (backgroundWorker.isCancelled() || backgroundWorker.isDone() || running) return false; 
-		backgroundWorker.execute();
+		backgroundWorker.execute();		
 		return true; 
 	}
 
-	protected class BackgroundWorker extends SwingWorker<T, PamWorkProgressMessage> {
+	public class BackgroundWorker extends SwingWorker<T, PamWorkProgressMessage> {
 
 		@Override
 		protected T doInBackground() throws Exception {
 			running = true;
-			T ans = pamWorkWrapper.runBackgroundTask(PamWorker.this);
+			T ans = null;
+			try {
+				ans = pamWorkWrapper.runBackgroundTask(PamWorker.this);
+			}
+			catch (Exception e) {
+				/**
+				 * Added this in since the caller to doInBackground has an exception handler
+				 * so messages don't get through. Worse, running = false is never set, and done() never called 
+				 * so this causes the Swing GUI to hang. 
+				 * Catching and reporting the message should help this. Can also make the 
+				 * exception available externally, so that anything using this can access
+				 * it for more detail if it's been hidden. 
+				 */
+				thrownException = e;
+				if (dumpException) {
+					e.printStackTrace();
+				}
+			}
 			running = false;
 			return ans;
 		}
@@ -125,6 +147,7 @@ public class PamWorker<T> {
 		@Override
 		protected void process(List<PamWorkProgressMessage> chunks) {
 			for (PamWorkProgressMessage msg:chunks) {
+				//System.out.println("PamWorker: msg: " + msg.textLines[0] +  " progress: " + msg.progress +   " " + this);
 				if (pamWorkDialog!=null) {
 					pamWorkDialog.update(msg);
 				}
@@ -139,6 +162,17 @@ public class PamWorker<T> {
 		}
 
 	}
+	
+
+	public PamWorkDialog getPamWorkDialog() {
+		return pamWorkDialog;
+	}
+
+
+	public BackgroundWorker getBackgroundWorker() {
+		return backgroundWorker;
+	}
+
 
 
 
@@ -153,6 +187,35 @@ public class PamWorker<T> {
 	 */
 	public PamWorkerProgressFX getPamWorkProgress() {
 		return pamWorkProgress;
+	}
+
+
+	/**
+	 * calls Exception.printStackTrace() if an excpetion is thrown in the worker thread. <br>
+	 * Default is true.
+	 * @return the dumpException
+	 */
+	public boolean isDumpException() {
+		return dumpException;
+	}
+
+
+	/**
+	 * calls Exception.printStackTrace() if an exception is thrown in the worker thread. <br>
+	 * Default is true.
+	 * @param dumpException the dumpException to set
+	 */
+	public void setDumpException(boolean dumpException) {
+		this.dumpException = dumpException;
+	}
+
+
+	/**
+	 * Get the exception if one was thrown in the worker thread. 
+	 * @return the thrownException
+	 */
+	public Exception getThrownException() {
+		return thrownException;
 	}
 
 }

@@ -4,15 +4,11 @@ import java.awt.Frame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.Serializable;
+import java.util.ListIterator;
 
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
-import warnings.PamWarning;
-import warnings.WarningSystem;
 import NMEA.NMEADataBlock;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitSettings;
@@ -20,8 +16,12 @@ import PamController.PamController;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamController.positionreference.PositionReference;
-import PamUtils.PamCalendar;
+import PamUtils.PlatformInfo;
+import PamUtils.PlatformInfo.OSType;
 import PamView.dialog.warn.WarnOnce;
+import PamguardMVC.PamDataBlock;
+import warnings.PamWarning;
+import warnings.WarningSystem;
 
 public class GPSControl extends PamControlledUnit implements PamSettings, PositionReference {
 
@@ -38,13 +38,16 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 	
 	private ProcessNmeaData gpsProcess;
 	
+	public ProcessNmeaData getGpsProcess() {
+		return gpsProcess;
+	}
 	protected ProcessHeadingData headingProcess;
 	
 	//viewer functionality;
 	private ImportGPSData importGPSData;
-	ImportGPSParams gpsImportParams= new ImportGPSParams(); 
 	
-	
+	ImportGPSParams gpsImportParams = new ImportGPSParams(); 
+		
 	public static final String gpsUnitType = "GPS Acquisition";
 	
 	private PamWarning gpsTimeWarning;
@@ -128,7 +131,6 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 		menuItem.addActionListener(new UpdateClock(parentFrame));
 		subMenu.add(menuItem);
 		
-
 		return subMenu;
 	}
 
@@ -142,7 +144,9 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 		@Override
 		public void actionPerformed(ActionEvent arg0) {
 			String currentPath;
-			ImportGPSParams newParams=ImportGPSDialog.showDialog(PamController.getInstance().getMainFrame(), PamController.getInstance().getMainFrame().getMousePosition(),gpsImportParams, importGPSData);
+			PamController.getInstance();
+			PamController.getInstance();
+			ImportGPSParams newParams=ImportGPSDialog.showDialog(PamController.getMainFrame(), PamController.getMainFrame().getMousePosition(),gpsImportParams, importGPSData);
 			
 			if (newParams!=null) gpsImportParams=newParams.clone();
 			
@@ -166,6 +170,7 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 			this.parentFrame = parentFrame;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			GPSParameters newP = GPSParametersDialog.showDialog(parentFrame, gpsParameters);
 			if (newP != null) {
@@ -182,24 +187,36 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 			this.parentFrame = parentFrame;
 		}
 
+		@Override
 		public void actionPerformed(ActionEvent e) {
-			String message = "<html>Clock management is now controlled from the \"File/Global time settings\" menu<p>" +
-		"The Global time settings do not require administrator privilidges<p><p>" +
-					"Press OK to proceed anyway to old GPS clock setting method</html>";
-			int ans = WarnOnce.showWarning(parentFrame, "System clock updating", message, WarnOnce.OK_CANCEL_OPTION);
-			if (ans == WarnOnce.OK_OPTION) {
-				GPSParameters newP = UpdateClockDialog.showDialog(parentFrame, gpsControl, gpsParameters, false);
-				gpsParameters = newP.clone();
-			}
+//			if (PlatformInfo.calculateOS() == OSType.WINDOWS) {
+			/**
+			 * This is no longer relevant since we've found a way to get round Windows security and allow
+			 * clock updates again. A different warning will be issued if the clock update fails, directing
+			 * people to the help pages. 
+			 */
+//				String message = "<html>Clock management is now controlled from the \"File/Global time settings\" menu<p>" +
+//						"The Global time settings do not require administrator privilidges<p><p>" +
+//						"Press OK to proceed anyway to old GPS clock setting method</html>";
+//				int ans = WarnOnce.showWarning(parentFrame, "System clock updating", message, WarnOnce.OK_CANCEL_OPTION);
+//				if (ans == WarnOnce.CANCEL_OPTION) {
+//					return;
+//				}
+//			}
+			GPSParameters newP = UpdateClockDialog.showDialog(parentFrame, gpsControl, gpsParameters, false);
+			gpsParameters = newP.clone();
 		}
 	}
+	@Override
 	public Serializable getSettingsReference() {
 		return gpsParameters;
 	}
+	@Override
 	public long getSettingsVersion() {
 		return GPSParameters.serialVersionUID;
 	}
 	
+	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 
 		if (pamControlledUnitSettings.getUnitType().equals(this.getUnitType())
@@ -242,8 +259,70 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 		return super.removeUnit();
 	}
 	
+	/**
+	 * Gets the closest position based on time. No interpolation
+	 * @param timeMilliseconds
+	 * @return closest ship position based on time. 
+	 */
 	public GpsDataUnit getShipPosition(long timeMilliseconds) {
 		return getGpsDataBlock().getClosestUnitMillis(timeMilliseconds);
+	}
+
+	/**
+	 * Gets the closest position based on time. 
+	 * @param timeMilliseconds time in milliseconds
+	 * @param interpolate interpolate between the point before and the one after. 
+	 * @return interpolated gps position. 
+	 */
+	public GpsDataUnit getShipPosition(long timeMilliseconds, boolean interpolate) {
+ 		if (!interpolate) {
+			return getGpsDataBlock().getClosestUnitMillis(timeMilliseconds);
+		}
+		// otherwise try to fine a point either side and weighted mean them or extrapolate. 
+		GpsDataUnit pointBefore = null, pointAfter = null;
+		synchronized (getGpsDataBlock().getSynchLock()) {
+			ListIterator<GpsDataUnit> iter = getGpsDataBlock().getListIterator(timeMilliseconds, 0, PamDataBlock.MATCH_BEFORE, PamDataBlock.POSITION_BEFORE);
+			if (iter == null) {
+				return null;
+			}
+			if (iter.hasNext()) {
+				pointBefore = iter.next();
+			}
+			if (iter.hasNext()) {
+				pointAfter = iter.next();
+			}
+		}
+		if (pointBefore == null && pointAfter == null) {
+			return null;
+		}
+		if (pointBefore != null & pointAfter != null) {
+			// interpolate since we have them both. 
+			double tB = timeMilliseconds-pointBefore.getTimeMilliseconds();
+			double tA = pointAfter.getTimeMilliseconds()-timeMilliseconds;
+			double wB = tA/(tB+tA); // weight for data before
+			double wA = tB/(tB+tA); // wedight for data after
+			double newLat = pointBefore.getGpsData().getLatitude()*wB + pointAfter.getGpsData().getLatitude()*wA;
+			double newLon = pointBefore.getGpsData().getLongitude()*wB + pointAfter.getGpsData().getLongitude()*wA;
+			// interpolating heading is more faff:
+			double hB = pointBefore.getGpsData().getHeading();
+			double hA = pointAfter.getGpsData().getHeading();
+			double hX = Math.sin(Math.toRadians(hB))*wB + Math.sin(Math.toRadians(hB))*wB;
+			double hY = Math.cos(Math.toRadians(hB))*wB + Math.cos(Math.toRadians(hB))*wB;
+			double newHead = Math.toDegrees(Math.atan2(hX, hY));
+			GpsData newData = new GpsData(newLat, newLon, 0, timeMilliseconds);
+			newData.setTrueHeading(newHead);
+			return new GpsDataUnit(timeMilliseconds, newData);
+		}
+		else if (pointBefore != null) {
+			// relatively common if we enter data just after a position was received. 
+			GpsData newPos = pointBefore.getGpsData().getPredictedGPSData(timeMilliseconds);
+			return new GpsDataUnit(timeMilliseconds, newPos);
+		}
+		else if (pointAfter != null) {
+			GpsData newPos = pointAfter.getGpsData().getPredictedGPSData(timeMilliseconds);
+			return new GpsDataUnit(timeMilliseconds, newPos);
+		}
+		return null; // should never happen since one of the above 4 clauses must be met. 
 	}
 	/**
 	 * Do we want this string ? It will be either RMC or GGA and may want wildcarding
@@ -322,6 +401,7 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 	public GPSDataMatcher getGpsDataMatcher() {
 		return gpsDataMatcher;
 	}
+	
 	@Override
 	public GpsData getReferencePosition(long timeMillis) {
 		GpsDataUnit gpDU = getShipPosition(timeMillis);

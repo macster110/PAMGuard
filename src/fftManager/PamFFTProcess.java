@@ -23,18 +23,18 @@ package fftManager;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Vector;
+import java.util.stream.Collectors;
 
-import PamController.PamController;
 import PamDetection.RawDataUnit;
 import PamUtils.PamUtils;
 import PamUtils.complex.ComplexArray;
-import PamguardMVC.ProcessAnnotation;
 import PamguardMVC.PamConstants;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
 import PamguardMVC.PamProcess;
 import PamguardMVC.PamRawDataBlock;
+import PamguardMVC.ProcessAnnotation;
 import Spectrogram.WindowFunction;
 
 /**
@@ -124,6 +124,7 @@ public class PamFFTProcess extends PamProcess {
 
 	public synchronized void setupFFT() {
 		
+//		System.out.println("In call to setupFFT in " + getProcessName());
 		// need to find the existing source data block and remove from observing it.
 		// then find the new one and subscribe to that instead. 
 		channelCounts = new int[PamConstants.MAX_CHANNELS];
@@ -156,7 +157,7 @@ public class PamFFTProcess extends PamProcess {
 		//added as null pointer causing exception in FFT module on viewer start up. 
 		//26/02/2018
 		if (rawDataBlock==null) return;
-		
+
 		setParentDataBlock(rawDataBlock);
 		
 		if (rawDataBlock == null) return;
@@ -234,7 +235,7 @@ public class PamFFTProcess extends PamProcess {
 	@Override
 	public void newData(PamObservable obs, PamDataUnit pamRawData) {
 		FFTDataUnit pu;
-/*		
+/*
  * 
  * 		int i=0;
  * 		System.out.println(pamRawData.getParentDataBlock().);
@@ -383,35 +384,43 @@ public class PamFFTProcess extends PamProcess {
 				dataPointer = fftOverlap;
 				if (dataPointer > 0) {
 					copyFrom = fftParameters.fftHop;
-					for (int j = 0; j < fftOverlap; j++) {
+					for (int j = 0; j < fftOverlap && copyFrom < fftParameters.fftLength; j++) {
 						windowedData[iChan][j] = windowedData[iChan][copyFrom++];
 //						windowedData[iChan] = Arrays.copyOfRange(windowedData[iChan], fftParameters.fftHop, fftParameters.fftHop+fftParameters.fftLength);
 					}
 				}
 			}
 		}
+		/**
+		 * Make a local copy of the array
+		 */
+		TempOutputStore[] oldStores = tempStores;
+		
 		if (iChan == PamUtils.getHighestChannel(fftParameters.channelMap)) {
 			// time to empty the stores - assume they all have the same
 			// amount of data 
 			int[] chanList = PamUtils.getChannelArray(fftParameters.channelMap);
 			try {
-			int n = tempStores[iChan].getN();
-			for (int iF = 0; iF < n; iF++) {
-				for (int iC = 0; iC < chanList.length; iC++) {
-//					pu = tempStores[chanList[iC]].get(iF);
-					try {
-					outputData.addPamData(tempStores[chanList[iC]].get(iF));
+				int n = oldStores[iChan].getN();
+				for (int iF = 0; iF < n; iF++) {
+					for (int iC = 0; iC < chanList.length; iC++) {
+						//					pu = tempStores[chanList[iC]].get(iF);
+						try {
+							outputData.addPamData(oldStores[chanList[iC]].get(iF));
+						}
+						catch (ArrayIndexOutOfBoundsException e) {
+							//						e.printStackTrace();
+//							System.err.printf("%s.newData: %s Store %s (was %s) iC: %d of %d iF: %d of %d\n", 
+//									this.getPamControlledUnit().getUnitName(), e.getMessage(), 
+//									oldStores[chanList[iC]], oldStores[chanList[iC]],
+//									iC, chanList.length, iF, n);
+						}
+						//					outputData.addPamData(null);
 					}
-					catch (ArrayIndexOutOfBoundsException e) {
-//						e.printStackTrace();
-						System.err.println("PAMFFTProcess.newData: " + e.getMessage() + " " + this.getPamControlledUnit().getUnitName() + " iC: " + iC +  " iF: " + iF);
-					}
-//					outputData.addPamData(null);
 				}
-			}
-			for (int iC = 0; iC < chanList.length; iC++) {
-				tempStores[chanList[iC]].clearStore();
-			}
+				for (int iC = 0; iC < chanList.length; iC++) {
+					oldStores[chanList[iC]].clearStore();
+				}
 			}
 			catch (Exception e) {
 				e.printStackTrace();
@@ -435,8 +444,27 @@ public class PamFFTProcess extends PamProcess {
 	}
 
 	@Override
-	public void prepareProcess() {
+	public boolean prepareProcessOK() {
+
 		setupFFT();
+
+		int fftChannelMap = fftControl.fftParameters.channelMap;
+		int sourceChannelMap = this.parentDataBlock.getChannelMap();
+		int unavailableSelectedChannels = fftChannelMap & ~sourceChannelMap;
+
+		if (unavailableSelectedChannels != 0) {
+			String commaSeparatedChannels = Arrays.stream(PamUtils.getChannelArray(unavailableSelectedChannels))
+					.mapToObj(String::valueOf)
+					.collect(Collectors.joining(", "));
+
+			System.err.printf(
+					"Error in the configuration of %s.\nFFT configuration uses the following channels that are not available in the source data: %s\n\n",
+					getProcessName(),
+					commaSeparatedChannels);
+			return false;
+		}
+
+		return true;
 	}
 	
 
@@ -538,6 +566,32 @@ public class PamFFTProcess extends PamProcess {
 	public ArrayList getCompatibleDataUnits(){
 		return new ArrayList<Class<? extends PamDataUnit>>(Arrays.asList(RawDataUnit.class));
 	}
+
+	@Override
+	public synchronized void dumpBufferStatus(String message, boolean sayEmpties) {
+		
+		super.dumpBufferStatus(message, sayEmpties);
+		int nTemp = 0;
+		if (tempStores != null) {
+			nTemp = tempStores.length;
+		}
+		for (int i = 0; i < nTemp; i++) {
+			if (tempStores[i] == null) {
+				continue;
+			}
+			int n = tempStores[i].tempUnits.size();
+			if (n > 0 || sayEmpties) {
+				System.out.printf("FFT %s temp store %d has %d datas\n", getProcessName(), i, n);
+			}
+		}
+	}
+	
+	@Override
+	public boolean isClearAtStart() {
+		// definitely always want to clear FFT data at start, whatever about anything else. 
+		return true;
+	}
+
 
 //	@Override
 //	public boolean requestOfflineData(PamDataBlock dataBlock, long startMillis,

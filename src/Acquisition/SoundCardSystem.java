@@ -8,27 +8,27 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.LineUnavailableException;
 import javax.sound.sampled.Mixer;
+import javax.sound.sampled.Mixer.Info;
 import javax.sound.sampled.TargetDataLine;
-import javax.swing.JComboBox;
-import javax.swing.JPanel;
-import javax.swing.border.TitledBorder;
+import javax.swing.JComponent;
 
 import Acquisition.layoutFX.AcquisitionPaneFX;
 import Acquisition.layoutFX.DAQSettingsPane;
 import Acquisition.layoutFX.SoundCardDAQPane;
-import soundPlayback.PlaybackControl;
-import soundPlayback.PlaybackSystem;
-import soundPlayback.SoundCardPlayback;
-import wavFiles.ByteConverter;
 import PamController.PamControlledUnitSettings;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamDetection.RawDataUnit;
-import PamguardMVC.debug.Debug;
+import PamUtils.FrequencyFormat;
+import pamguard.GlobalArguments;
+import soundPlayback.PlaybackControl;
+import soundPlayback.PlaybackSystem;
+import soundPlayback.SoundCardPlayback;
+import wavFiles.ByteConverter;
 
 /**
  * Everything and everything to do with controlling and reading sound cards.
- * 
+ *
  * @author Doug Gillespie
  * @see Acquisition.DaqSystem
  * @see Acquisition.AcquisitionProcess
@@ -37,28 +37,33 @@ import PamguardMVC.debug.Debug;
 public class SoundCardSystem extends DaqSystem implements PamSettings {
 
 	public static final String sysType = "Sound Card";
-
-	JPanel daqDialog;
 	
-	JComboBox audioDevices;
+	/**
+	 * global argument options to set device name or number 
+	 */
+	public static final String SETDEVNAME = "-scname";
+	public static final String SETDEVNUMBER = "-scnumber";
+
+//	JPanel daqDialog;
+	SoundCardPanel soundCardPanel;
 	
 	SoundCardParameters soundCardParameters = new SoundCardParameters(sysType);
-	
+
 	private AudioFormat audioFormat;
 
 	private AudioDataQueue newDataList;
-	
+
 	private volatile boolean stopCapture;
-	
+
 	private AcquisitionControl acquisitionControl;
-	
+
 	private int rawBufferSizeInBytes;
 	// Might need this to be more flexible
 	private int sampleSizeInBytes = 2;
 	private double sampleMax = 32768;
-	
+
 	private int daqChannels;
-	
+
 	private TargetDataLine targetDataLine;
 
 	private PlaybackSystem soundCardPlayback;
@@ -66,47 +71,75 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 	private int dataUnitSamples;
 
 	private ByteConverter byteConverter;
-	
+
 	/**
 	 * JavaFX settings pane for sound card settings
 	 */
 	private SoundCardDAQPane soundCardSettingsPane;
-	
+
 	public SoundCardSystem (AcquisitionControl daqControl) {
 		this.acquisitionControl = daqControl;
 		PamSettingManager.getInstance().registerSettings(this);
 		soundCardPlayback = new SoundCardPlayback(this);
+		checkGlobalArguments();
 	}
-	
+
+	/**
+	 * Check to see if a device name or number has been fed in as a global argument
+	 */
+	private void checkGlobalArguments() {
+		String gName = GlobalArguments.getParam(SETDEVNAME);
+		if (gName != null) {
+			if (checkDeviceName(gName)) {
+				soundCardParameters.deviceName = gName;
+				soundCardParameters.deviceNumber = getDeviceNumber(soundCardParameters.deviceNumber, gName);
+			}
+		}
+		
+		String gNumS = GlobalArguments.getParam(SETDEVNUMBER);
+		if (gNumS != null) {
+			try {
+				int gNum = Integer.valueOf(gNumS);
+				soundCardParameters.deviceNumber = gNum;
+				soundCardParameters.deviceName = getDeviceName(gNum);
+			}
+			catch (NumberFormatException e) {
+				
+			}
+		}
+		
+	}
+
 	@Override
 	public boolean prepareSystem(AcquisitionControl daqControl) {
 
 		this.acquisitionControl = daqControl;
-		
+
 		// keep a reference to where data will be put.
 		this.newDataList = daqControl.getDaqProcess().getNewDataQueue();
 		if (this.newDataList == null) return false;
 		daqChannels = daqControl.acquisitionParameters.nChannels;
 		float sampleRate = daqControl.acquisitionParameters.sampleRate;
-		
-		audioFormat = new AudioFormat(sampleRate, 16, daqChannels, true, true);
+
+		audioFormat = new AudioFormat(sampleRate, soundCardParameters.getBitDepth(), daqChannels, true, true);
 
 		dataUnitSamples = (int) (acquisitionControl.acquisitionParameters.sampleRate / 10);
 		dataUnitSamples = Math.max(dataUnitSamples, 1000);
-		
+
 		ArrayList<Mixer.Info> mixerinfos = getInputMixerList();
+		int devNum = getDeviceNumber();
 		//System.out.println("soundCardParameters.deviceNumber:"+soundCardParameters.deviceNumber);
-		if (soundCardParameters.deviceNumber < 0 || soundCardParameters.deviceNumber >= mixerinfos.size()) {
-			System.out.println("Invalid sound card number: " + soundCardParameters.deviceNumber);
+		if (devNum < 0 || devNum >= mixerinfos.size()) {
+			System.out.println("Invalid sound card number: " + devNum);
 			return false;
 		}
-		Mixer.Info thisMixerInfo = mixerinfos.get(soundCardParameters.deviceNumber);
+		Mixer.Info thisMixerInfo = mixerinfos.get(devNum);
 		Mixer thisMixer = AudioSystem.getMixer(thisMixerInfo);
 		if (thisMixer.getTargetLineInfo().length <= 0){
 			thisMixer.getLineInfo();
 			return false;
 		}
-		
+
 		try {
 			// try to get the device of choice ...
 			targetDataLine = (TargetDataLine) thisMixer.getLine(thisMixer.getTargetLineInfo()[0]);
@@ -118,7 +151,7 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 
 		boolean lineOk = false;
 //		audioFormat = new AudioFormat(sampleRate, 24, daqChannels, true, true);
-//		// first try to open input for 24 bit recording, 
+//		// first try to open input for 24 bit recording,
 //		try {
 //			targetDataLine.open(audioFormat);
 //			sampleSizeInBytes = 3;
@@ -128,28 +161,29 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 //		} catch (LineUnavailableException Ex) {
 //			lineOk = false;
 //		}
-		// if the 24 bit recording failed, then try to open for 16 bit recording. 
-		if (lineOk == false) {
-			audioFormat = new AudioFormat(sampleRate, 16, daqChannels, true, true);
+		// if the 24 bit recording failed, then try to open for 16 bit recording.
+		if (!lineOk) {
+			audioFormat = new AudioFormat(sampleRate, soundCardParameters.getBitDepth(), daqChannels, true, true);
 			try {
 				targetDataLine.open(audioFormat);
-				sampleMax = 1<<15;
+				sampleMax = 1<<(soundCardParameters.getBitDepth()-1);
 				lineOk = true;
 			} catch (LineUnavailableException Ex) {
-				System.out.println("Sound card 16 bit recording unavailable");
+				System.out.printf("Sound card %d bit %d channel recording at %s unavailable\n", 
+						soundCardParameters.getBitDepth(), daqChannels, FrequencyFormat.formatFrequency(sampleRate, true));
 				return false;
 			}
 		}
 
 		byteConverter = ByteConverter.createByteConverter(audioFormat);
-		
+
 		// Buffer size to hold 1/10th of a second
 		rawBufferSizeInBytes = dataUnitSamples  * daqChannels * sampleSizeInBytes;
-		
-		
+
+
 		return true;
 	}
-	
+
 
 	/* (non-Javadoc)
 	 * @see Acquisition.DaqSystem#getDataUnitSamples()
@@ -161,20 +195,20 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 
 	@Override
 	public boolean startSystem(AcquisitionControl daqControl) {
-		
+
 		if (targetDataLine == null) return false;
 
 		// Create a thread to capture the sound card input
 		// and start it running.
 		Thread captureThread = new Thread(new CaptureThread());
 		captureThread.start();
-		
+
 		// then start the device
 		targetDataLine.start();
-		
+
 		setStreamStatus(STREAM_RUNNING);
 		return true;
-		
+
 	}
 
 	@Override
@@ -202,75 +236,67 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 	}
 
 	@Override
-	public JPanel getDaqSpecificDialogComponent(AcquisitionDialog acquisitionDialog) {
+	public JComponent getDaqSpecificDialogComponent(AcquisitionDialog acquisitionDialog) {
 
-		if (daqDialog == null) {
-			daqDialog = createDaqDialogPanel();
-		}
-		
-		return daqDialog;
-		
+		return getSoundCardPanel().getComponent(acquisitionDialog);
+
 	}
-
-	private JPanel createDaqDialogPanel() {
-		
-		JPanel p = new JPanel();
-		
-		p.setBorder(new TitledBorder("Select audio line"));
-		p.setLayout(new BorderLayout());
-		p.add(BorderLayout.CENTER, audioDevices = new JComboBox());
-		
-		return p;
+	
+	private SoundCardPanel getSoundCardPanel() {
+		if (soundCardPanel == null) {
+			soundCardPanel = new SoundCardPanel(this);
+		}
+		return soundCardPanel;
 	}
 
 
 	public static ArrayList<Mixer.Info> getInputMixerList() {
-		ArrayList<Mixer.Info> mixers = new ArrayList<Mixer.Info>();
+		ArrayList<Mixer.Info> mixers = new ArrayList<>();
 		AudioSystem.getMixerInfo();
 		Mixer.Info[] mixerInfo = AudioSystem.getMixerInfo();
 		Mixer mixer;
-		for (int i = 0; i < mixerInfo.length; i++) {
-			mixer = AudioSystem.getMixer(mixerInfo[i]);
+		for (Info element : mixerInfo) {
+			mixer = AudioSystem.getMixer(element);
 			//System.out.println("mixer:"+mixer);
 			//System.out.println(mixer.getClass().getName());
 			//System.out.println("mixer info:"+mixerInfo[i]);
-			//extra bit for Mac's where "Line In" is under mixer "Built-in Line Input" 
+			//extra bit for Mac's where "Line In" is under mixer "Built-in Line Input"
 			//which is com.sun.media.sound.SimpleInputDevice
 			//cjb 2009-01-05
 			if (mixer.getTargetLineInfo().length > 0){
 				if ( (mixer.getClass().getName().equals("com.sun.media.sound.DirectAudioDevice")) ||
 						(mixer.getClass().getName().equals("com.sun.media.sound.SimpleInputDevice"))) {
 					//System.out.println("Adding to input mixer list:"+mixer.getClass().getName());
-					mixers.add(mixerInfo[i]);
+					mixers.add(element);
 				}
 			}
 		}
 		return mixers;
 	}
 	public static ArrayList<Mixer.Info> getOutputMixerList() {
-		ArrayList<Mixer.Info> mixers = new ArrayList<Mixer.Info>();
+		ArrayList<Mixer.Info> mixers = new ArrayList<>();
 		AudioSystem.getMixerInfo();
 		Mixer.Info[] mixerInfo = AudioSystem.getMixerInfo();
 		Mixer mixer;
-		for (int i = 0; i < mixerInfo.length; i++) {
+		for (Info element : mixerInfo) {
 			try {
-			mixer = AudioSystem.getMixer(mixerInfo[i]);
+			mixer = AudioSystem.getMixer(element);
 			}
 			catch (Exception e) {
 				continue;
 			}
 			//System.out.println("Output mixer list:" + mixer);
 			//System.out.println("Output mixer list:" + mixer.getClass().getName());
-			//extra bit for Mac's where "Line Out" is under mixer "Built-in Line Input" 
-			//which gives 0 length array for getSourceLineInfo() 
+			//extra bit for Mac's where "Line Out" is under mixer "Built-in Line Input"
+			//which gives 0 length array for getSourceLineInfo()
 			//cjb 2009-01-05
 			if (mixer.getSourceLineInfo().length > 0){
 				if ((mixer.getClass().getName().equals("com.sun.media.sound.DirectAudioDevice")) ||
 				(mixer.getClass().getName().equals("com.sun.media.sound.HeadspaceMixer"))) {
 					//System.out.println(mixer.getClass().getName());
-					mixers.add(mixerInfo[i]);
+					mixers.add(element);
 //					Debug.out.printf("Use mixer %d, %s\n", i,  mixerInfo[i].getName());
-				}			
+				}
 //				else {
 //					Debug.out.printf("Don't Use mixer %d, %s\n", i,  mixerInfo[i].getName());
 //				}
@@ -281,9 +307,9 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 		}
 		return mixers;
 	}
-	
+
 	public static ArrayList<String> getDevicesList() {
-		ArrayList<String> devices = new ArrayList<String>();
+		ArrayList<String> devices = new ArrayList<>();
 		ArrayList<Mixer.Info> mixers = getInputMixerList();
 		for (int i = 0; i < mixers.size(); i++) {
 			//System.out.println("Adding Device:"+mixers.get(i).getName());
@@ -291,9 +317,9 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 		}
 		return devices;
 
-			
+
 	}
-	
+
 	@Override
 	public void dialogSetParams() {
 		// do a quick check to see if the system type is stored in the parameters.  This field was added
@@ -302,48 +328,50 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 		// whether or not to include the parameters in the XML output
 		if (soundCardParameters.systemType==null) soundCardParameters.systemType=getSystemType();
 
+		getSoundCardPanel().setParams();
+//		ArrayList<String> devices = getDevicesList();
+//
+//		audioDevices.removeAllItems();
+//		for (String element : devices) {
+//			//System.out.println("Adding to audio device:"+devices.get(i));
+//			audioDevices.addItem(element);
+//		}
+//
+//		soundCardParameters.deviceNumber = Math.max(Math.min(devices.size()-1, soundCardParameters.deviceNumber), 0);
+//		if (devices.size() > 0) {
+//			audioDevices.setSelectedIndex(soundCardParameters.deviceNumber);
+//		}
 
-		ArrayList<String> devices = getDevicesList();
-		
-		audioDevices.removeAllItems();
-		for (int i = 0; i < devices.size(); i++) {
-			//System.out.println("Adding to audio device:"+devices.get(i));
-			audioDevices.addItem(devices.get(i));
-		}
-		
-		soundCardParameters.deviceNumber = Math.max(Math.min(devices.size()-1, soundCardParameters.deviceNumber), 0);
-		if (devices.size() > 0) {
-			audioDevices.setSelectedIndex(soundCardParameters.deviceNumber);
-		}
-		
 	}
-	
+
 	@Override
 	public boolean dialogGetParams() {
 		//System.out.println("soundCardParameters: " + soundCardParameters + "audioDevices: " + audioDevices);
-		if (audioDevices!=null) soundCardParameters.deviceNumber = audioDevices.getSelectedIndex();
-		return true;
+//		if (audioDevices!=null) soundCardParameters.deviceNumber = audioDevices.getSelectedIndex();
+//		return true;
+		return getSoundCardPanel().getParams();
 	}
-	
+
 	@Override
 	public String getSystemType() {
 		return sysType;
 	}
-	
+
 	@Override
 	public String getSystemName() {
 		// return the name of the sound card.
 		ArrayList<String> devices = getDevicesList();
 		//System.out.println("soundCardParameters.deviceNumber:"+soundCardParameters.deviceNumber);
 		//System.out.println("devices.size():"+devices.size());
-		if (devices == null || devices.size() <= soundCardParameters.deviceNumber) {
+		int devNum = getDeviceNumber();
+		if (devices == null || devices.size() <= devNum) {
 			return new String("No card");
 		}
 		else {
 			//device number was sometimes ending up as -1 probably as getting set from
 			//as selected item in dialog when nothing selected? cjb
 			try {
-				return devices.get(java.lang.Math.max(soundCardParameters.deviceNumber,0));
+				return devices.get(java.lang.Math.max(devNum,0));
 			}
 			catch (Exception e) {
 				return "No card";
@@ -356,7 +384,7 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 		//javax.sound only seems to support upto 2 channels
 		//i.e. option of 1 or 2 - mono or stereo
 		//even though API reading API can make one think
-		//could have more... cjb 2010-04-28 
+		//could have more... cjb 2010-04-28
 		return 2;
 	}
 
@@ -364,7 +392,7 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 	public int getMaxSampleRate() {
 		return PARAMETER_UNKNOWN;
 	}
-	
+
 	/* (non-Javadoc)
 	 * @see Acquisition.DaqSystem#getPeak2PeakVoltage()
 	 */
@@ -376,6 +404,73 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 	@Override
 	public boolean isRealTime() {
 		return true;
+	}
+	
+	/**
+	 * Get the soundcard device number. Ideally this should be from the name, but can also
+	 * be from the number if the name doesnt' exist. 
+	 * @return
+	 */
+	public int getDeviceNumber() {
+		if (soundCardParameters == null) {
+			return 0;
+		}
+		return getDeviceNumber(soundCardParameters.deviceNumber, soundCardParameters.deviceName);
+	}
+	
+	/**
+	 * Get the device number to run. This should be based on name, but can default back 
+	 * to the number if the name cannot be found
+	 * @param number device number
+	 * @param name device name
+	 * @return usable device number
+	 */
+	public int getDeviceNumber(int number, String name) {
+		ArrayList<String> devList = getDevicesList();
+		if (devList == null || devList.size() == 0) {
+			return 0;
+		}
+		if (name == null) {
+			return Math.min(number, devList.size()-1);
+		}
+		for (int i = 0; i < devList.size(); i++) {
+			String aDev = devList.get(i);
+			if (name.equals(aDev)) {
+				return i;
+			}
+		}
+		return Math.min(number, devList.size()-1);
+	}
+	
+	/**
+	 * Get a device name for a number
+	 * @param devNumber
+	 * @return
+	 */
+	public String getDeviceName(int devNumber) {
+		ArrayList<String> devList = getDevicesList();
+		if (devList == null || devList.size() <= devNumber) {
+			return null;
+		}
+		return devList.get(devNumber);
+	}
+	
+	/**
+	 * Check a device name exists (Case sensitive);
+	 * @param devName
+	 * @return true if it exists. 
+	 */
+	public boolean checkDeviceName(String devName) {
+		ArrayList<String> devList = getDevicesList();
+		if (devList == null || devName == null) {
+			return false;
+		}
+		for (String aName : devList) {
+			if (aName.equals(devName)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
@@ -396,24 +491,29 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 		return PARAMETER_UNKNOWN;
 	}
 
+	@Override
 	public Serializable getSettingsReference() {
 		return soundCardParameters;
 	}
 
+	@Override
 	public long getSettingsVersion() {
 		return SoundCardParameters.serialVersionUID;
 	}
 
+	@Override
 	public String getUnitName() {
 //		return "Sound Card System";
 		return acquisitionControl.getUnitName();
 	}
 
+	@Override
 	public String getUnitType() {
 //		return "Acquisition System";
 		return "Sound Card System";
 	}
-	
+
+	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 //		if (PamSettingManager.getInstance().isSettingsUnit(this, pamControlledUnitSettings)) {
 		try {
@@ -428,7 +528,7 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 
 	private volatile boolean captureRunning;
 
-	
+
 //	/**
 //	 * Unpack the byte data into a sensible number.
 //	 * @param buffer
@@ -446,7 +546,8 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 //		}
 
 	class CaptureThread implements Runnable {
-		
+
+		@Override
 		public void run() {
 			stopCapture = false;
 			captureRunning = true;
@@ -472,10 +573,10 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 					count++;
 					// Read data from the internal
 					// buffer of the data line.
-					
+
 					int bytesRead = targetDataLine.read(tempBuffer, 0,
 							tempBuffer.length);
-					
+
 					// System.out.println("Read in :" + bytesRead + " bytes");
 					/*
 					 * Much better to create the PamDataUnits here, since the
@@ -483,11 +584,11 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 					 * this. The main thread then just has to add the references
 					 * to the PamDataBlocks to theoutput data block.
 					 */
-					
+
 					if (bytesRead > 0) {
 						// convert byte array to set of double arrays, one per
 						// channel  e.g. framesize = 1 for 8 bit sound
-						
+
 						// Framesize is bytecost per Sample in time. ie chanels x sampledepth in bygtes
 						newSamplesPerChannel = bytesRead / audioFormat.getFrameSize();
 						double[][] doubleData = new double[daqChannels][newSamplesPerChannel];
@@ -519,7 +620,7 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 					} catch (Exception ex) {
 						ex.printStackTrace();
 					}
-					
+
 				}// end while
 			} catch (Exception e) {
 				System.out.println(e);
@@ -529,33 +630,38 @@ public class SoundCardSystem extends DaqSystem implements PamSettings {
 			stopCapture = false;
 			captureRunning = false;
 			setStreamStatus(STREAM_ENDED);
-			
+
 		}// end run
 	}// end inner class CaptureThread
 	@Override
 	public void daqHasEnded() {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public String getDeviceName() {
-		return String.format("%d", soundCardParameters.deviceNumber);
+		return String.format("%d", getDeviceNumber());
 	}
-	
+
 	@Override
 	public DAQSettingsPane getDAQSpecificPane(AcquisitionPaneFX acquisitionPaneFX) {
 		if (soundCardSettingsPane==null) {
-			soundCardSettingsPane = new SoundCardDAQPane(this); 
+			soundCardSettingsPane = new SoundCardDAQPane(this);
 		}
 		return soundCardSettingsPane;
 	}
 
 	/**
-	 * Get the parameters for the sound card system. 
+	 * Get the parameters for the sound card system.
 	 * @return the parameters for the sound card system
 	 */
 	public SoundCardParameters getSoundCardParameters() {
 		return this.soundCardParameters;
+	}
+
+	@Override
+	public int getSampleBits() {
+		return soundCardParameters.getBitDepth();
 	}
 }

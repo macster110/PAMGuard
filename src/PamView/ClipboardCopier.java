@@ -40,7 +40,7 @@ public class ClipboardCopier implements ClipboardOwner, Transferable, Printable 
 
 	private Image image;
 
-	private String printJobName = "PAMGUARD";
+	private String printJobName = "PAMGuard";
 
 	/**
 	 * 
@@ -217,6 +217,7 @@ public class ClipboardCopier implements ClipboardOwner, Transferable, Printable 
 	 * @author Doug Gillespie
 	 */
 	class CopyToClipboard implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			copyToClipBoard();
 		}
@@ -251,6 +252,7 @@ public class ClipboardCopier implements ClipboardOwner, Transferable, Printable 
 	 * @author Doug Gillespie
 	 */
 	class PrintAction implements ActionListener {
+		@Override
 		public void actionPerformed(ActionEvent e) {
 			printComponent();
 		}

@@ -5,25 +5,23 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ListIterator;
 
-import fftManager.Complex;
-import fftManager.FastFFT;
-import wavFiles.WavFile;
-import wavFiles.WavFileReader;
-import wavFiles.WavHeader;
 import Acquisition.AcquisitionProcess;
 import PamController.PamController;
 import PamDetection.AbstractLocalisation;
 import PamDetection.PamDetection;
 import PamUtils.PamUtils;
-import PamguardMVC.AcousticDataUnit;
+import PamUtils.complex.ComplexArray;
 import PamguardMVC.PamConstants;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.RawDataHolder;
 import PamguardMVC.RawDataTransforms;
-
 import PamguardMVC.superdet.SuperDetection;
 import Spectrogram.WindowFunction;
+import fftManager.Complex;
+import fftManager.FastFFT;
+import wavFiles.WavFileReader;
+import wavFiles.WavHeader;
 
 public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> implements PamDetection, RawDataHolder {
 
@@ -33,7 +31,11 @@ public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> imple
 	
 	public long triggerMilliseconds;
 
-	private double[][] rawData;
+//	private double[][] rawData;
+	
+	private short[][] int16Data;
+	
+	private double int16Max;
 	
 	/**
 	 * Reference to the data unit that triggered the clip
@@ -69,7 +71,7 @@ public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> imple
 		this.triggerMilliseconds = triggerMilliseconds;
 		this.fileName = fileName;
 		this.triggerName = triggerName;
-		this.rawData = rawData;
+		this.setRawData(rawData);
 		if (this.fileName == null) {
 			this.fileName = "";
 		}
@@ -229,6 +231,44 @@ public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> imple
 		}
 		return specData;
 	}
+	/**
+	 * Generate complex spectrogram data for the clip. 
+	 * @param channel
+	 * @param fftLength FFT length
+	 * @param fftHop FFT hop
+	 * @return Array of ComplexArray FFT data (half fft length, due to real input)
+	 */
+	public ComplexArray[] generateSpectrogramArrays(int channel, int fftLength, int fftHop) {
+		// TODO Auto-generated method stub
+		double[] wave = getSpectrogramWaveData(channel, getDisplaySampleRate());
+		if (wave == null) {
+			return null;
+		}
+		int nFFT = (wave.length - (fftLength-fftHop)) / fftHop;
+		if (nFFT <= 0) {
+			return null;
+		}
+		ComplexArray[] specData = new ComplexArray[nFFT];
+		double[] waveBit = new double[fftLength];
+		double[] winFunc = getWindowFunc(fftLength);
+		Complex[] complexOutput = Complex.allocateComplexArray(fftLength/2);
+		int wPos = 0;
+		getFastFFT(fftLength);
+		int m = FastFFT.log2(fftLength);
+		for (int i = 0; i < nFFT; i++) {
+			wPos = i*fftHop;
+			for (int j = 0; j < fftLength; j++) {
+//				waveBit[j] = wave[j+wPos]*winFunc[j];
+				waveBit[j] = wave[j+wPos]; // no windowing for this since used in cross correlation. 
+			}
+			specData[i] = fastFFT.rfft(waveBit, fftLength);
+//			fastFFT.rfft(waveBit, complexOutput, m);
+//			for (int j = 0; j < fftLength/2; j++) {
+//				specData[i][j] = complexOutput[j].clone();
+//			}
+		}
+		return specData;
+	}
 	
 	protected static FastFFT fastFFT;
 	protected static FastFFT getFastFFT(int fftLength) {
@@ -238,8 +278,14 @@ public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> imple
 		return fastFFT;
 	}
 	
-	AcquisitionProcess findDaqProcess() {
+	protected AcquisitionProcess findDaqProcess() {
+//		sourceProcess = getParentDataBlock().
+		try {
 			return (AcquisitionProcess) getParentDataBlock().getSourceProcess();
+		}
+		catch (ClassCastException e) {
+			return null;
+		}
 	}
 	
 	
@@ -261,15 +307,66 @@ public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> imple
 	}
 	
 	/**
+	 * Compress the double data into int16 to save memory
+	 * @param rawData
+	 */
+	private void compressData(double[][] rawData) {
+		if (rawData == null || rawData.length == 0) {
+			int16Data = null;
+			return;
+		}
+		int nc = rawData.length;
+		int ns = rawData[0].length;
+		double min = 0, max = 0;
+		double v;
+		for (int c = 0; c < nc; c++) {
+			for (int s = 0; s < ns; s++) {
+				v = rawData[c][s];
+				min = Math.min(min, v);
+				max = Math.max(max, v);
+			}
+		}
+		int16Max = Math.max(Math.abs(min), max);
+		double scale = 32727./int16Max;
+		int16Data = new short[nc][ns];
+		for (int c = 0; c < nc; c++) {
+			for (int s = 0; s < ns; s++) {
+				int16Data[c][s] = (short) Math.round(rawData[c][s]*scale);
+			}
+		}
+	}
+	
+	/**
+	 * @return the rawData
+	 */
+	public double[][] getRawData() {
+		if (int16Data == null) {
+			return null;
+		}
+		int nc = int16Data.length;
+		int ns = int16Data[0].length;
+		double[][] rawData = new double[nc][ns];
+		double scale = int16Max/32767.;
+		for (int c = 0; c < nc; c++) {
+			for (int s = 0; s < ns; s++) {
+				rawData[c][s] = (double) int16Data[c][s]*scale;
+			}
+		}
+		return rawData;
+	}
+
+	/**
 	 * Get all the wave data into an array. 
 	 * @return the wave data or null if it can't be found. 
 	 */
+	@Override
 	public double[][] getWaveData() {
+		double[][] rawData = getRawData();
 		if (rawData != null) {
 			return rawData;
 		}
 		File wavFileName = findWavFile();
-		if (wavFileName == null || wavFileName.exists() == false || wavFileName.isDirectory()) {
+		if (wavFileName == null || !wavFileName.exists() || wavFileName.isDirectory()) {
 			return null;
 		}
 		WavFileReader wavFile = null;
@@ -294,13 +391,13 @@ public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> imple
 	 * @return the sample rate of original wave data or null if it can't be found. 
 	 */
 	protected Float getSampleRate() {
-		if (rawData != null) {
+		if (getRawData() != null && getParentDataBlock() != null) {
 			return getParentDataBlock().getSampleRate();
 //			return PamController.getInstance().getRawDataBlock(triggerName).getSampleRate();
 		}
 		
 		File wavFileName = findWavFile();
-		if (wavFileName == null || wavFileName.exists() == false) {
+		if (wavFileName == null || !wavFileName.exists()) {
 			return null;
 		}
 		WavFileReader wavFile = null;
@@ -355,7 +452,7 @@ public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> imple
 
 	private File findWavFile() {
 		try {
-			if (offlineFile == null || offlineFile.exists() == false) {
+			if (offlineFile == null || !offlineFile.exists()) {
 				if (getParentDataBlock() == null) return null;
 				ClipProcess clipProcess = (ClipProcess) getParentDataBlock().getParentProcess();
 				offlineFile = clipProcess.findClipFile(this);
@@ -398,17 +495,11 @@ public class ClipDataUnit extends PamDataUnit<PamDataUnit, SuperDetection> imple
 	}
 
 	/**
-	 * @return the rawData
-	 */
-	public double[][] getRawData() {
-		return rawData;
-	}
-
-	/**
 	 * @param rawData the rawData to set
 	 */
 	public void setRawData(double[][] rawData) {
-		this.rawData = rawData;
+//		this.rawData = rawData;
+		compressData(rawData);
 	}
 
 	/**

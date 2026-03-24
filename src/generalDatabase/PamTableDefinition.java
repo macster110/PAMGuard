@@ -1,9 +1,8 @@
 package generalDatabase;
 
-import java.sql.Connection;
 import java.sql.Types;
+
 import PamController.PamViewParameters;
-import PamUtils.PamCalendar;
 
 /**
  * 
@@ -192,14 +191,7 @@ public class PamTableDefinition extends EmptyTableDefinition implements Cloneabl
 	public PamTableItem getUidItem() {
 		return uid;
 	}
-	public PamConnection getCheckedConnection() {
-		return checkedConnection;
-	}
-
-	public void setCheckedConnection(PamConnection checkedConnection) {
-		this.checkedConnection = checkedConnection;
-	}
-
+	
 	public PamTableItem getUpdateReference() {
 		return updateReference;
 	}

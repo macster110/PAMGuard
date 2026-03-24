@@ -29,7 +29,10 @@ import PamView.dialog.warn.WarnOnce;
  */
 public class SettingsImport {
 
+	private PamController pamController;
+
 	public SettingsImport(PamController pamController) {
+		this.pamController = pamController;
 	}
 
 	/**
@@ -235,7 +238,7 @@ public class SettingsImport {
 	 * @param settings
 	 * @return
 	 */
-	ArrayList<SettingsImportGroup> organiseSettingsGroups(ArrayList<PamControlledUnitSettings> settings) {
+	public ArrayList<SettingsImportGroup> organiseSettingsGroups(ArrayList<PamControlledUnitSettings> settings) {
 		/**
 		 * this needs rewriting for psfx files which are organised differently. first we need to find 
 		 * a list of PAMGuard modules by finding the settings group of the PAMController. 
@@ -303,7 +306,7 @@ public class SettingsImport {
 		for (int i = 0; i < settings.size(); i++) {
 			PamControlledUnitSettings aSet = settings.get(i);
 			if (used[i]) continue;
-			if (SMRUEnable.isEnable()) {
+			if (SMRUEnable.isDevEnable()) {
 				System.out.println(String.format("Ungrouped settings %s-%s ", aSet.getUnitType(), aSet.getUnitName()));			
 			}
 		}

@@ -26,16 +26,17 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InvalidClassException;
-import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.URL;
 import java.net.URLClassLoader;
 
 import org.apache.commons.io.input.ClassLoaderObjectInputStream;
+
 import PamModel.PamModel;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamView.dialog.warn.WarnOnce;
 
 
@@ -58,6 +59,13 @@ public class PamControlledUnitSettings implements Serializable, ManagedParameter
 
 	//	private PamSettings owner;
 
+	public PamControlledUnitSettings(PamSettings pamSettings) {
+		this.versionNo = pamSettings.getSettingsVersion();
+		this.unitType = pamSettings.getUnitType();
+		this.unitName = pamSettings.getUnitName();
+		this.ownerClassName = null;
+		this.settings = pamSettings.getSettingsReference();
+	}
 	/**
 	 * Make a settings object with unpacked data. This must still be used with old style psf files
 	 * @param unitType
@@ -347,7 +355,8 @@ public class PamControlledUnitSettings implements Serializable, ManagedParameter
 		else {
 			classLoader = new URLClassLoader(new URL[0], PamControlledUnitSettings.class.getClassLoader()) {
 
-			    public void addURL(URL url) {
+			    @Override
+				public void addURL(URL url) {
 			        super.addURL(url);
 			    }
 			};
@@ -398,8 +407,13 @@ public class PamControlledUnitSettings implements Serializable, ManagedParameter
 	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
+	}
+
+	@Override
+	public String toString() {
+		return String.format("Type %s; Name %s, Data ", getUnitType(), getUnitName()) + getSettings();
 	}
 
 }

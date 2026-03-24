@@ -8,15 +8,16 @@ import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 
 import Acquisition.FileInputSystem;
+import PamDetection.RawDataUnit;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
-import PamDetection.RawDataUnit;
 import fftManager.FFT;
 
 
 /* @author Dave Mellinger
  */
+@Deprecated // use MAtchFiltProc2 which uses faster FFT and is generally more efficient. 
 public class MatchFiltProcess extends IshDetFnProcess
 {
 	/**
@@ -60,7 +61,7 @@ public class MatchFiltProcess extends IshDetFnProcess
      */
 	@Override
 	public float getDetSampleRate() {
-		return sampleRate;
+		return getSampleRate();
 	}
 
 	@Override
@@ -105,7 +106,7 @@ public class MatchFiltProcess extends IshDetFnProcess
 		//But if buffer is too long, then the display gets jumpy.  The compromise
 		//is to use the longer of kernel.length*2 (thus repeating roughly 
 		//kernel.length samples in each FFT) and 1/10 second.
-		int bufLen = Math.max((int)Math.round(sampleRate * 0.1), kernel.length * 2);
+		int bufLen = Math.max((int)Math.round(getSampleRate() * 0.1), kernel.length * 2);
 		bufLen = FFT.nextBinaryExp(bufLen);
 		buffer = new double[bufLen];
 	}
@@ -148,6 +149,14 @@ public class MatchFiltProcess extends IshDetFnProcess
 				double[] x = fftMgr.crossCorrelation(buffer, 0, buffer.length, 
 						                             kernel, 0, kernel.length);
 
+				// debug output the max of x.
+//				double maxX = 0;
+//				double totX = 0;
+//				for (int ix = 0; ix < x.length; ix++) {
+//					maxX = Math.max(maxX, x[ix]);
+//					totX += x[ix];
+//				}
+//				System.out.printf("Mean and Max correlation value is %7.5f, %7.5f\n", totX/x.length, maxX);
 				//Extract the useful values from x into an output buffer.  The
 				//non-useful values are those "polluted" by the circular nature
 				//of FFT-based cross-correlation.
@@ -181,7 +190,7 @@ public class MatchFiltProcess extends IshDetFnProcess
 	
 	@Override
 	public float getHiFreq() {
-		return sampleRate / 2;
+		return getSampleRate() / 2;
 	}
 
 	@Override

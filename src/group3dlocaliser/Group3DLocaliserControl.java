@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
+import Localiser.LocalisationAlgorithm;
+import Localiser.LocalisationAlgorithmInfo;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitSettings;
 import PamController.PamSettingManager;
@@ -16,16 +18,20 @@ import PamController.PamSettings;
 import group3dlocaliser.algorithm.LocaliserAlgorithm3D;
 import group3dlocaliser.algorithm.LocaliserAlgorithmParams;
 import group3dlocaliser.algorithm.crossedbearing.CrossedBearingGroupLocaliser;
-import group3dlocaliser.algorithm.gridsearch.TOADGridSearch;
 import group3dlocaliser.algorithm.hyperbolic.HyperbolicLocaliser;
+import group3dlocaliser.algorithm.toadmcmc.ToadMCMCLocaliser;
+import group3dlocaliser.algorithm.toadmimplex.ToadMimplexLocaliser;
 import group3dlocaliser.algorithm.toadsimplex.ToadSimplexLocaliser;
 import group3dlocaliser.dialog.GroupLocSettingPaneFX;
 import group3dlocaliser.offline.Group3DOfflineTask;
+import group3dlocaliser.tethys.Group3DLocalizationCreator;
+import group3dlocaliser.tethys.Group3dAlgorithmInfo;
 import offlineProcessing.OLProcessDialog;
 import offlineProcessing.OfflineTaskGroup;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX2AWT;
+import tethys.localization.LocalizationCreator;
 
-public class Group3DLocaliserControl extends PamControlledUnit implements PamSettings {
+public class Group3DLocaliserControl extends PamControlledUnit implements PamSettings, LocalisationAlgorithm {
 	
 	public static final String unitType = "Group 3D Localiser";
 	
@@ -39,13 +45,18 @@ public class Group3DLocaliserControl extends PamControlledUnit implements PamSet
 	
 	private Group3DOfflineTask g3DOfflineTask;
 
+	private Group3dAlgorithmInfo group3dAlgorithmInfo;
+
 	public Group3DLocaliserControl(String unitName) {
 		super(unitType, unitName);
 		algorithms3D = new ArrayList<>();
-		algorithms3D.add(new CrossedBearingGroupLocaliser());
+		algorithms3D.add(new CrossedBearingGroupLocaliser(this));
 		algorithms3D.add(new HyperbolicLocaliser(this));
 		algorithms3D.add(new ToadSimplexLocaliser(this, 2));
 		algorithms3D.add(new ToadSimplexLocaliser(this, 3));
+		algorithms3D.add(new ToadMCMCLocaliser(this));
+		algorithms3D.add(new ToadMimplexLocaliser(this));
+
 //		algorithms3D.add(new TOADGridSearch(this));
 		
 		group3dProcess = new Group3DProcess(this);
@@ -87,7 +98,7 @@ public class Group3DLocaliserControl extends PamControlledUnit implements PamSet
 				showSettingsMenu(parentFrame);
 			}
 		});
-		if (isViewer() == false) {
+		if (!isViewer()) {
 			return menuItem;
 		}
 		// Otherwise make a more complex menu.
@@ -217,5 +228,25 @@ public class Group3DLocaliserControl extends PamControlledUnit implements PamSet
 	 */
 	public Group3DOfflineTask getG3DOfflineTask() {
 		return g3DOfflineTask;
+	}
+
+	@Override
+	public LocalisationAlgorithmInfo getAlgorithmInfo() {
+		if (group3dAlgorithmInfo == null) {
+			group3dAlgorithmInfo = new Group3dAlgorithmInfo(this);
+		}
+		return group3dAlgorithmInfo;
+	}
+
+	@Override
+	public LocalizationCreator getTethysCreator() {
+		return new Group3DLocalizationCreator(this);
+	}
+
+	/**
+	 * @return the group3dParams
+	 */
+	public Group3DParams getGroup3dParams() {
+		return group3dParams;
 	}
 }

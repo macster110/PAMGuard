@@ -6,6 +6,7 @@ import javafx.scene.Node;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
@@ -43,6 +44,8 @@ public class SettingsFilePane extends SettingsPane<SettingsFileData> {
 	
 	private PamBorderPane mainPane = new PamBorderPane();
 
+	private ProgressBar progressBar;
+
 	public SettingsFilePane(){
 		super(null);
 		createSettingsLoadPane();
@@ -57,6 +60,7 @@ public class SettingsFilePane extends SettingsPane<SettingsFileData> {
 		PamGuiManagerFX.titleFont2style(label);
 //		label.setFont(PamGuiManagerFX.titleFontSize2);
 		vBox.getChildren().add(label);
+		vBox.setPadding(PamGuiManagerFX.defaultPadding);
 
 		//folder select and browse pane.
 		PamHBox folderSelectPane=new PamHBox(); 
@@ -99,7 +103,22 @@ public class SettingsFilePane extends SettingsPane<SettingsFileData> {
 //		vBox.getChildren().add(alwaysShow);
 
 		mainPane.setCenter(vBox);
+		
+		progressBar = new ProgressBar();
+		progressBar.setVisible(false);
+		
+		
+		mainPane.setBottom(progressBar);
 
+
+	}
+
+	/**
+	 * Get the progress bar. This is default set to not visible and can be used to show loading settings. 
+	 * @return the progress bar. 
+	 */
+	public ProgressBar getProgressBar() {
+		return progressBar;
 	}
 
 	/**

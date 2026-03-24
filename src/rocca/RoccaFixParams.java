@@ -31,8 +31,6 @@ import java.io.IOException;
 
 import javax.swing.JFileChooser;
 
-import PamUtils.PamCalendar;
-
 
 
 /**
@@ -98,7 +96,8 @@ public class RoccaFixParams {
 //		listOfFiles[0] = new File(dirIn, csvIn);
 		
 		listOfFiles = this.dir.listFiles(new FilenameFilter() {
-		    public boolean accept(File dir, String name) {
+		    @Override
+			public boolean accept(File dir, String name) {
 		        return name.toLowerCase().endsWith(".csv");
 		    }
 		});
@@ -226,7 +225,7 @@ public class RoccaFixParams {
 			/* calculate parameters */
 			rcdb.setAsAWhistle(true);
 			rcdb.calculateStatistics();
-	        roccaProcess.roccaClassifier.classifyContour2(rcdb);
+	        roccaProcess.getRoccaClassifier().classifyContour2(rcdb);
 			
 			/* save the output */
 	        roccaProcess.saveContourStats(rcdb, 0, i, "xxx",listOfFiles[i].getName());

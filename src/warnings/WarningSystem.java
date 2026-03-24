@@ -10,7 +10,6 @@ import java.util.ListIterator;
 import javax.swing.Timer;
 
 import PamController.PamController;
-import PamUtils.PamCalendar;
 
 /**
  * System for handling and displaying warnings and errors from various parts of PAMguard. 
@@ -149,7 +148,7 @@ public class WarningSystem {
 	 * Remove old warnings. 
 	 */
 	private synchronized void removeOldWarnings() {
-		long now = PamCalendar.getTimeInMillis();
+		long now = System.currentTimeMillis();
 		ListIterator<PamWarning> it = warnings.listIterator();
 		int removals = 0;
 		while (it.hasNext()) {

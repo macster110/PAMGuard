@@ -4,7 +4,6 @@ import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import annotation.handler.AnnotationChoiceHandler;
 import annotation.handler.AnnotationChoices;
-import annotation.handler.AnnotationHandler;
 import annotation.string.StringAnnotationType;
 import annotation.userforms.UserFormAnnotationType;
 
@@ -16,7 +15,7 @@ public class MapGroupAnnotationHandler extends AnnotationChoiceHandler {
 		super(pamDataBlock);
 		this.mapGroupLocaliserControl = mapGroupLocaliserControl;
 		addAnnotationType(new StringAnnotationType("Text Annotation", 80));
-		addAnnotationType(new UserFormAnnotationType());
+		addAnnotationType(new UserFormAnnotationType(mapGroupLocaliserControl.getMarkGroupProcess().getMarkGroupDataBlock()));
 	}
 
 	@Override

@@ -13,10 +13,11 @@ import Array.streamerOrigin.GPSOriginSettings;
 import Array.streamerOrigin.HydrophoneOriginMethod;
 import Array.streamerOrigin.HydrophoneOriginMethods;
 import Array.streamerOrigin.OriginSettings;
-import PamController.PamController;
+import PamController.PamControllerInterface;
 import PamController.masterReference.MasterReferencePoint;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 import PamUtils.LatLong;
 import PamUtils.PamCalendar;
@@ -150,8 +151,18 @@ public class Streamer implements Serializable, Cloneable, ManagedParameters {
 	public Streamer clone()  {
 		try {
 			Streamer newStreamer =  (Streamer) super.clone();
-			newStreamer.allLocatorSettings = new ArrayList<>(allLocatorSettings);
-			newStreamer.allOriginSettings = new ArrayList<>(allOriginSettings);
+			if (allLocatorSettings != null) {
+				newStreamer.allLocatorSettings = new ArrayList<>(allLocatorSettings);
+			}
+			else {
+				newStreamer.allLocatorSettings = new ArrayList<>();
+			}
+			if (allOriginSettings != null) {
+				newStreamer.allOriginSettings = new ArrayList<>(allOriginSettings);
+			}
+			else {
+				newStreamer.allOriginSettings = new ArrayList<>();
+			}
 			newStreamer.checkAllocations();
 			OriginSettings os = this.getOriginSettings();
 			if (os != null) {
@@ -496,7 +507,7 @@ public class Streamer implements Serializable, Cloneable, ManagedParameters {
 ////				HydrophoneOriginMethod origin = HydrophoneOriginMethods.getInstance().getMethod(originClass);
 //			}
 //			else 
-			if (pamArray.getArrayLocatorClass() == StraightHydrophoneLocator.class) {
+			if (pamArray != null && pamArray.getArrayLocatorClass() == StraightHydrophoneLocator.class) {
 				locatorClass = StraightHydrophoneLocator.class;
 				originClass = GPSOriginMethod.class;
 				HydrophoneLocator locator = HydrophoneLocators.getInstance().getLocatorSystem(locatorClass).getLocator(pamArray, this);
@@ -529,6 +540,9 @@ public class Streamer implements Serializable, Cloneable, ManagedParameters {
 	 * @return the hydrophoneOrigin
 	 */
 	public HydrophoneOriginMethod getHydrophoneOrigin() {
+		if (hydrophoneOrigin == null) {
+			setupLocator(pamArray);
+		}
 		return hydrophoneOrigin;
 	}
 
@@ -555,11 +569,11 @@ public class Streamer implements Serializable, Cloneable, ManagedParameters {
 	}
 
 	public void notifyModelChanged(int changeType, boolean initComplete) {
-		if (initComplete) {
+		if (initComplete && hydrophoneOrigin != null) {
 			hydrophoneOrigin.prepare();
 		}
 		switch (changeType) {
-		case PamController.INITIALIZATION_COMPLETE:
+		case PamControllerInterface.INITIALIZATION_COMPLETE:
 //			if (PamController.getInstance().getRunMode() == PamController.RUN_NORMAL) {
 //				makeStreamerDataUnit();
 //			}
@@ -570,7 +584,7 @@ public class Streamer implements Serializable, Cloneable, ManagedParameters {
 	/**
 	 * Make a streamer data unit and add it to the data block. 
 	 */
-	protected void makeStreamerDataUnit() {
+	public void makeStreamerDataUnit() {
 		StreamerDataUnit sdu = new StreamerDataUnit(PamCalendar.getTimeInMillis(), this);
 		ArrayManager.getArrayManager().getStreamerDatabBlock().addPamData(sdu);
 	}
@@ -666,8 +680,8 @@ public class Streamer implements Serializable, Cloneable, ManagedParameters {
 	 */
 	@Override
 	public String toString() {
-		return super.toString() + "; OriginSettings: " + getOriginSettings().toString() + "," + getHydrophoneOrigin().getOriginSettings().toString() + 
-				"; Locator " + getLocatorSettings().toString();
+		return super.toString() + "; OriginSettings: " + getOriginSettings()==null ? "null" : getOriginSettings().toString() + "," + getHydrophoneOrigin().getOriginSettings().toString() + 
+				"; Locator " + getLocatorSettings()==null ? "null" : getLocatorSettings().toString();
 	}
 
 	public static Streamer getAverage(Streamer sd1,
@@ -767,7 +781,7 @@ public class Streamer implements Serializable, Cloneable, ManagedParameters {
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("coordinate");
 			ps.put(new PrivatePamParameterData(this, field) {
@@ -885,7 +899,7 @@ public class Streamer implements Serializable, Cloneable, ManagedParameters {
 			break;
 		case HEIGHT:
 			if (value != null) {
-				setZ(value);;
+				setZ(value);
 			}
 			break;
 		case PITCH:

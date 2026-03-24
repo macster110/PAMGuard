@@ -19,7 +19,9 @@ import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import rawDeepLearningClassifier.dlClassification.DLClassName;
 
 /*
- * Symbol Options for the annotation pane
+ * Symbol Options for the annotation pane.
+ * 
+ * @author Jamie Macaulay
  */
 public class DLPredictionPane extends PamBorderPane implements TDSettingsPane {
 	
@@ -67,6 +69,8 @@ public class DLPredictionPane extends PamBorderPane implements TDSettingsPane {
 		predColHolder.setPadding(new Insets(5,0,0,0));
 
 		this.setParams();
+		
+		mainPane.setPrefWidth(300);
 
 //		if (dlPredictionPlotInfoFX.getDlControl().getDLModel()!=null) {
 //			layoutColourPanes( dlPredictionPlotInfoFX.getDlControl().getDLModel().getClassNames());
@@ -101,6 +105,8 @@ public class DLPredictionPane extends PamBorderPane implements TDSettingsPane {
 		if (dlPredictionPlotInfoFX.getDlControl().getDLModel()!=null) {
 			//populate the prediction pane. 
 			DLClassName[] classNames = dlPredictionPlotInfoFX.getDlControl().getDLModel().getClassNames();
+			
+//			System.out.println("MAKE MY CLASS NAMES: " + dlPredictionPlotInfoFX.getDlControl().getDLModel().getClassNames());
 
 			layoutColourPanes(classNames);
 		}
@@ -184,7 +190,7 @@ public class DLPredictionPane extends PamBorderPane implements TDSettingsPane {
 		try {
 			PamSVGIcon iconMaker= new PamSVGIcon(); 
 			//PamSVGIcon svgsprite = iconMaker.create(new File(getClass().getResource(resourcePath).toURI()), Color.WHITE);
-			PamSVGIcon svgsprite = iconMaker.create(getClass().getResource(resourcePath).toURI().toURL(), Color.DODGERBLUE);
+			PamSVGIcon svgsprite = iconMaker.create(getClass().getResource(resourcePath).toURI().toURL(), Color.DODGERBLUE, 1);
 			 
 //			svgsprite.getSpriteNode().setStyle("-fx-text-color: white");				
 //			svgsprite.getSpriteNode().setStyle("-fx-fill: white");

@@ -7,8 +7,10 @@ import org.controlsfx.control.RangeSlider;
 import org.jamdev.jdl4pam.transforms.DLTransform;
 import org.jamdev.jdl4pam.transforms.DLTransform.DLTransformType;
 import org.jamdev.jdl4pam.transforms.FreqTransform;
+import org.jamdev.jdl4pam.transforms.SimpleTransform;
 import org.jamdev.jdl4pam.transforms.WaveTransform;
 import org.jamdev.jpamutils.wavFiles.AudioData;
+import org.jamdev.jpamutils.wavFiles.FilterParams;
 
 import PamUtils.PamArrayUtils;
 import javafx.collections.FXCollections;
@@ -16,10 +18,15 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
+import javafx.scene.Node;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.paint.Color;
 import javafx.util.StringConverter;
+import pamViewFX.fxGlyphs.PamGlyphDude;
 import pamViewFX.fxNodes.PamBorderPane;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.sliders.ColourRangeSlider;
@@ -57,7 +64,7 @@ public abstract class DLTransformImage extends PamBorderPane{
 	/**
 	 * Choice box to select which transform to preview. 
 	 */
-	private ChoiceBox<DLTransform> transformschoiceBox; 
+	private ComboBox<DLTransform> transformschoiceBox; 
 
 	/**
 	 * Example sound factory. 
@@ -106,7 +113,12 @@ public abstract class DLTransformImage extends PamBorderPane{
 	/**
 	 * The time label. 
 	 */
-	private Label timeLabel; 
+	private Label timeLabel;
+
+	/**
+	 * The error label. 
+	 */
+	private Label errorLabel; 
 
 
 	public DLTransformImage() {
@@ -130,14 +142,29 @@ public abstract class DLTransformImage extends PamBorderPane{
 		}); 
 
 		//create choice box for time slider.
-		transformschoiceBox	 = new ChoiceBox<DLTransform>(); 
+		transformschoiceBox	 = new ComboBox<DLTransform>(); 
 		transformschoiceBox.valueProperty().addListener((obsval, oldval, newval)->{
 			updateTransformImage();
-			calcTimeBins(transformsR);
-			plotPane.repaint();
+			//			calcTimeBins(transformsR);
+			//			plotPane.repaint();
 		});
 		transformschoiceBox.setConverter(new DLTransformConverter());
 		transformschoiceBox.setPrefWidth(170); 
+		
+		
+//		
+//		 // Use a CellFactory to control the display
+//		transformschoiceBox.setCellFactory(param -> new ListCell<DLTransform>() {
+//            @Override
+//            protected void updateItem(DLTransform item, boolean empty) {
+//                super.updateItem(item, empty);
+//                if (empty || item == null) {
+//                    setText(null);
+//                } else {
+//                    setText(item.getName());
+//                }
+//            }
+//        });
 
 		plotPane.getPlotCanvas().widthProperty().addListener((obsval, oldval, newval)->{
 			plotPane.repaint();
@@ -173,7 +200,8 @@ public abstract class DLTransformImage extends PamBorderPane{
 			updateExampleSound(newval); 
 		});
 		speciesChoiceBox.getSelectionModel().select(0);
-		speciesChoiceBox.setPrefWidth(170); 
+		speciesChoiceBox.setPrefWidth(150); 
+		
 
 		PamHBox hBox = new PamHBox(); 
 		hBox.setAlignment(Pos.CENTER_RIGHT);
@@ -194,11 +222,18 @@ public abstract class DLTransformImage extends PamBorderPane{
 
 		timeSlider.maxWidthProperty().bind(plotPane.getPlotCanvas().widthProperty().add(5));
 
+		//create an error label 
+		errorLabel = new Label();
+		Node decoration = PamGlyphDude.createPamIcon("mdi2c-close-circle-outline", Color.RED, 10);
+		errorLabel.setGraphic(decoration);
+//		Decorator.addDecoration(errorLabel, new GraphicDecoration(decoration, Pos.CENTER_RIGHT));
+
 		BorderPane.setAlignment(timeLabel, Pos.CENTER);
 		this.setBottom(timeLabel);
 
 	}
 
+	
 	/**
 	 * Get the species choice box. 
 	 * @return - the species choice box. 
@@ -212,7 +247,7 @@ public abstract class DLTransformImage extends PamBorderPane{
 	 * Calculate the sample time bins. 
 	 */
 	private void calcTimeBins(float sampleRate) {
-		
+
 		timeBins[0] = (int) (sampleRate*(timeSlider.getLowValue()/1000.0));
 		timeBins[1] = (int) (sampleRate*(timeSlider.getHighValue()/1000.0));
 
@@ -221,9 +256,8 @@ public abstract class DLTransformImage extends PamBorderPane{
 
 		long[] shape = calcShape(); 
 
-
 		double nSamples = this.exampleSound.getSampleRate()*((timeSlider.getHighValue()-timeSlider.getLowValue())/1000.0);
-		
+
 
 		if (shape!=null && shape.length==2) {
 			int timeShape =  (int) (shape[0]*(nSamples/(double) exampleSound.getWave().length));
@@ -238,6 +272,7 @@ public abstract class DLTransformImage extends PamBorderPane{
 		}
 	}
 
+	
 	/**
 	 * Calculate the output shape. 
 	 */
@@ -247,24 +282,30 @@ public abstract class DLTransformImage extends PamBorderPane{
 		if  (this.exampleSound==null)  return null; 
 
 		ArrayList<DLTransform> transforms = getDLTransforms(); 
-		
+
 		if  (transforms==null)  return null; 
-		
+
 		long[] shape; 
 		if (transforms.get(transforms.size()-1) instanceof FreqTransform) {
 			FreqTransform freqTransform = ((FreqTransform) transforms.get(transforms.size()-1)); 
-		
+
 			if (freqTransform.getSpecTransfrom()==null) return null; 
-			
+
 			double[][] data2D = freqTransform.getSpecTransfrom().getTransformedData();
-	
+
 			shape = new long[] {data2D.length, data2D[0].length};
 		}
 		else {
 			WaveTransform waveTransform = ((WaveTransform) transforms.get(transforms.size()-1)); 
-			
-			double[] data = waveTransform.getWaveData().getScaledSampleAmpliudes(); 
-			
+
+			//			System.out.println("Get wave data: " +  waveTransform.getDLTransformType() + "  " +  waveTransform.getWaveData()); 
+
+			if (waveTransform.getWaveData()==null) {
+				return null;
+			}
+
+			double[] data = waveTransform.getWaveData().getScaledSampleAmplitudes();
+
 			shape = new long[] {data.length};
 		}
 
@@ -301,6 +342,7 @@ public abstract class DLTransformImage extends PamBorderPane{
 		return this.exampleSound.getSampleRate();
 	}
 
+	
 	/**
 	 * Update the example sound. 
 	 * @param exampleSoundType - the example sound type. 
@@ -310,6 +352,7 @@ public abstract class DLTransformImage extends PamBorderPane{
 		updateExampleSound(exampleSound); 	
 	}
 
+	
 	/**
 	 * Update the example sound. 
 	 * @param exampleSound - the new example sound. 
@@ -332,12 +375,18 @@ public abstract class DLTransformImage extends PamBorderPane{
 		updateTransformImage();
 	}
 
+	
 	/**
 	 * Update the transform image to the latest selected transform and data params. 
 	 */
-	public void updateTransformImage() {
+	public boolean updateTransformImage() {
 
-		if  (this.exampleSound==null)  return; 
+		setErrorMessage(null); 
+
+		if  (this.exampleSound==null) {
+			System.err.println("DLTRanfromImage.updateTransformImage: the example sound is null"); 
+			return false; 
+		}
 
 		specImage=null;
 		data1D=null; 
@@ -347,11 +396,28 @@ public abstract class DLTransformImage extends PamBorderPane{
 		((WaveTransform)  getDLTransforms().get(0)).setWaveData(soundData); 
 
 		DLTransform currentTransform =  getDLTransforms().get(0); 
-		for (int i=0; i<transformschoiceBox.getSelectionModel().getSelectedIndex()+1; i++) {
-			currentTransform = getDLTransforms().get(i).transformData(currentTransform); 
-		}
 
-		//		System.out.println("Current transfrom: " + currentTransform.getDLTransformType() + " index: " + transformschoiceBox.getSelectionModel().getSelectedIndex()); 
+		int i = 0;
+		String errCheck;
+		
+		int selectedIndex = transformschoiceBox.getSelectionModel().getSelectedIndex();
+		//update all the transforms with the transformed data
+		for (i=0; i<selectedIndex+1; i++) {
+			errCheck = checkTransform(getDLTransforms().get(i), currentTransform);
+			if (errCheck!=null) {
+				setErrorMessage("Error in " + getDLTransforms().get(i).getDLTransformType() + " - " + errCheck); 
+				return false;
+			}
+			//				System.out.println("TRANSFROM IMAGE 1: " + currentTransform.getDLTransformType() + " index: " + i + " " + ((WaveTransform) currentTransform).getWaveData().getSampleAmplitudes().length);
+			
+			
+			currentTransform = getDLTransforms().get(i).transformData(currentTransform);
+//			if (currentTransform instanceof FreqTransform)	{
+//				System.out.println("TRANSFROM IMAGE 1: " + currentTransform.getDLTransformType() + " index: " + i + " " + ((FreqTransform) currentTransform).getSpecTransfrom().getReal().length + " " + ((FreqTransform) currentTransform).getSpecTransfrom().getReal()[0].length);
+//			}
+
+//						System.out.println("TRANSFROM IMAGE 2: " + currentTransform.getDLTransformType() + " index: " + i + " " + transformschoiceBox.getSelectionModel().getSelectedIndex() + " " + currentTransform);
+		}
 
 		if (currentTransform instanceof FreqTransform) {
 			if (((FreqTransform) currentTransform).getSpecTransfrom()!=null) {
@@ -391,15 +457,20 @@ public abstract class DLTransformImage extends PamBorderPane{
 				specImage = new SpectrogramImage(data2D, colArray, PamArrayUtils.minmax(data2D), false); 
 				transformsR = ((FreqTransform) currentTransform).getSpecTransfrom().getSpectrgram().getSampleRate(); 
 			}
+			else {
+				//error 
+				setErrorMessage("Error in " + currentTransform.getDLTransformType()); 
+				return false;
+			}
 		}
 
 		if (currentTransform instanceof WaveTransform) {
-			if (((WaveTransform) currentTransform).getWaveData()!=null) {
+			if (((WaveTransform) currentTransform).getWaveData()!=null && ((WaveTransform) currentTransform).getWaveData().getSampleAmplitudes().length>0) {
 				plotPane.getAxis(Side.LEFT).setLabel("Amplitude");
 
 				colRangeSlider.setDisable(true);
 
-				data1D = ((WaveTransform) currentTransform).getWaveData().getScaledSampleAmpliudes(); 
+				data1D = ((WaveTransform) currentTransform).getWaveData().getScaledSampleAmplitudes(); 
 				data1DminMax= PamArrayUtils.minmax(data1D); 
 
 				plotPane.getAxis(Side.LEFT).setMinVal(data1DminMax[0]);
@@ -408,10 +479,124 @@ public abstract class DLTransformImage extends PamBorderPane{
 				transformsR =  ((WaveTransform) currentTransform).getWaveData().getSampleRate(); 
 				//System.out.println("Spec wave data: " + ((WaveTransform) currentTransform).getWaveData().getScaledSampleAmpliudes()[10]); 
 			}
+			else {
+				setErrorMessage("Error in " + currentTransform.getDLTransformType()); 
+				return false;
+			}
+
 		}
 
 		calcTimeBins(transformsR);
 		plotPane.repaint();
+		return true;
+	}
+
+	
+	/**
+	 * Set an error message in the plit
+	 * @param string
+	 */
+	public void setErrorMessage(String string) {
+		if (string==null) {
+			this.setCenter(plotPane);
+			return;
+		}
+		plotPane.getPlotCanvas().getGraphicsContext2D().clearRect(0, 0, plotPane.getPlotCanvas().getWidth(),
+				plotPane.getPlotCanvas().getHeight());
+
+
+		errorLabel.setText(string);
+
+
+		this.setCenter(errorLabel);
+
+		//			getPlotCanvas().getGraphicsContext2D().setStroke(Color.RED);
+		//		getPlotCanvas().getGraphicsContext2D().setFill(Color.RED);
+		//		getPlotCanvas().getGraphicsContext2D().strokeText(string, 10, getPlotCanvas().getHeight()/2);
+	}
+
+
+	/**
+	 * Check for error in a transform and return the transform if true; 
+	 * @param dlTransform - the new transform
+	 * @param currentTransform - the data t be transformed
+	 * @return a string error message. 
+	 */
+	private String checkTransform(DLTransform dlTransform, DLTransform currentTransform) {
+
+		String error = null;
+		SimpleTransform simpleTransform = ((SimpleTransform) dlTransform);
+		float sampleRate;
+		switch (dlTransform.getDLTransformType()) {
+		case DECIMATE: 
+		case DECIMATE_SCIPY:			
+			//decimation sampleRate
+			sampleRate = simpleTransform.getParams()[0].floatValue();
+			double seconds = ((WaveTransform) currentTransform).getWaveData().getLengthInSeconds();
+			
+			if (seconds < 3/sampleRate) {
+				//only three samples left
+				error = "The decimation Nyquist is too low for the sample sound. Use a different example species";
+			}
+
+			break;
+		case ENHANCE:
+			break;
+		case FILTER:
+			FilterParams params = WaveTransform.transform2FilterParams(simpleTransform.getParams());
+			sampleRate = ((WaveTransform) currentTransform).getWaveData().getSampleRate();
+
+			if (params.filterType==AudioData.BANDPASS || params.filterType== AudioData.LOWPASS) {
+				//filter cutoff must be within sample rate. 
+				if (params.highCut>=sampleRate) {
+					error = "The upper filter frequency cannnot be greater than or equal to Nyquist";
+				}
+			}
+			if (params.filterType==AudioData.BANDPASS || params.filterType== AudioData.HIGHPASS) {
+
+				if (params.lowCut>=sampleRate) {
+					error = "The lower filter frequency cannnot be greater than or equal to Nyquist";
+				}
+			}
+			break;
+		case FILTER_ISOLATED_SPOTS:
+			break;
+		case GAUSSIAN_FILTER:
+			break;
+		case MEDIANFILTER:
+			break;
+		case NORMALISE_WAV:
+			break;
+		case PREEMPHSIS:
+			break;
+		case REDUCETONALNOISE_MEAN:
+			break;
+		case REDUCETONALNOISE_MEDIAN:
+			break;
+		case SPEC2DB:
+			break;
+		case SPECCLAMP:
+			break;
+		case SPECCROPINTERP:
+			break;
+		case SPECNORMALISE:
+			break;
+		case SPECNORMALISEROWSUM:
+			break;
+		case SPECNORMALISESTD:
+			break;
+		case SPECNORMALISE_MINIMAX:
+			break;
+		case SPECTROGRAM:
+			break;
+		case SPECTROGRAMKETOS:
+			break;
+		case TRIM:
+			break;
+		default:
+			break;
+		}
+		return error;
 	}
 
 
@@ -429,11 +614,16 @@ public abstract class DLTransformImage extends PamBorderPane{
 
 			if (specImage!=null) {
 				//work out how to paint with time slider settings. 
+				WritableImage image = specImage.getRawSpecImage();
+				if (specImage.getRawSpecImage()==null) {
+					//something has gone wrong with the image
+					setErrorMessage("Error creating spectrogram image. Check the transforms and example sound.");
+				}
 
-				double x1 = (timeSlider.getLowValue()/(timeSlider.getMax()-timeSlider.getMin()))*specImage.getRawSpecImage().getWidth();
-				double x2 = (timeSlider.getHighValue()/(timeSlider.getMax()-timeSlider.getMin()))*specImage.getRawSpecImage().getWidth();
+				double x1 = (timeSlider.getLowValue()/(timeSlider.getMax()-timeSlider.getMin()))*image.getWidth();
+				double x2 = (timeSlider.getHighValue()/(timeSlider.getMax()-timeSlider.getMin()))*image.getWidth();
 
-				getPlotCanvas().getGraphicsContext2D().drawImage(specImage.getRawSpecImage(), x1, 0, x2-x1, specImage.getRawSpecImage().getHeight(),  0, 0, 
+				getPlotCanvas().getGraphicsContext2D().drawImage(image, x1, 0, x2-x1, image.getHeight(),  0, 0, 
 						getPlotCanvas().getWidth(), getPlotCanvas().getHeight());
 
 			}
@@ -452,6 +642,8 @@ public abstract class DLTransformImage extends PamBorderPane{
 					y1=  ((dataTrim[i]- data1DminMax[0])/(dataRange))*getPlotCanvas().getHeight(); 
 					y2=  ((dataTrim[i+1]- data1DminMax[0])/(dataRange))*getPlotCanvas().getHeight(); 
 
+					getPlotCanvas().getGraphicsContext2D().setStroke(Color.BLACK);
+					getPlotCanvas().getGraphicsContext2D().setFill(Color.BLACK);
 					getPlotCanvas().getGraphicsContext2D().strokeLine(x1, y1, x2, y2);
 				}
 			}

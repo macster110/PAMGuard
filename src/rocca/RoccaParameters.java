@@ -29,6 +29,7 @@ import java.lang.reflect.Field;
 
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamModel.parametermanager.PrivatePamParameterData;
 
 /**
@@ -305,6 +306,15 @@ public class RoccaParameters implements Serializable, Cloneable, ManagedParamete
      */
     int sightingThreshold = 40;
 
+    /**
+     * boolean indicating whether the Strong Whistle threshold represents the difference
+     * between the highest vote and the second highest vote (=true) or whether it
+     * is used as an absolute value (=false).  The original method was to use as an
+     * absolute value, but new testing shows that using it as a difference seems to
+     * work better
+     */
+    private boolean strongWhistleDiff = false;
+    
     /** the filename template, modelled after the Ishmael template */
     String filenameTemplate = "Encounter%X-%f-Channel%t-%Y%M%D_%H%m%s";
 
@@ -419,6 +429,7 @@ public class RoccaParameters implements Serializable, Cloneable, ManagedParamete
      * or whether to save the entire amount that the user has boxed (false)
      */
     private boolean trimWav = false;
+    
     
     
 	public RoccaParameters() {
@@ -854,9 +865,20 @@ public class RoccaParameters implements Serializable, Cloneable, ManagedParamete
 		this.trimWav = trimWav;
 	}
 	
+
+	public boolean isStrongWhistleDiff() {
+		return strongWhistleDiff;
+	}
+
+
+	public void setStrongWhistleDiff(boolean strongWhistleDiff) {
+		this.strongWhistleDiff = strongWhistleDiff;
+	}
+	
+	
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		try {
 			Field field = this.getClass().getDeclaredField("runAncCalcs4Clicks");
 			ps.put(new PrivatePamParameterData(this, field) {
@@ -925,5 +947,6 @@ public class RoccaParameters implements Serializable, Cloneable, ManagedParamete
 		}
 		return ps;
 	}
+
 
 }

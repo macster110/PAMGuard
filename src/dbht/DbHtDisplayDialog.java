@@ -42,7 +42,7 @@ public class DbHtDisplayDialog extends PamDialog {
 		mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
 		
 		JPanel scalePanel = new JPanel(new GridBagLayout());
-		scalePanel.setBorder(new TitledBorder("Amlitude Scale"));
+		scalePanel.setBorder(new TitledBorder("Amplitude Scale"));
 		GridBagConstraints c = new PamGridBagContraints();
 		c.gridwidth = 3;
 		addComponent(scalePanel, showGrid = new JCheckBox("Show Grid"), c);
@@ -108,7 +108,7 @@ public class DbHtDisplayDialog extends PamDialog {
 	}
 
 	private void enableControls() {
-		boolean e = (autoScale.isSelected() == false);
+		boolean e = !autoScale.isSelected();
 		minAmp.setEnabled(e);
 		maxAmp.setEnabled(e);
 		if (PamController.getInstance().getRunMode() == PamController.RUN_NETWORKRECEIVER) {

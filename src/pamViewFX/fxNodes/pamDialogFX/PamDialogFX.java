@@ -2,6 +2,7 @@ package pamViewFX.fxNodes.pamDialogFX;
 
 import java.util.Optional;
 
+import PamView.PamIcon;
 import dataPlotsFX.FXIconLoder;
 import javafx.event.ActionEvent;
 import javafx.geometry.Point2D;
@@ -20,6 +21,7 @@ import javafx.stage.Window;
 
 /**
  * Creates a dialog with some useful PAMGUARD customisation.
+ * 
  * @author Jamie Macaulay
  *
  */
@@ -103,7 +105,7 @@ public abstract class PamDialogFX<T> extends Dialog<T> {
 	 */
 	private void setDefaultIcon() {
 		try {
-			Image icon = FXIconLoder.createImage("Resources/pamguardIcon.png");
+			Image icon = FXIconLoder.createImage(PamIcon.getPAMGuardIconPath(PamIcon.SMALL));
 			Stage stage = (Stage) this.getDialogPane().getScene().getWindow();
 			stage.getIcons().add(icon);
 		}
@@ -252,6 +254,14 @@ public abstract class PamDialogFX<T> extends Dialog<T> {
 	 */
 	public static boolean showError(String content) {
 		return showMessageDialog(null, "Error", content, AlertType.ERROR); 
+	}
+	
+	/**
+	 * Show error dialog with default OK and CANCEL. 
+	 * @param content - the error message. 
+	 */
+	public static boolean showError(String title, String content) {
+		return showMessageDialog(null, title, content, AlertType.ERROR); 
 	}
 
 	public static boolean showMessageDialog(Window owner, String string, String string2, ButtonType yes,

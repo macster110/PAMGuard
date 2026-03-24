@@ -1,9 +1,6 @@
 package dataPlotsFX.layout;
 
 import java.util.ArrayList;
-
-import org.controlsfx.glyphfont.Glyph;
-
 import pamScrollSystem.AbstractPamScroller;
 import pamScrollSystem.PamScrollObserver;
 import pamViewFX.PamGuiManagerFX;
@@ -34,6 +31,7 @@ import dataPlotsFX.overlaymark.TDOverlayAdapter;
 import dataPlotsFX.scroller.TDAcousticScroller;
 import dataPlotsFX.sound.SoundOutputManager;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
@@ -49,7 +47,6 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.StackPane;
-import javafx.scene.paint.Color;
 
 /**
  * The main display node for showing tdGraphs. Contains time axis, tdGraphs, time axis and control pane. 
@@ -61,7 +58,7 @@ public class TDDisplayFX extends PamBorderPane {
 	/**
 	 * The standard refresh rate in millis
 	 */
-	public static long standardRefreshMillis=50;
+	public static long STANDARD_REFRESH_MILLIS=50;
 
 	//flags for canvas repaint
 
@@ -158,7 +155,7 @@ public class TDDisplayFX extends PamBorderPane {
 	/**
 	 * The height of the control pane. 
 	 */
-	final static double CONTROL_PANE_HEIGHT=80;
+	final static double CONTROL_PANE_HEIGHT=70;
 
 
 	/**
@@ -193,6 +190,9 @@ public class TDDisplayFX extends PamBorderPane {
 	 * Holds the axis pane. 
 	 */
 	private PamSplitPane splitPaneHolder;
+
+	
+	private SimpleStringProperty mousePosStringProperty = new SimpleStringProperty();
 
 	/**
 	 * Constructor for the main JavaFX display.
@@ -239,23 +239,30 @@ public class TDDisplayFX extends PamBorderPane {
 		controlPane=new TDControlPaneFX(tdControl,this);
 		controlPane.setParams(tdParametersFX);
 		controlPane.setPrefHeight(CONTROL_PANE_HEIGHT);
+		controlPane.setStyle("-fx-background-color: -fx-background;");
+
 
 		hidingControlPane=new HidingPane(Side.TOP, controlPane, this, false );
 		hidingControlPane.showHidePane(tdParametersFX.showControl);
-		hidingControlPane.getStylesheets().add(this.getCSSSettingsResource()); //style as a settings pane. 
+//		hidingControlPane.getStylesheets().clear();
+//		hidingControlPane.getStylesheets().addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getGUICSS()); //style as a settings pane. 
+		hidingControlPane.getHideButton().setStyle("-fx-border-color: none; -fx-background-radius: 5 5 0 0;  -fx-border-radius: 5 5 0 0;");
+
 		hidingControlPane.showingProperty().addListener((valProp, oldVal, newVal)->{
 			//set correct showing property.
 			tdParametersFX.showControl=newVal; 
 		});
 		this.setTop(hidingControlPane);
+		hidingControlPane.showHidePane(true);
 
 		//create the button which shows the hiding panel. Although we get this button from the hiding pane, where to place
 		//it and what colour it is etc has to be set for whatever pane it is to be located in. 
 		showButton=hidingControlPane.getShowButton();
-		showButton.getStyleClass().add("transparent-button-square");
-		showButton.setStyle("-fx-background-radius: 0 0 10 10;");
+		hidingControlPane.setShowButtonOpacity(1.0);
+//		showButton.getStyleClass().add("transparent-button-square");
+		showButton.setStyle("-fx-background-radius: 0 0 0 5; -fx-border-color: none;");
 		showButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-down", PamGuiManagerFX.iconSize));
-		showButton.setPrefWidth(60);
+		showButton.setPrefWidth(30);
 		showButton.setMaxHeight(timeAxisSize-20);
 
 		//create the time axis for the display. 
@@ -268,6 +275,7 @@ public class TDDisplayFX extends PamBorderPane {
 		timeStamp=new Label();
 
 		mousePositionData = new Label();
+		mousePositionData.textProperty().bind(this.mousePosStringProperty); 
 
 		//layout the main pane
 		layoutTDMainPane(tdParametersFX.orientation);
@@ -276,7 +284,7 @@ public class TDDisplayFX extends PamBorderPane {
 		StackPane mainGraphPane=new StackPane();
 		mainGraphPane.getChildren().add(splitPaneHolder);
 		mainGraphPane.getChildren().add(showButton);
-		StackPane.setAlignment(showButton, Pos.TOP_CENTER);		
+		StackPane.setAlignment(showButton, Pos.TOP_RIGHT);		
 
 		this.setCenter(mainGraphPane);
 
@@ -284,8 +292,8 @@ public class TDDisplayFX extends PamBorderPane {
 		//layout the graphs within the main panel
 		layoutTDGraphs(tdParametersFX.orientation);		
 
-		//need to set the divder positon after the graphs as this doesn;t work if set before. 
-		splitPaneHolder.setDividerPosition(0, 0.95);
+		//need to set the divider position after the graphs as this doesn't work if set before. 
+		splitPaneHolder.setDividerPosition(0, 0.85);
 
 		intilized=true; 
 	}
@@ -424,7 +432,7 @@ public class TDDisplayFX extends PamBorderPane {
 		} 
 
 		//Set background so that same as the axis colour-fills in box on corner between x and y axis. 
-		timeAxisHolder.getStyleClass().add("pane");
+		//timeAxisHolder.getStyleClass().add("pane");
 
 		//layout the graphs within the main panel
 		layoutTDGraphs(tdParametersFX.orientation); 
@@ -615,9 +623,10 @@ public class TDDisplayFX extends PamBorderPane {
 	 * @param milliSeconds - the master clock position. 
 	 */
 	public void scrollDisplayEnd(long milliSeconds) {
+		
 
-		if (!isViewer() && milliSeconds <= lastUpdate && milliSeconds > lastUpdate - tdParametersFX.visibleTimeRange) {
-			//System.out.println("milliSeconds <= lastUpdate && milliSeconds > lastUpdate - visibleRange");
+		if (!isViewer() && lastUpdate>0 && milliSeconds <= lastUpdate && milliSeconds > lastUpdate - tdParametersFX.visibleTimeRange) {
+//			System.out.println("milliSeconds <= lastUpdate && milliSeconds > lastUpdate - visibleRange");
 			return;
 		}
 
@@ -691,15 +700,20 @@ public class TDDisplayFX extends PamBorderPane {
 		//		System.out.println("timeScrollerFX.getMaximumMillis() "+timeScrollerFX.getMaximumMillis()+" timeScrollerFX.getMinimumMillis() "+
 		//						timeScrollerFX.getMinimumMillis()+" "+timeScrollerFX.getObservers().size()+ " "+timeScrollerFX.getNumUsedDataBlocks()+" vis amount "+timeScrollerFX.getVisibleAmount()
 		//						+" rangeMillis(): "+timeScrollerFX.getRangeMillis());
-		//		System.out.println(String.format("ScrollerFX set start %s, End %s, pos %s pc time %s", PamCalendar.formatTime(scrollStart),
-		//		PamCalendar.formatTime(scrollEnd),PamCalendar.formatTime(scrollPos), PamCalendar.formatTime(System.currentTimeMillis())));
+//				System.out.println(String.format("ScrollerFX set start %s, End %s, pos %s pc time %s", PamCalendar.formatTime(scrollStart),
+//				PamCalendar.formatTime(scrollEnd),PamCalendar.formatTime(scrollPos, true), PamCalendar.formatTime(System.currentTimeMillis(), true)));
 		getTimeScroller().setRangeMillis(scrollStart, scrollEnd, true);
 		getTimeScroller().setVisibleMillis(tdParametersFX.visibleTimeRange);
 		getTimeScroller().setValueMillis(scrollPos);
 
 		setTimeStamp();
 
-		repaintAll(standardRefreshMillis);
+//		long time0 = System.currentTimeMillis();
+		repaintAll(STANDARD_REFRESH_MILLIS);
+//		long time1 = System.currentTimeMillis();
+		
+//		System.out.println("Time repaint all: " + (time1-time0));
+
 
 	}
 
@@ -728,13 +742,13 @@ public class TDDisplayFX extends PamBorderPane {
 		}
 	}
 
-	/**
-	 * Cycles through all the time data graphs and updates the plot display. 
-	 * @param flag - a canvas repaint flag e.g. TDPlotPane.FRONT_CANAVAS.  
-	 */
-	public void repaintAll(int flag){
-		repaintAll(0, flag);
-	}
+//	/**
+//	 * Cycles through all the time data graphs and updates the plot display. 
+//	 * @param flag - a canvas repaint flag e.g. TDPlotPane.FRONT_CANAVAS.  
+//	 */
+//	public void repaintAll(int flag){
+//		repaintAll(0, flag);
+//	}
 
 	/**
 	 * Cycles through all the time data graphs and updates the plot display. 
@@ -760,7 +774,7 @@ public class TDDisplayFX extends PamBorderPane {
 		timeScrollerFX.scrollerChangingProperty().addListener((obsVal, oldVal, newVal)->{
 			//only repaint if the scroller has stopped moving. 
 			if (!newVal && (newVal!=oldVal)){
-				this.repaintAll(10);
+				this.repaintAll(10L);
 				oldVal=newVal; 
 			}
 		});
@@ -834,7 +848,7 @@ public class TDDisplayFX extends PamBorderPane {
 				aGraph.timeRangeSpinnerChange(oldValue, newValue);
 			}
 
-			repaintAll(standardRefreshMillis); //here 50 because scrollValueChanged is also called. 
+			repaintAll(STANDARD_REFRESH_MILLIS); //here 50 because scrollValueChanged is also called. 
 
 		}
 	}
@@ -849,14 +863,13 @@ public class TDDisplayFX extends PamBorderPane {
 
 		@Override
 		public void scrollValueChanged(AbstractPamScroller pamScroller) {
-			//			System.out.println("TDDisplayFX: Scroll Value changed: " +  System.currentTimeMillis());
 			//			System.out.println(String.format("Scroller value changed get start %s, End %s, pos %s", PamCalendar.formatTime(timeScrollerFX.getMinimumMillis()),
 			//					PamCalendar.formatTime(timeScrollerFX.getMaximumMillis()),PamCalendar.formatTime(timeScrollerFX.getValueMillis())));
 			//have to set the repaint wait millis param to zero or else when scroll bar is moved quickly painting does not occur correctly. 
 			//may not be on fx thread
 			Platform.runLater(()->{
 				setTimeStamp();
-				repaintAll(TDDisplayFX.standardRefreshMillis);
+				repaintAll(TDDisplayFX.STANDARD_REFRESH_MILLIS);
 			});
 		}
 		@Override
@@ -887,7 +900,8 @@ public class TDDisplayFX extends PamBorderPane {
 					aGraph.timeScrollValueChanged(((AcousticScrollerFX) pamScroller).getValueMillisD());
 				}
 				setTimeStamp();
-				repaintAll(standardRefreshMillis);
+				repaintAll(STANDARD_REFRESH_MILLIS);
+
 			});
 		}
 
@@ -1027,7 +1041,7 @@ public class TDDisplayFX extends PamBorderPane {
 		return tdGraphs;
 	}
 
-	public String getCSSSettingsResource() {
+	public ArrayList<String> getCSSSettingsResource() {
 		return PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getSlidingDialogCSS();
 	}
 
@@ -1180,14 +1194,20 @@ public class TDDisplayFX extends PamBorderPane {
 			//			this.repaintAll();
 			break; 
 		case PamController.CHANGED_PROCESS_SETTINGS:
+			//might need to update the register to remove any data info
+			this.getTDControl().updateProviderRegister();
 			break;
 		}
 
+		//forces a repaint after any changes. 
+		lastUpdate=-1;
+		
 		if (tdGraphs != null) {
 			for (TDGraphFX tdg:tdGraphs) {
 				tdg.notifyModelChanged(changeType);
 			}
 		}
+		
 	}
 
 	/**
@@ -1327,7 +1347,7 @@ public class TDDisplayFX extends PamBorderPane {
 	/**
 	 * @return the mousePositionData
 	 */
-	public Label getMousePositionData() {
+	private Label getMousePositionLabel() {
 		return mousePositionData;
 	}
 
@@ -1342,6 +1362,15 @@ public class TDDisplayFX extends PamBorderPane {
 				}
 			}
 		});
+	}
+
+
+	/**
+	 * Simple string property for mouse position in time axis. 
+	 * @return the position text property. 
+	 */
+	public SimpleStringProperty mousePosTextProperty() {
+		return this.mousePosStringProperty;
 	}
 
 }

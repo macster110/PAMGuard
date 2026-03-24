@@ -22,38 +22,31 @@ package PamguardMVC;
 
 import java.awt.Point;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Vector;
 
 import javax.swing.JPopupMenu;
 
-import pamMaths.PamVector;
-import annotation.DataAnnotation;
-import annotation.DataAnnotationType;
-import binaryFileStorage.DataUnitFileInformation;
-import clickDetector.offlineFuncs.OfflineEventDataUnit;
 import Acquisition.AcquisitionControl;
-import Acquisition.AcquisitionParameters;
 import Acquisition.AcquisitionProcess;
 import Array.ArrayManager;
-import Array.HydrophoneLocator;
-import Array.PamArray;
 import Array.SnapshotGeometry;
 import GPS.GpsData;
 import GPS.GpsDataUnit;
 import PamController.PamController;
 import PamDetection.AbstractLocalisation;
 import PamUtils.FrequencyFormat;
-import PamUtils.LatLong;
 import PamUtils.PamCalendar;
-import PamUtils.PamSort;
 import PamUtils.PamUtils;
 import PamUtils.time.CalendarControl;
 import PamguardMVC.datamenus.DataMenuParent;
-import PamguardMVC.superdet.SubdetectionInfo;
 import PamguardMVC.superdet.SuperDetection;
+import annotation.DataAnnotation;
+import annotation.DataAnnotationType;
+import binaryFileStorage.DataUnitFileInformation;
+import clickDetector.offlineFuncs.OfflineEventDataUnit;
+import pamMaths.PamVector;
 
 /**
  * @author Doug Gillespie
@@ -95,7 +88,10 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 	 */
 	private PamDataBlock<T> parentDataBlock;
 	
-//	public GpsDataUnit gpsDataUnit;
+//	/**
+//	 * Daq source info passed around from raw data units, for info only. 
+//	 */
+//	private DaqSourceInfo daqSourceInfo;
 
 
 	
@@ -119,6 +115,12 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 	 * Index of any database unit that this updated. 
 	 */
 	private int databaseUpdateOf;
+	
+	/**
+	 * Mark the unit as deleted. May have want to send an update notification 
+	 * with this dataunit even after it's been deleted, so displays can update, etc. 
+	 */
+	private boolean deleted;
 	
 	/**
 	 * Information about the binary file the data unit is stored in
@@ -406,6 +408,10 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 	public void updateDataUnit(long updateTime) {
 		updateCount++;
 		this.lastUpdateTime = updateTime;
+		DataUnitFileInformation finf = getDataUnitFileInformation();
+		if (finf != null) {
+			finf.setNeedsUpdate(true);
+		}
 	}
 
 	/**
@@ -564,7 +570,8 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 	
 	/**
 	 * Get the latlong of the mean hydrophone position at the time of 
-	 * this detection. 
+	 * this detection. If the data unit has a channel bitmap of zero, then 
+	 * get the GPS position of the vessel at that time. 
 	 * @param recalculate
 	 * @return Lat long of detection origin (usually the position of the reference hydrophone at time of detection)
 	 */
@@ -902,7 +909,7 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 		str += String.format("%s %s %s<p>", PamCalendar.formatDate(basicData.getTimeMilliseconds(), true),
 				PamCalendar.formatTime(basicData.getTimeMilliseconds(), 3, true),
 				CalendarControl.getInstance().getTZCode(true));
-		if (CalendarControl.getInstance().isUTC() == false) {
+		if (!CalendarControl.getInstance().isUTC()) {
 			str += String.format("%s %s %s<p>", PamCalendar.formatDate(basicData.getTimeMilliseconds(), false),
 					PamCalendar.formatTime(basicData.getTimeMilliseconds(), 3, false),
 					"UTC");
@@ -974,8 +981,21 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 
 		
 		// add frequency and amplitude information
-		str += "Frequency: " + FrequencyFormat.formatFrequencyRange(this.getFrequency(), true) + "<br>";
-		str += String.format("Amplitude: %3.1fdB<br>", getAmplitudeDB());
+		double[] frequency = this.getFrequency();
+		if (frequency != null) {
+			boolean allzeros = true;
+			for (int i = 0; i < frequency.length; i++) {
+				if (frequency[i] > 0) {
+					allzeros = false;
+				}
+			}
+			if (!allzeros) {
+				str += "Frequency: " + FrequencyFormat.formatFrequencyRange(this.getFrequency(), true) + "<br>";
+			}
+		}
+		if (getAmplitudeDB() != 0) {
+			str += String.format("Amplitude: %3.1fdB<br>", getAmplitudeDB());
+		}
 		if (getSignalSPL() != null) {
 			str += String.format("SPL: %3.1fdBre1uPa<br>",linAmplitudeToDB(getSignalSPL()));
 		}
@@ -1215,7 +1235,7 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 					iter.remove();
 				}
 			}
-			if (superDetections.contains(superDetection) == false) {
+			if (!superDetections.contains(superDetection)) {
 				superDetections.add(superDetection);
 			}
 			if (parentDataBlock != null && PamController.getInstance().getRunMode() != PamController.RUN_PAMVIEW) {
@@ -1245,7 +1265,7 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 	 * @return super detection or null
 	 */
 	public SuperDetection getSuperDetection(Class superClass, boolean includeSubClasses) {
-		if (includeSubClasses == false) {
+		if (!includeSubClasses) {
 			return getSuperDetection(superClass);
 		}
 		synchronized (superDetectionSyncronisation) {
@@ -1719,4 +1739,32 @@ abstract public class PamDataUnit<T extends PamDataUnit, U extends PamDataUnit> 
 	public void setEmbryonic(boolean embryonic) {
 		this.embryonic = embryonic;
 	}
+
+	/**
+	 * @return the deleted
+	 */
+	public boolean isDeleted() {
+		return deleted;
+	}
+
+	/**
+	 * @param deleted the deleted to set
+	 */
+	public void setDeleted(boolean deleted) {
+		this.deleted = deleted;
+	}
+
+//	/**
+//	 * @return the daqSourceInfo
+//	 */
+//	public DaqSourceInfo getDaqSourceInfo() {
+//		return daqSourceInfo;
+//	}
+//
+//	/**
+//	 * @param daqSourceInfo the daqSourceInfo to set
+//	 */
+//	public void setDaqSourceInfo(DaqSourceInfo daqSourceInfo) {
+//		this.daqSourceInfo = daqSourceInfo;
+//	}
 }

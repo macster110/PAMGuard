@@ -20,10 +20,6 @@
  */
 package PamController;
 
-import generalDatabase.DBControl;
-import generalDatabase.DBControlSettings;
-import javafx.scene.control.Alert.AlertType;
-
 import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
@@ -42,8 +38,20 @@ import javax.swing.JOptionPane;
 import javax.swing.UIManager;
 import javax.swing.plaf.FontUIResource;
 
+import PamController.settings.SettingsNameChange;
+import PamController.settings.SettingsNameChanger;
+import PamUtils.PamCalendar;
+import PamUtils.PamFileChooser;
+import PamUtils.PamFileFilter;
+import PamView.dialog.warn.WarnOnce;
+import generalDatabase.DBControl;
+import generalDatabase.DBControlSettings;
+import javafx.scene.control.Alert.AlertType;
 import pamViewFX.fxNodes.utilsFX.PamUtilsFX;
 import pamViewFX.fxSettingsPanes.SettingsFileDialogFX;
+import pamguard.GlobalArguments;
+import pamguard.LogFileUtils;
+import pamguard.Pamguard;
 
 //XMLSettings
 //import org.jdom.Document;
@@ -54,16 +62,6 @@ import pamViewFX.fxSettingsPanes.SettingsFileDialogFX;
 //import org.w3c.dom.Node;
 //import com.thoughtworks.xstream.XStream;
 
-
-
-
-
-
-
-
-import java.io.StringWriter;
-
-
 //import javax.xml.transform.OutputKeys;
 //import javax.xml.transform.Transformer;
 //import javax.xml.transform.TransformerException;
@@ -72,28 +70,10 @@ import java.io.StringWriter;
 //import javax.xml.transform.stream.StreamResult;
 
 
-
-
-
-
-
-
-
 //import sun.jdbc.odbc.OdbcDef;
 import tipOfTheDay.TipOfTheDayManager;
 //import javax.swing.filechooser.FileFilter;
 //import javax.swing.filechooser.FileNameExtensionFilter;
-
-import PamController.settings.SettingsNameChange;
-import PamController.settings.SettingsNameChanger;
-import PamUtils.PamCalendar;
-import PamUtils.PamFileChooser;
-import PamUtils.PamFileFilter;
-import PamUtils.Splash;
-import PamView.PamGui;
-import PamView.dialog.warn.WarnOnce;
-import amplifier.AmpDialog;
-import amplifier.AmpParameters;
 
 //import PamUtils.PamFileFilter;
 
@@ -137,7 +117,7 @@ public class PamSettingManager {
 	 * List of modules that have / want PAMGUARD Settings
 	 * which get stored in the psf file and / or the database store.
 	 */
-	private ArrayList<PamSettings> owners;
+//	private ArrayList<PamSettings> owners;
 
 	/**
 	 * List of modules that specifically use settings from the database
@@ -171,7 +151,17 @@ public class PamSettingManager {
 	static public final String fileEnd = "psf";
 	static public final String fileEndx = "psfx";
 	static public final String fileEndXML = "psfxml";
+	
 	private static boolean saveAsPSFX = true;
+	
+	/**
+	 * A secondary configuration to use when loading configs into 
+	 * batch mode for viewing and extracting offline tasks. This is a 
+	 * real bodge and bad style, but can't do much about it at this stage. 
+	 * USe very sparingly and make sure it's set null once the external batch
+	 * configuration is loaded. 
+	 */
+	private PamConfiguration secondaryConfiguration;
 
 	static public String getCurrentSettingsFileEnd() {
 		if (saveAsPSFX) {
@@ -219,11 +209,12 @@ public class PamSettingManager {
 	/**
 	 * Save settings to a psf file
 	 */
-	static private final int SAVE_PSF = 0x1;
+	static public final int SAVE_PSF = 0x1;
+	
 	/**
 	 * Save settings to database tables (if available).
 	 */
-	static private final int SAVE_DATABASE = 0x2;
+	static public final int SAVE_DATABASE = 0x2;
 
 	/**
 	 * running in remote mode, default normal
@@ -246,7 +237,7 @@ public class PamSettingManager {
 
 
 	private PamSettingManager() {
-		owners = new ArrayList<PamSettings>();
+//		owners = new ArrayList<PamSettings>();
 		databaseOwners = new ArrayList<PamSettings>();
 		globalOwners = new ArrayList<PamSettings>();
 		//		setCurrentFile(new File(defaultFile));
@@ -265,7 +256,8 @@ public class PamSettingManager {
 	public void reset() {
 		initialSettingsList = null;
 		databaseSettingsList = null;
-		owners = new ArrayList<PamSettings>();
+//		owners = new ArrayList<PamSettings>();
+		getOwners().clear();
 		databaseOwners = new ArrayList<PamSettings>();
 
 	}
@@ -306,6 +298,17 @@ public class PamSettingManager {
 	}
 
 	/**
+	 * Deregister a settings. 
+	 * @param pamUnit
+	 * @return
+	 */
+	public boolean unRegisterSettings(PamSettings pamUnit) {
+		boolean found = getOwners().remove(pamUnit);
+		found |= databaseOwners.remove(pamUnit);
+		found |= globalOwners.remove(pamUnit);
+		return found;
+	}
+	/**
 	 * Register modules that have settings information that
 	 * should be stored in serialised form in
 	 * psf files and database Pamguard_Settings tables.
@@ -319,7 +322,7 @@ public class PamSettingManager {
 	public boolean registerSettings(PamSettings pamUnit, int whichLists) {
 
 		if ((whichLists & LIST_UNITS) != 0) {
-			owners.add(pamUnit);
+			getOwners().add(pamUnit);
 		}
 		if ((whichLists & LIST_DATABASESTUFF) != 0) {
 			databaseOwners.add(pamUnit);
@@ -383,6 +386,8 @@ public class PamSettingManager {
 			boolean[] usedSettings,	PamSettings user) {
 		if (settingsList == null) return null;
 		// go through the list and see if any match this module. Avoid repeats.
+//		String unitName = user.getUnitName();
+//		String unitType = user.getUnitType();
 		for (int i = 0; i < settingsList.size(); i++) {
 			if (usedSettings != null && usedSettings[i]) continue;
 			if (isSettingsUnit(user, settingsList.get(i))) {
@@ -392,6 +397,7 @@ public class PamSettingManager {
 				return settingsList.get(i);
 			}
 		}
+		
 		/*
 		 * To improve complex module loading where settings may be saved by multiple sub-modules, in
 		 * July 2015 many modules which had fixed settings had their settings names and types changed !
@@ -475,9 +481,10 @@ public class PamSettingManager {
 	 * @return Settings owner or null.
 	 */
 	public PamSettings findSettingsOwner(String unitType, String unitName, String unitClassName) {
+		ArrayList<PamSettings> owners = getOwners();
 		for (PamSettings owner:owners) {
 			if (owner.getClass() != null && unitClassName != null) {
-				if (owner.getClass().getName().equals(unitClassName) == false) {
+				if (!owner.getClass().getName().equals(unitClassName)) {
 					continue;
 				}
 			}
@@ -492,7 +499,7 @@ public class PamSettingManager {
 	/**
 	 * Call just before PAMGUARD exits to save the settings
 	 * either to psf and / or database tables.
-	 * @return true if settings saved sucessfully.
+	 * @return true if settings saved successfully.
 	 */
 	public boolean saveFinalSettings() {
 		int runMode = PamController.getInstance().getRunMode();
@@ -501,7 +508,12 @@ public class PamSettingManager {
 		case PamController.RUN_NETWORKRECEIVER:
 			return saveSettings(SAVE_PSF | SAVE_DATABASE);
 		case PamController.RUN_PAMVIEW:
-			return saveSettings(SAVE_DATABASE);
+			if (GlobalArguments.getParam(GlobalArguments.BATCHVIEW) != null) {
+				return saveSettings(SAVE_PSF | SAVE_DATABASE);
+			}
+			else {
+				return saveSettings(SAVE_DATABASE);
+			}
 		case PamController.RUN_MIXEDMODE:
 			return saveSettings(SAVE_DATABASE);
 		case PamController.RUN_NOTHING:
@@ -517,7 +529,7 @@ public class PamSettingManager {
 	 */
 	public boolean saveSettings(int saveWhere) {
 
-		if (initializationComplete == false) {
+		if (!initializationComplete) {
 			// if PAMGAURD hasn't finished loading, then don't save the settings
 			// or the file will get wrecked (bug tracker 2269579)			
 			String msg = "There was an error loading settings from this configuration, so the configuration"
@@ -653,7 +665,8 @@ public class PamSettingManager {
 
 		ArrayList<PamControlledUnitSettings> pamSettingsList;
 		pamSettingsList = new ArrayList<PamControlledUnitSettings>();
-		for (int i = 0; i < owners.size(); i++) {
+		ArrayList<PamSettings> owners = getOwners();
+		for (int i = 0; i < getOwners().size(); i++) {
 			pamSettingsList
 			.add(new PamControlledUnitSettings(owners.get(i)
 					.getUnitType(), owners.get(i).getUnitName(),
@@ -773,6 +786,7 @@ public class PamSettingManager {
 		//XMLSettings
 		ArrayList<PamControlledUnitSettings> pamSettingsList;
 		pamSettingsList = new ArrayList<PamControlledUnitSettings>();
+		ArrayList<PamSettings> owners = getOwners();
 		for (int i = 0; i < owners.size(); i++) {
 			pamSettingsList
 			.add(new PamControlledUnitSettings(owners.get(i)
@@ -796,7 +810,6 @@ public class PamSettingManager {
 		/*
 		 * then save it to a single XML file
 		 */
-
 		//XML file test
 
 		objectToXMLFile(pamSettingsList,file);
@@ -849,7 +862,12 @@ public class PamSettingManager {
 			ans = loadNormalSettings();
 			break;
 		case PamController.RUN_PAMVIEW:
-			ans = loadViewerSettings();
+			if (GlobalArguments.getParam(GlobalArguments.BATCHVIEW) != null) {
+				ans = loadNormalSettings();
+			}
+			else {
+				ans = loadViewerSettings();
+			}
 			break;
 		case PamController.RUN_MIXEDMODE:
 			ans = loadMixedModeSettings();
@@ -903,6 +921,7 @@ public class PamSettingManager {
 	 * all modules in the list.
 	 */
 	private void initialiseRegisteredModules() {
+		ArrayList<PamSettings> owners = getOwners();
 		if (owners == null) {
 			return;
 		}
@@ -1029,13 +1048,22 @@ public class PamSettingManager {
 		loadingLocalSettings = true;
 
 		loadSettingsFileData();
+		
 
-		if (PamSettingManager.RUN_REMOTE == false) {
+		if (!PamSettingManager.RUN_REMOTE && !GlobalArguments.isBatch()) {
+			// run the log file check and the tips of the day here. 
+			
+			
 			if (settingsFileData != null) {
+				if (settingsFileData.getCheckLogFileErrors()) {
+					LogFileUtils.checkLogFileErrors(Pamguard.getSettingsFolder());
+				}
+				
+				
 				TipOfTheDayManager.getInstance().setShowAtStart(settingsFileData.showTipAtStartup);
 				if (settingsFileData.showTipAtStartup) {
 					if (PamGUIManager.isSwing()) {
-					TipOfTheDayManager.getInstance().showTip(null, null);
+						TipOfTheDayManager.getInstance().showTip(null, null);
 					}
 				}
 			}
@@ -1230,8 +1258,8 @@ public class PamSettingManager {
 		PamSettings owner;
 		for (int i = 0; i < ownersList.size(); i++) {
 			owner = ownersList.get(i);
-			if (owner.getUnitType().equals(unitType) == false) continue;
-			if (unitName != null && owner.getUnitName().equals(unitName) == false) continue;
+			if (!owner.getUnitType().equals(unitType)) continue;
+			if (unitName != null && !owner.getUnitName().equals(unitName)) continue;
 			return owner;
 		}
 
@@ -1480,11 +1508,20 @@ public class PamSettingManager {
 		if (settings.getUnitName() == null || settingsUser.getUnitName() == null) return false;
 		if (settings.getUnitType() == null || settingsUser.getUnitType() == null) return false;
 
-
-		if (settings.getUnitName().equals(settingsUser.getUnitName())
-				&& settings.getUnitType().equals(settingsUser.getUnitType())
-				&& settings.versionNo == settingsUser.getSettingsVersion()){
-			return true;
+		/*
+		 *  some of the settings names used in Viewer mode have become too long, notably
+		 *  in some data selectors which are using a datablocks long data name. This 
+		 *  screws things up, so moving to a begins with rather than equals for the name. 
+		 */
+		String name = settingsUser.getUnitName();
+		String type = settingsUser.getUnitType();
+		long version = settingsUser.getSettingsVersion();
+		
+		if (settings.getUnitType().equals(type)
+				&& settings.versionNo == version){
+			if (name.startsWith(settings.getUnitName())) {
+				return true;
+			}
 		}
 
 		return false;
@@ -1670,7 +1707,7 @@ public class PamSettingManager {
 		 * then create the file (and do a few other things)
 		 */
 		File slFile = getSettingsListFile();
-		if (slFile.exists() == false) {
+		if (!slFile.exists()) {
 			createSettingsListFile();
 		}
 
@@ -1776,7 +1813,7 @@ public class PamSettingManager {
 		if (settingsFileData == null) {
 			return false;
 		}
-		if (PamSettingManager.RUN_REMOTE == false) {
+		if (!PamSettingManager.RUN_REMOTE) {
 			settingsFileData.showTipAtStartup = TipOfTheDayManager.getInstance().isShowAtStart();
 		}
 		settingsFileData.trimList();
@@ -2179,9 +2216,6 @@ public class PamSettingManager {
 
 	}
 
-	public ArrayList<PamSettings> getOwners() {
-		return owners;
-	}
 
 	/**
 	 *
@@ -2191,6 +2225,7 @@ public class PamSettingManager {
 		PamSettingsGroup psg = new PamSettingsGroup(PamCalendar.getTimeInMillis());
 		PamControlledUnitSettings pcus;
 		PamSettings ps;
+		ArrayList<PamSettings> owners = getOwners();
 		for (int i = 0; i < owners.size(); i++) {
 			ps = owners.get(i);
 			pcus = new PamControlledUnitSettings(ps.getUnitType(), ps.getUnitName(),
@@ -2266,6 +2301,7 @@ public class PamSettingManager {
 	 * @return Array list of settings.
 	 */
 	public ArrayList<PamSettings> findPamSettings(String unitType, String unitName) {
+		ArrayList<PamSettings> owners = getOwners();
 		if (owners == null) {
 			return null;
 		}
@@ -2341,6 +2377,63 @@ public class PamSettingManager {
 			int ans = WarnOnce.showWarning(frame, "New Display Scaling", message, WarnOnce.OK_OPTION);
 		}
 
+	}
+
+	/**
+	 * List of settings owners has moved to PAMConfiguration. This is so that when loading 
+	 * a secondary config in batch mode, the 'owners' can be redirected to a different
+	 * configuration. Ideally, just about everything in this entire class would move 
+	 * to PAMConfiguration, but don't want to break the static registersettings function in 
+	 * every module. 
+	 * @return the owners
+	 */
+	public ArrayList<PamSettings> getOwners() {
+		if (secondaryConfiguration != null) {
+			return secondaryConfiguration.getSettingsOwners();
+		}
+		//otherwise return the main list from the main configuration held by PamController. 
+		return PamController.getInstance().getPamConfiguration().getSettingsOwners();
+	}
+
+	/**
+	 * @return the secondaryConfiguration
+	 */
+	public PamConfiguration getSecondaryConfiguration() {
+		return secondaryConfiguration;
+	}
+
+	/**
+	 * <b>Warning - fragile code. Use very sparingly!</b><br>
+	 * A secondary configuration to use when loading configs into 
+	 * batch mode for viewing and extracting offline tasks. This is a 
+	 * real bodge and bad style, but can't do much about it at this stage. 
+	 * USe very sparingly and make sure it's set null once the external batch
+	 * configuration is loaded. 
+	 * @param secondaryConfiguration the secondaryConfiguration to set
+	 */
+	public void setSecondaryConfiguration(PamConfiguration secondaryConfiguration) {
+		this.secondaryConfiguration = secondaryConfiguration;
+	}
+	
+	/**
+	 * Check log files at PAMGuard startup ? 
+	 * @return
+	 */
+	public boolean isCheckLogFileErrors() {
+		if (settingsFileData == null) {
+			return false;
+		}
+		return settingsFileData.getCheckLogFileErrors();
+	}
+	
+	/**
+	 * Check log files for errors at PAMGuard startup
+	 * @param check
+	 */
+	public void setCheckLogFileErrors(boolean check) {
+		if (settingsFileData != null) {
+			settingsFileData.setCheckLogFileErrors(check);
+		}
 	}
 
 }

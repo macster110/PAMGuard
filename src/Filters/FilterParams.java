@@ -22,14 +22,10 @@ package Filters;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.Arrays;
 
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-
-import PamController.PamControlledUnit;
 import PamModel.parametermanager.ManagedParameters;
 import PamModel.parametermanager.PamParameterSet;
+import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import PamUtils.FrequencyFormat;
 
 /**
@@ -78,6 +74,10 @@ public class FilterParams implements Serializable, Cloneable, ManagedParameters 
 
 	public static final int SCALE_LOG = 0;
 	public static final int SCALE_LIN = 1;
+
+	public static final int PZPLOT_PZ = 0;
+	public static final int PZPLOT_IMPULSE = 1;
+	public static int pzPlotStyle = PZPLOT_IMPULSE;
 
 	/**
 	 * Construct a filter parameter set with default params
@@ -358,7 +358,7 @@ public class FilterParams implements Serializable, Cloneable, ManagedParameters 
 
 	@Override
 	public PamParameterSet getParameterSet() {
-		PamParameterSet ps = PamParameterSet.autoGenerate(this);
+		PamParameterSet ps = PamParameterSet.autoGenerate(this, ParameterSetType.DETECTOR);
 		return ps;
 	}
 
