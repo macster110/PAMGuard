@@ -206,7 +206,7 @@ public class SpecCorrPane extends SettingsPane<IshDetParams> {
 	@Override
 	public IshDetParams getParams(IshDetParams params) {
 		// TODO Auto-generated method stub
-		return null;
+		return params;
 	}
 
 	@Override

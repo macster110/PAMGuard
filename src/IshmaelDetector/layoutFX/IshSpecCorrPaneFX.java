@@ -15,18 +15,18 @@ public class IshSpecCorrPaneFX extends IshPaneFX {
 
 	private  SpecCorrPane specCorrelationPane;
 
-	private SgramCorrControl specIshDetControl; 
+//	private SgramCorrControl specIshDetControl; 
 
 	public IshSpecCorrPaneFX(SgramCorrControl specIshDetControl) {
 		super(specIshDetControl);
-		this.specIshDetControl=specIshDetControl; 
+//		this.specIshDetControl=specIshDetControl; 
 		// TODO Auto-generated constructor stub
 	}
 
 	@Override
 	public SettingsPane<IshDetParams> getDetectorPane() {
 		if (specCorrelationPane==null) {
-			specCorrelationPane= new SpecCorrPane(specIshDetControl); 
+			specCorrelationPane= new SpecCorrPane((SgramCorrControl) super.ishDetControl); 
 		}
 		return specCorrelationPane;
 	}
