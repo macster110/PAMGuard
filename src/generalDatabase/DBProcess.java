@@ -1676,6 +1676,7 @@ public class DBProcess extends PamProcess {
 		int autoCommit = databaseControll.dbParameters.getUseAutoCommit() ? 1 : 0;
 		String summary = String.format("<DBNAME>%s</DBNAME><AUTOCOMMIT>%d</AUTOCOMMIT><WRITES>%d</WRITES><FAILS>%d</FAILS>", 
 					name, autoCommit, summaryWriteOK, summaryWriteErr);
+
 		if (clear) {
 			summaryWriteOK = summaryWriteErr = 0;
 		}

@@ -89,8 +89,14 @@ public class NMEAControl extends PamControlledUnit implements PamSettings {
 	private void checkGlobalArguments() {
 		String globArg = GlobalArguments.getParam(NMEACOMCOMMAND);
 		if (globArg != null) {
-			System.out.printf("Setting %s COM port to %s\n", getUnitName(), globArg);
-			nmeaParameters.serialPortName = globArg;
+
+			System.out.printf("Setting %s serial port to %s\n", getUnitName(), globArg);
+			if (globArg.equalsIgnoreCase("auto")) {
+				nmeaParameters.autoSerialPort = true;
+			}
+			else {
+				nmeaParameters.serialPortName = globArg;
+			}
 		}
 		
 	}
@@ -271,5 +277,6 @@ public class NMEAControl extends PamControlledUnit implements PamSettings {
 		
 		return NMEAString;
 	}
+
 	
 }
