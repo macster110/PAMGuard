@@ -575,7 +575,7 @@ public class DLClassifyProcess extends PamProcess {
 
 		//the model result may be null if the classifier uses a new thread. 
 
-//		System.out.println("DLClassifyProcess: New newRawModelResult: startSample " + pamRawData.getStartSample() + " No. prediction results: " + modelResult.size()+ "  " + getSourceParams().countChannelGroups());
+		System.out.println("DLClassifyProcess: New newRawModelResult: startSample " + pamRawData.getStartSample() + " No. prediction results: " + modelResult.size()+ "  " + getSourceParams().countChannelGroups());
 
 		//create a new data unit - always add to the model result section. 
 		DLDataUnit dlDataUnit;
@@ -611,6 +611,7 @@ public class DLClassifyProcess extends PamProcess {
 					for (int j=0; j<dlDataUnits.size(); j++) {
 						/****Make our own data units****/
 						if (dlDataUnits.get(j).getPredicitionResult().isBinaryClassification()) {
+							System.out.println("DLClassifyProcess.newRawModelResult: Postive detection: " + dlDataUnits.get(j).getPredicitionResult().getStartSample() + "  " + modelResult.get(j).getStartSample());
 							//if the model result has a binary classification then it is added to the data buffer unless the data
 							//buffer has reached a maximum size. In that case the data is saved. 
 							groupRawDataBuffer[i].add(pamRawData); 
