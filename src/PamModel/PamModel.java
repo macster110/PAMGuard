@@ -544,6 +544,12 @@ final public class PamModel implements PamSettings {
 		mi.setHidden(!isViewer);
 		mi.setMaxNumber(1);
 
+		mi = PamModuleInfo.registerControlledUnit("soundtrapSensor.SudSensorControl", "SoundTrap SWV Sensor Import");
+		mi.setModulesMenuGroup(sensorsGroup);
+		mi.setToolTipText("Extracts magnetometer and accelerometer data from SoundTrap SUD (.swv) files and computes heading, pitch and roll");
+		mi.setMaxNumber(1);
+		mi.setHelpPoint("sensors/soundtrapSensor/docs/soundtrapSensor.html");
+
 		mi = PamModuleInfo.registerControlledUnit("cpod.CPODControl2", "CPOD Detector Import");
 		mi.setModulesMenuGroup(sensorsGroup);
 		mi.setToolTipText("Imports CPOD data");
