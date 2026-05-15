@@ -500,6 +500,24 @@ public class ExportProcessDialog {
 			super(null, settingsName);
 		}
 
+		/**
+		 * Override to allow tasks from different data blocks without triggering the
+		 * base-class "cannot combine tasks" error message.  The ExportTaskGroup is
+		 * specifically designed to run tasks from multiple data blocks sequentially:
+		 * {@link #runTaskFrom} resets {@code primaryDataBlock} to the correct block
+		 * before each run, so the single-block constraint in
+		 * {@link OfflineTaskGroup#addTask} does not apply here.
+		 * <p>
+		 * We clear {@code primaryDataBlock} before delegating to the superclass so
+		 * that the guard condition ({@code primaryDataBlock != task.getDataBlock()})
+		 * is never met during group construction.
+		 */
+		@Override
+		public boolean addTask(OfflineTask task) {
+			setPrimaryDataBlock(null);
+			return super.addTask(task);
+		}
+
 
 		@Override
 		public String getUnitType() {

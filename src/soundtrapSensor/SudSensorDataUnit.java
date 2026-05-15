@@ -11,7 +11,7 @@ import PamguardMVC.PamDataUnit;
  *   <li>Heading, pitch and roll produced by the sensor-fusion algorithm (°)</li>
  * </ul>
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorDataUnit extends PamDataUnit {
 
@@ -36,7 +36,7 @@ public class SudSensorDataUnit extends PamDataUnit {
      * @param accelX accelerometer X (m/s²)
      * @param accelY accelerometer Y (m/s²)
      * @param accelZ accelerometer Z (m/s²)
-     * @param heading heading (degrees, 0-360)
+     * @param heading heading (degrees, ±180)
      * @param pitch   pitch   (degrees, ±90)
      * @param roll    roll    (degrees, ±180)
      */

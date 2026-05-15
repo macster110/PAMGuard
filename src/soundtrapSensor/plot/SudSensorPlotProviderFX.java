@@ -11,7 +11,7 @@ import soundtrapSensor.SudSensorDataBlock;
  * {@link dataPlotsFX.data.TDDataProviderRegisterFX} so that the heading, pitch
  * and roll lines appear as an available overlay on any TD graph.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorPlotProviderFX extends TDDataProviderFX {
 

@@ -5,18 +5,20 @@ import dataGram.DatagramProvider;
 import dataGram.DatagramScaleInformation;
 
 /**
- * Datagram provider for the SudSensor module. Displays average heading, pitch
+ * Datagram provider for the SudSensor module. Displays heading, pitch
  * and roll in the PAMGuard datagram panel as three separate bands using a 2D
  * plot (one value per time slice per band).
  * <p>
- * The three datagram points are:
+ * All three orientation values are produced by {@link SudSensorFusion} in a
+ * ±180 ° / ±90 ° range.  They are shifted to strictly non-negative values
+ * before storage so they survive the datagram rendering pipeline:
  * <ol>
- *   <li>Heading   – 0 to 360 °</li>
- *   <li>Pitch     – shifted +90 so the range is 0 to 180 °</li>
- *   <li>Roll      – shifted +180 so the range is 0 to 360 °</li>
+ *   <li>Heading – ±180 °, shifted +180 → 0–360 °</li>
+ *   <li>Pitch   – ±90 °,  shifted +90  → 0–180 °</li>
+ *   <li>Roll    – ±180 °, shifted +180 → 0–360 °</li>
  * </ol>
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorDatagramProvider implements DatagramProvider {
 
@@ -35,13 +37,21 @@ public class SudSensorDatagramProvider implements DatagramProvider {
     }
 
     /**
-     * Accumulates one sample into the datagram line. Each of the three slots
-     * holds the running total for one orientation angle; the datagram
-     * framework will average across all data units in each time slice.
-     *
-     * @param dataUnit   the current {@link SudSensorDataUnit}
-     * @param dataGramLine array of length {@link #getNumDataGramPoints()}
-     * @return 1 (number of data points contributed)
+     * Writes the current orientation reading into the datagram line.
+     * <p>
+     * Values are <em>assigned</em> (not accumulated) so the stored value is
+     * always one representative sample and is independent of how many data
+     * units happened to fall inside the datagram time bin.  Accumulating sums
+     * would cause the stored value to scale with the sample count, producing
+     * regular spikes at file-boundary intervals.
+     * <p>
+     * Each value is shifted to a non-negative range before storage (negative
+     * stored values are treated as "no data" by the rendering pipeline):
+     * <ul>
+     *   <li>Heading ±180 °  + 180 → 0–360 °</li>
+     *   <li>Pitch   ±90 °   +  90 → 0–180 °</li>
+     *   <li>Roll    ±180 °  + 180 → 0–360 °</li>
+     * </ul>
      */
     @Override
     public int addDatagramData(PamDataUnit dataUnit, float[] dataGramLine) {
@@ -49,10 +59,9 @@ public class SudSensorDatagramProvider implements DatagramProvider {
             return 0;
         }
         SudSensorDataUnit su = (SudSensorDataUnit) dataUnit;
-        // All orientation values are in a ±180 range; shift to 0–360 for display.
-        dataGramLine[0] += (float) (su.getHeading() + 180.0);  // −180..+180 → 0..360
-        dataGramLine[1] += (float) (su.getPitch()   +  90.0);  // −90..+90   → 0..180
-        dataGramLine[2] += (float) (su.getRoll()    + 180.0);  // −180..+180 → 0..360
+        dataGramLine[0] = (float) (su.getHeading() + 180.0);  // −180..+180 → 0..360
+        dataGramLine[1] = (float) (su.getPitch()   +  90.0);  // −90..+90   → 0..180
+        dataGramLine[2] = (float) (su.getRoll()    + 180.0);  // −180..+180 → 0..360
         return 1;
     }
 

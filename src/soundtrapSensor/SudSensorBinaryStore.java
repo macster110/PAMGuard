@@ -30,7 +30,7 @@ import binaryFileStorage.ModuleHeader;
  * </pre>
  * Total: 9 × 8 = 72 bytes per record.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorBinaryStore extends BinaryDataSource {
 

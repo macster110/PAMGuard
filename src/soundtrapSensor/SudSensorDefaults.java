@@ -10,7 +10,7 @@ package soundtrapSensor;
  * To add a new device in the future, add a new constant and supply its
  * values in the switch block of {@link #createParams()}.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public enum SudSensorDefaults {
 

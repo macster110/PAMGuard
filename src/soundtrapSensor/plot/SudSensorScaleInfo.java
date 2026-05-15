@@ -9,7 +9,7 @@ import dataPlotsFX.data.TDScaleInfo;
  * that overrides the default ParameterType string so we can show
  * "Orientation (°)" or "Raw Sensor" without needing a new enum value.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorScaleInfo extends TDScaleInfo {
 

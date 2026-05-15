@@ -24,7 +24,7 @@ import soundtrapSensor.plot.SudSensorPlotProviderFX;
  * magnetometer/accelerometer data, computes heading, pitch and roll via a
  * Mahony sensor-fusion filter, and stores the results to binary files.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorControl extends PamControlledUnit implements PamSettings {
 
@@ -33,18 +33,19 @@ public class SudSensorControl extends PamControlledUnit implements PamSettings {
     private SudSensorParams params = new SudSensorParams();
     private final SudSensorProcess sensorProcess;
     private final SudSensorSWVHandler swvHandler;
+    private final SudSensorStreamerPublisher streamerPublisher;
 
     public SudSensorControl(String unitName) {
         super(UNIT_TYPE, unitName);
 
         addPamProcess(sensorProcess = new SudSensorProcess(this));
+
+        streamerPublisher = new SudSensorStreamerPublisher(this);
         swvHandler = new SudSensorSWVHandler(this);
 
         TDDataProviderRegisterFX.getInstance().registerDataInfo(
                 new SudSensorPlotProviderFX(this, sensorProcess.getSensorDataBlock()));
 
-        // Subscribe immediately so that the handler is in place before
-        // acquisition starts
         swvHandler.subscribeSUD();
 
         if (!isViewer) {
@@ -64,6 +65,10 @@ public class SudSensorControl extends PamControlledUnit implements PamSettings {
 
     public SudSensorSWVHandler getSWVHandler() {
         return swvHandler;
+    }
+
+    public SudSensorStreamerPublisher getStreamerPublisher() {
+        return streamerPublisher;
     }
 
     // -----------------------------------------------------------------
@@ -88,6 +93,8 @@ public class SudSensorControl extends PamControlledUnit implements PamSettings {
         SudSensorParams newParams = SudSensorDialog.showDialog(parentFrame, this);
         if (newParams != null) {
             params = newParams;
+            // Reset the publisher so the new interval / offsets take effect immediately.
+            streamerPublisher.reset();
         }
     }
 

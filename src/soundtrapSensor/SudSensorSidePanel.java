@@ -24,7 +24,7 @@ import PamguardMVC.PamObserverAdapter;
  * Side panel for the SudSensor module. Displays the most recently computed
  * heading, pitch and roll values whilst PAMGuard is processing SWV data.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorSidePanel extends PamObserverAdapter implements PamSidePanel {
 

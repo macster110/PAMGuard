@@ -92,6 +92,7 @@ public class ModuleIconFactory {
 			iconNode = createNMEASymbol();
 		case NOISE_BAND:
 			iconNode = getSVGIcon("/Resources/modules/noise_band_monitor.svg", Color.BLACK, 2);
+
 			break;
 		case NOISE_FILT:
 			iconNode = new ImageView(new Image(getClass().getResourceAsStream("/Resources/modules/filterdNoiseMeasurement.png")));

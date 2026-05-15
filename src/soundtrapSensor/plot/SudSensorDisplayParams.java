@@ -20,7 +20,7 @@ import rawDeepLearningClassifier.dataPlotFX.LineInfo;
  *   <li>8 – Accel Z</li>
  * </ul>
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorDisplayParams implements Serializable, Cloneable {
 

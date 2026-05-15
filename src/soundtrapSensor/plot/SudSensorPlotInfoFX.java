@@ -3,6 +3,7 @@ package soundtrapSensor.plot;
 import java.io.Serializable;
 
 import PamController.PamController;
+import PamUtils.PamCalendar;
 import PamView.GeneralProjector.ParameterType;
 import PamView.GeneralProjector.ParameterUnits;
 import PamguardMVC.PamDataUnit;
@@ -32,7 +33,7 @@ import soundtrapSensor.SudSensorDataUnit;
  * Line colours and visibility are configurable via the {@link SudSensorSettingsPane}
  * that appears in any TD graph hosting this overlay.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorPlotInfoFX extends TDDataInfoFX {
 
@@ -95,20 +96,22 @@ public class SudSensorPlotInfoFX extends TDDataInfoFX {
     public Polygon drawDataUnit(int plotNumber, PamDataUnit pamDataUnit,
                                 GraphicsContext g, double scrollStart,
                                 TDProjectorFX tdProjector, int type) {
+    	
+    	//System.out.println("Drawing SudSensor data unit at time " + PamCalendar.formatDateTime(  pamDataUnit.getTimeMilliseconds()));
 
         if (!(pamDataUnit instanceof SudSensorDataUnit)) return null;
         SudSensorDataUnit su = (SudSensorDataUnit) pamDataUnit;
 
         double t = su.getTimeMilliseconds() - scrollStart;
         double x = tdProjector.getTimePix(t);
+        
 
         g.setLineWidth(1.5);
         g.setLineDashes(null);
 
         // Determine which scale is currently selected to know which lines to draw
-        boolean isRaw = (getCurrentScaleInfo() == scaleRaw);
 
-        if (isRaw) {
+        if (getCurrentScaleInfo()==scaleRaw) {
             // Raw sensor lines: mag X/Y/Z (indices 3-5), accel X/Y/Z (indices 6-8)
             drawLine(g, x, tdProjector.getYPix(su.getMagX()),   SudSensorDisplayParams.IDX_MAG_X);
             drawLine(g, x, tdProjector.getYPix(su.getMagY()),   SudSensorDisplayParams.IDX_MAG_Y);
@@ -116,7 +119,7 @@ public class SudSensorPlotInfoFX extends TDDataInfoFX {
             drawLine(g, x, tdProjector.getYPix(su.getAccelX()), SudSensorDisplayParams.IDX_ACCEL_X);
             drawLine(g, x, tdProjector.getYPix(su.getAccelY()), SudSensorDisplayParams.IDX_ACCEL_Y);
             drawLine(g, x, tdProjector.getYPix(su.getAccelZ()), SudSensorDisplayParams.IDX_ACCEL_Z);
-        } else {
+        } else if (getCurrentScaleInfo()==scaleOrientation) {
             // Orientation lines: heading, pitch, roll (indices 0-2)
             drawLine(g, x, tdProjector.getYPix(su.getHeading()), SudSensorDisplayParams.IDX_HEADING);
             drawLine(g, x, tdProjector.getYPix(su.getPitch()),   SudSensorDisplayParams.IDX_PITCH);

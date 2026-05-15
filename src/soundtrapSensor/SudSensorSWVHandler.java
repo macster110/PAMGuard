@@ -27,7 +27,7 @@ import PamController.PamController;
  * a {@link SudSensorDataUnit} is created and added to the
  * {@link SudSensorDataBlock}.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorSWVHandler implements SUDNotificationHandler {
 
@@ -58,6 +58,7 @@ public class SudSensorSWVHandler implements SUDNotificationHandler {
      * when a new file starts.
      */
     private long lastSampleMillis = 0;
+	private double chunkLen;
 
     public SudSensorSWVHandler(SudSensorControl sensorControl) {
         this.sensorControl = sensorControl;
@@ -99,17 +100,40 @@ public class SudSensorSWVHandler implements SUDNotificationHandler {
      * indicating that the fusion filter state is still valid.
      */
     private boolean isContiguousWithPrevious(long newStartMillis) {
+    	System.out.println("Checking file continuity: lastSampleMillis=" + lastSampleMillis +
+				", newStartMillis=" + newStartMillis);
+    	
         if (fusion == null || lastSampleMillis <= 0 || newStartMillis <= 0) {
+        	System.out.println("Not contiguous: no previous fusion or invalid timestamps");
             return false;
         }
         long gapMs = newStartMillis - lastSampleMillis;
-        long maxGapMs = sensorControl.getParams().maxContiguousGapMs;
-        return gapMs >= 0 && gapMs <= maxGapMs;
+        //use a gap threshold that is the max contiguous gap plus the length of the chunk, to allow for some flexibility in chunk timing without causing a fusion reset
+        long maxGapMs = sensorControl.getParams().maxContiguousGapMs + (long) chunkLen;
+        boolean isContiguous = gapMs >= 0 && gapMs <= maxGapMs;
+        
+        System.out.println("Gap of " + gapMs + " ms is " + (isContiguous ? "contiguous" : "not contiguous"));
+        
+        return isContiguous;
     }
 
     private void rebuildFusion(double fs) {
         this.sampleRateHz = fs;
         fusion = new SudSensorFusion(sensorControl.getParams(), fs);
+        sensorControl.getStreamerPublisher().reset();
+        // Keep the data block's sample rate in sync so it is always current
+        // during normal processing (viewer mode gets it from the binary header).
+        sensorControl.getSensorProcess().getSensorDataBlock().setSampleRateHz(fs);
+    }
+
+    /**
+     * Returns the sample rate of the SWV sensor stream in Hz.
+     * Defaults to 25 Hz until the first SWV chunk is processed.
+     *
+     * @return sample rate in Hz
+     */
+    public double getSampleRateHz() {
+        return sampleRateHz;
     }
 
     @Override
@@ -205,12 +229,16 @@ public class SudSensorSWVHandler implements SUDNotificationHandler {
                         fusion.getRollDeg());
 
                 dataBlock.addPamData(du);
+                sensorControl.getStreamerPublisher().processSensorData(du);
                 lastSampleMillis = sampleMillis;
 
             } catch (IOException e) {
                 break;
             }
         }
+        
+        //the chunk length in ms, used for debugging and to determine if the next chunk is contiguous enough to keep the fusion state
+        chunkLen = nFrames *dtMs;
     }
 
     // -----------------------------------------------------------------
@@ -238,7 +266,7 @@ public class SudSensorSWVHandler implements SUDNotificationHandler {
         subscribeSUD();
     }
 
-    public void pamStop() {
+    public void prepare() {
         lastSampleMillis = 0;
     }
 }

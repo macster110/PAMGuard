@@ -7,7 +7,7 @@ import java.io.Serializable;
  * fusion and calibration of the magnetometer/accelerometer data extracted from
  * SoundTrap .swv files.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorParams implements Serializable, Cloneable {
 
@@ -72,6 +72,45 @@ public class SudSensorParams implements Serializable, Cloneable {
      */
     public double accelLsbToMsq      = 9.80665e-3;   // m/s² per LSB  (LSM303AGR ±2 g HR)
     public double magLsbToMicroTesla = 0.15;           // µT  per LSB  (LSM303AGR)
+
+    // -------------------------------------------------------------------------
+    // Streamer output settings
+    // -------------------------------------------------------------------------
+
+    /**
+     * When true, the module periodically creates {@code StreamerDataUnit}s
+     * from the mean heading/pitch/roll of the sensor-fusion output.
+     */
+    public boolean createStreamerDataUnits = false;
+
+    /**
+     * How often (in seconds) a new {@code StreamerDataUnit} is created.
+     * Minimum recommended value is 5 s; smaller values produce large database volumes.
+     */
+    public int streamerIntervalSeconds = 5;
+
+    /**
+     * Index of the {@code Streamer} in the current array that this module
+     * should update.  Defaults to 0 (the first / only streamer).
+     */
+    public int streamerIndex = 0;
+
+    /**
+     * Fixed offset added to the sensor heading before it is stored in the
+     * streamer.  Use this to account for any rotational misalignment between
+     * the orientation sensor and the hydrophone array (degrees, −180..+180).
+     */
+    public double headingOffsetDeg = 0.0;
+
+    /**
+     * Fixed offset added to the sensor pitch (degrees).
+     */
+    public double pitchOffsetDeg = 0.0;
+
+    /**
+     * Fixed offset added to the sensor roll (degrees).
+     */
+    public double rollOffsetDeg = 0.0;
 
     @Override
     public SudSensorParams clone() {

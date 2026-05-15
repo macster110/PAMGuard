@@ -26,7 +26,7 @@ import rawDeepLearningClassifier.dataPlotFX.LineInfo;
  * <em>Raw Sensor</em> axis is selected, and the magnetometer/accelerometer
  * controls are disabled when any orientation axis is selected.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorSettingsPane extends PamBorderPane implements TDSettingsPane {
 
@@ -181,7 +181,7 @@ public class SudSensorSettingsPane extends PamBorderPane implements TDSettingsPa
 
     @Override
     public String getShowingName() {
-        return "Sensor Lines";
+        return "Orientation Sensor";
     }
 
     @Override

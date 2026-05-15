@@ -11,7 +11,7 @@ package soundtrapSensor;
  * using the error between the measured gravity/field vectors and the predicted
  * ones from the current quaternion estimate.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorFusion {
 

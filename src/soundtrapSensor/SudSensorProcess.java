@@ -7,7 +7,7 @@ import pamScrollSystem.AbstractScrollManager;
  * The PAMGuard process for the SudSensor module. Creates and owns the
  * {@link SudSensorDataBlock} and drives the sensor processing.
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudSensorProcess extends PamProcess {
 
@@ -20,12 +20,17 @@ public class SudSensorProcess extends PamProcess {
 
         sensorDataBlock = new SudSensorDataBlock(this);
         sensorDataBlock.setDatagramProvider(new SudSensorDatagramProvider(sensorControl));
-        AbstractScrollManager.getScrollManager().addToSpecialDatablock(sensorDataBlock);
+        //AbstractScrollManager.getScrollManager().addToSpecialDatablock(sensorDataBlock);
         addOutputDataBlock(sensorDataBlock);
     }
 
     public SudSensorDataBlock getSensorDataBlock() {
         return sensorDataBlock;
+    }
+    
+    @Override
+	public void prepareProcess() {
+        sensorControl.getSWVHandler().prepare();
     }
 
     @Override
@@ -38,14 +43,17 @@ public class SudSensorProcess extends PamProcess {
         sensorControl.getSWVHandler().pamStart();
     }
 
-    @Override
-    public void pamStop() {
-        sensorControl.getSWVHandler().pamStop();
-    }
+
 
     @Override
     public void destroyProcess() {
-        AbstractScrollManager.getScrollManager().removeFromSpecialDatablock(sensorDataBlock);
+        //AbstractScrollManager.getScrollManager().removeFromSpecialDatablock(sensorDataBlock);
         super.destroyProcess();
     }
+
+	@Override
+	public void pamStop() {
+		// TODO Auto-generated method stub
+		
+	}
 }
