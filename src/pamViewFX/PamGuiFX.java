@@ -227,16 +227,17 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 				
 		/**create settings pane. This allows access to primary PAMGUARD settings.**/
 		settingsPane=new PamSettingsMenuPane();
-		settingsPane.setPrefWidth(250);
+		settingsPane.setPrefWidth(270);
 		
 		leftPaneWrapper = new PamVBox();
-		leftPaneWrapper.setPrefWidth(250);
+		leftPaneWrapper.setPrefWidth(270);
 		settingsContentPane = settingsPane;
 		leftPaneWrapper.getChildren().add(settingsContentPane);
 		
 		hidingPaneLeft=new HidingPane(Side.LEFT, leftPaneWrapper, this, false);
 		hidingPaneLeft.showHidePane(false);
-		
+		hidingPaneLeft.setStyle("-fx-background-color: -fx-darkbackground");
+
 		mainLayout = layout;
 		
 		hidingPaneLeft.showingProperty().addListener((obs, wasShowing, isShowing) -> {

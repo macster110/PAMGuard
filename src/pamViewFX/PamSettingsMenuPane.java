@@ -15,6 +15,8 @@ import PamController.soundMedium.GlobalMedium;
 import PamController.soundMedium.GlobalMedium.SoundMedium;
 import PamModel.PamModuleInfo;
 import PamUtils.PamFileFilter;
+import PamView.ColourScheme;
+import PamView.PamColors;
 import binaryFileStorage.BinaryStore;
 import dataModelFX.connectionNodes.ModuleIconFactory;
 import generalDatabase.DBControlUnit;
@@ -41,6 +43,7 @@ import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamVBox;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
 import pamViewFX.fxNodes.pamDialogFX.PamSettingsDialogFX;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import pamViewFX.fxNodes.utilityPanes.SettingsDialog;
 import pamViewFX.fxSettingsPanes.StorageOptionsPane;
 import pamViewFX.fxStyles.PamStylesManagerFX;
@@ -243,9 +246,7 @@ public class PamSettingsMenuPane extends PamVBox {
 		styleButton(about);
 		about.setGraphic(PamGlyphDude.createPamIcon("mdi2i-information-outline", 
 				 PamGuiManagerFX.iconSize));
-//		PamButton tip=new PamButton("Tip of the day..."); 
-//		styleButton(tip);
-		
+
 		PamButton website=new PamButton("Website"); 
 		styleButton(website);
 		website.setGraphic(PamGlyphDude.createPamIcon("mdi2e-earth", 
@@ -260,8 +261,49 @@ public class PamSettingsMenuPane extends PamVBox {
 		styleButton(checkForUpdates);
 		checkForUpdates.setGraphic(PamGlyphDude.createPamIcon("mdi2r-refresh", 
 				 PamGuiManagerFX.iconSize));
-		
-		this.getChildren().addAll(settingsLabel,saveConfig,saveConfigAs, new Separator(),  mediumToggleBox, generalSettings, settings, new Separator(), 
+
+		// ---------- Dark mode toggle ----------
+		PamToggleSwitch darkModeToggle = new PamToggleSwitch("");
+		// Initialise toggle state from current colour scheme
+		boolean isNight = ColourScheme.NIGHTSCHEME.equalsIgnoreCase(
+				PamColors.getInstance().getColourScheme() != null
+						? PamColors.getInstance().getColourScheme().getName()
+						: "");
+		darkModeToggle.setSelected(isNight);
+
+		darkModeToggle.selectedProperty().addListener((obs, oldVal, dark) -> {
+			String scheme = dark ? ColourScheme.NIGHTSCHEME : ColourScheme.DAYSCHEME;
+			
+			PamColors.getInstance().setColourScheme(scheme);
+			System.out.println("PamSettingsMenu Colour scheme set to " + PamColors.getInstance().getColourScheme().getName());
+			// Refresh the FX scene and all known CSS entry-points
+			PamGuiManagerFX guiManager = PamController.getInstance().getGuiManagerFX();
+			if (guiManager != null) {
+				guiManager.refreshSceneCSS();
+			}
+			
+			
+		});
+
+		Label darkModeLabel = new Label("Dark Mode");
+		darkModeLabel.setAlignment(Pos.CENTER_LEFT);
+		darkModeLabel.setPadding(new Insets(0, 0, 0, 15));
+		darkModeLabel.setGraphic(PamGlyphDude.createPamIcon("mdi2w-weather-night", PamGuiManagerFX.iconSize));
+
+		PamHBox darkModeToggleBox = new PamHBox();
+		darkModeToggleBox.setAlignment(Pos.CENTER_RIGHT);
+		darkModeToggleBox.setSpacing(5);
+		darkModeToggleBox.getChildren().add(darkModeToggle);
+		darkModeToggleBox.setMaxWidth(Double.MAX_VALUE);
+
+		PamHBox darkModeBox = new PamHBox(darkModeLabel, darkModeToggleBox);
+		HBox.setHgrow(darkModeToggleBox, Priority.ALWAYS);
+		darkModeBox.setAlignment(Pos.CENTER_LEFT);
+		darkModeBox.setSpacing(5);
+		darkModeBox.setPadding(new Insets(0, 5, 5, 0));
+		// --------------------------------------
+
+		this.getChildren().addAll(settingsLabel, saveConfig, saveConfigAs, new Separator(), darkModeBox, mediumToggleBox, generalSettings, settings, new Separator(),
 				storageManager, database, binaryStorage, new Separator(), help, checkForUpdates, website, contact, about);
 
 	}

@@ -48,6 +48,7 @@ import pamViewFX.fxNodes.internalNode.PamInternalPane;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
 import pamViewFX.fxNodes.pamDialogFX.PamSettingsDialogFX;
 import pamViewFX.fxStyles.PamAtlantaStyle;
+import pamViewFX.fxStyles.PamDefaultStyle;
 import pamViewFX.fxStyles.PamStylesManagerFX;
 import pamViewFX.pamTask.PamTaskUpdate;
 import userDisplayFX.UserDisplayNodeFX;
@@ -539,6 +540,18 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	public ArrayList<String> getPamDialogCSS() {//return new PrimerDark().getUserAgentStylesheet();
 
 		return PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS();
+	}
+
+	/**
+	 * Refresh the scene and all known pane stylesheets from the current PamDefaultStyle.
+	 * Call this after switching colour schemes so that the new CSS takes effect immediately.
+	 */
+	public void refreshSceneCSS() {
+		PamDefaultStyle style = PamStylesManagerFX.getPamStylesManagerFX().getCurStyle();
+		if (scene != null) {
+			scene.getStylesheets().clear();
+			scene.getStylesheets().addAll(style.getGUICSS());
+		}
 	}
 
 
