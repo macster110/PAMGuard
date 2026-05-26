@@ -218,6 +218,10 @@ public class PamGuiTabFX extends PamTabFX {
 		
 		
 		PamGuiInternalPane newInternalPane=new PamGuiInternalPane(userDisplayNodeFX, holder);
+		
+		//bind the drag pad to the height of the shared toolbar so that it is always below the toolbar.
+		newInternalPane.dragPadNorthProperty().bind(pamGui.getSharedToolbar().heightProperty());
+		
 		if (!userDisplayNodeFX.isResizeableDisplay()) newInternalPane.showResizeControls(false);
 		holder.getChildren().add(newInternalPane);
 		internalPanes.add(newInternalPane);
@@ -239,12 +243,26 @@ public class PamGuiTabFX extends PamTabFX {
 			holderHeight=pamGui.getPamGuiManagerFX().getDataModelFX().getHeight();
 		}
 		//HACK end
-		
+
+		// Compute the drag pad insets from the first pane (all panes share the same bindings).
+		double padNorth = internalPanes.isEmpty() ? 0 : internalPanes.get(0).getDragPadNorth();
+		double padSouth = internalPanes.isEmpty() ? 0 : internalPanes.get(0).getDragPadSouth();
+		double padWest  = internalPanes.isEmpty() ? 0 : internalPanes.get(0).getDragPadWest();
+		double padEast  = internalPanes.isEmpty() ? 0 : internalPanes.get(0).getDragPadEast();
+
+		// Effective area available for laying out panes, after accounting for drag pads.
+		double availWidth  = holderWidth  - padWest - padEast;
+		double availHeight = holderHeight - padNorth - padSouth;
+
+		// Origin offset so that panes start inside the padded area.
+		double originX = padWest;
+		double originY = padNorth;
+
 		//TILE means equally sized windows 
 		if (sortType==SORT_TILE){
 			for (int i=0; i<internalPanes.size(); i++){
-				internalPanes.get(i).setPaneSize(holderWidth/internalPanes.size(), holderHeight);
-				internalPanes.get(i).setPaneLayout((i*holderWidth)/internalPanes.size(), 0);
+				internalPanes.get(i).setPaneSize(availWidth/internalPanes.size(), availHeight);
+				internalPanes.get(i).setPaneLayout(originX + (i*availWidth)/internalPanes.size(), originY);
 			}
 			return;
 		}
@@ -281,15 +299,15 @@ public class PamGuiTabFX extends PamTabFX {
 			double pad =0.;
 			
 			if (largeWindows > 0) {
-				x = 0;
-				y = 0;
+				x = originX;
+				y = originY;
 				if (smallWindows == 0) {
-					h = (horz) ? holderHeight : holderHeight/largeWindows;
-					w = (horz) ? (holderWidth / largeWindows) : holderWidth*r;
+					h = (horz) ? availHeight : availHeight/largeWindows;
+					w = (horz) ? (availWidth / largeWindows) : availWidth*r;
 				}
 				else {
-					h = (horz) ? holderHeight * r :  holderHeight/largeWindows;
-					w = (horz) ? (holderWidth / largeWindows) : holderWidth ;
+					h = (horz) ? availHeight * r :  availHeight/largeWindows;
+					w = (horz) ? (availWidth / largeWindows) : availWidth;
 				}
 				for (int i = 0; i < dw.size(); i++) {
 					if (dw.get(i).getUserDisplayNode().isMinorDisplay()) continue;
@@ -306,16 +324,16 @@ public class PamGuiTabFX extends PamTabFX {
 			
 			//small windows
 			if (smallWindows > 0) {
-				x = (horz) ? 0 : holderWidth - holderWidth* r1;
-				y = (horz) ? h : 0;
+				x = (horz) ? originX : originX + availWidth - availWidth * r1;
+				y = (horz) ? originY + h : originY;
 									
 				if (largeWindows > 0) {
-					h = (horz) ? holderHeight - h : holderHeight/smallWindows;
-					w = (horz) ? (holderWidth / smallWindows) :  holderWidth* r1;
+					h = (horz) ? availHeight - h : availHeight/smallWindows;
+					w = (horz) ? (availWidth / smallWindows) :  availWidth * r1;
 				}
 				else {
-					w = (horz) ? (holderWidth / smallWindows) :  holderWidth;
-					h = (horz) ? holderHeight : holderHeight/smallWindows;
+					w = (horz) ? (availWidth / smallWindows) :  availWidth;
+					h = (horz) ? availHeight : availHeight/smallWindows;
 				}
 				
 				for (int i = 0; i < dw.size(); i++) {

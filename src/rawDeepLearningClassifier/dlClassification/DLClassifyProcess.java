@@ -329,6 +329,12 @@ public class DLClassifyProcess extends PamProcess {
 		}
 	}
 	
+	/**
+	 * Check whether the new detection group is contiguous with the last one in the buffer. This is important because we only want to merge data units which are contiguous. 
+	 * @param detectionGroup - the new detection group. 
+	 * @param i - the channel group index. 
+	 * @return true if the new detection group is contiguous with the last one in the buffer. 
+	 */
 	private boolean isGroupContiguous(SegmenterDetectionGroup detectionGroup, int i) {
 		if (groupDetectionBuffer[i] == null || groupDetectionBuffer[i].size() == 0) {
 			//no buffer so always contiguous
@@ -337,7 +343,7 @@ public class DLClassifyProcess extends PamProcess {
 		
 		//so we have at least one segment in the buffer. Check whether the new segment is contiguous with the last one.
 		
-		long timeMillis1 = groupDetectionBuffer[i].getLast().getSegmentStartMillis();
+		long timeMillis1 = groupDetectionBuffer[i].get(groupDetectionBuffer[i].size() - 1).getSegmentStartMillis();
 		long timeMillis2 = detectionGroup.getSegmentStartMillis();
 		
 		//now, does this fall within the max gap time?
