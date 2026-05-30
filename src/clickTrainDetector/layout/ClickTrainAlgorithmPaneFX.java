@@ -592,6 +592,11 @@ public class ClickTrainAlgorithmPaneFX extends SettingsPane<ClickTrainParams> {
 	public String getHelpPoint() {
 		return ClickTrainControl.helpPoint;
 	}
+
+	@Override
+	public helpFX.HelpPoint getHelpPointFX() {
+		return new helpFX.HelpPoint("click_train_detector.md");
+	}
 	
 
 }

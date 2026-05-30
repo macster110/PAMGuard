@@ -709,6 +709,11 @@ public class DLSettingsPane  extends SettingsPane<RawDLParams>{
 		return "Raw Deep Learning Parameters";
 	}
 
+	@Override
+	public helpFX.HelpPoint getHelpPointFX() {
+		return new helpFX.HelpPoint("deep_learning_classifier.md");
+	}
+
 
 	@Override
 	public Pane getContentNode() {

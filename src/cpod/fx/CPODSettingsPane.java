@@ -502,6 +502,11 @@ public class CPODSettingsPane extends SettingsPane<CPODParams> {
 		return "CPOD Paramters";
 	}
 
+	@Override
+	public helpFX.HelpPoint getHelpPointFX() {
+		return new helpFX.HelpPoint("cpod_importer.md");
+	}
+
 
 
 	@Override
