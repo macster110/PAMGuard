@@ -499,7 +499,7 @@ public class CPODSettingsPane extends SettingsPane<CPODParams> {
 
 	@Override
 	public String getName() {
-		return "CPOD Paramters";
+		return "CPOD Parameters";
 	}
 
 	@Override
