@@ -448,6 +448,11 @@ public class DecimatorSettingsPane extends SettingsPane<DecimatorParams> {
 	}
 
 	@Override
+	public helpFX.HelpPoint getHelpPointFX() {
+		return new helpFX.HelpPoint("decimator.md");
+	}
+
+	@Override
 	public Node getContentNode() {
 		return mainPane;
 	}

@@ -607,6 +607,11 @@ public class NoiseBandSettingsPane extends SettingsPane<NoiseBandSettings> {
 	}
 
 	@Override
+	public helpFX.HelpPoint getHelpPointFX() {
+		return new helpFX.HelpPoint("noise_band_monitor.md");
+	}
+
+	@Override
 	public Node getContentNode() {
 		return mainPane;
 	}

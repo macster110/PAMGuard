@@ -32,6 +32,10 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.TextField;
+import helpFX.HelpManager;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -1121,6 +1125,27 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		}
 	}
 
+	/**
+	 * Build a system {@link MenuBar} for the PAMGuardFX main window.
+	 *
+	 * <p>The menu bar provides top-level access to commonly used actions including
+	 * help. Callers should embed the returned {@code MenuBar} at the top of the
+	 * primary scene.</p>
+	 *
+	 * @return a populated {@link MenuBar}
+	 */
+	public MenuBar buildSystemMenuBar() {
+		MenuBar menuBar = new MenuBar();
 
+		// --- Help menu ---
+		Menu helpMenu = new Menu("Help");
+
+		MenuItem helpContentsItem = new MenuItem("Help Contents");
+		helpContentsItem.setOnAction(e -> HelpManager.getInstance().openHelp());
+
+		helpMenu.getItems().add(helpContentsItem);
+		menuBar.getMenus().add(helpMenu);
+		return menuBar;
+	}
 
 }

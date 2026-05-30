@@ -20,6 +20,7 @@ import PamView.PamColors;
 import binaryFileStorage.BinaryStore;
 import dataModelFX.connectionNodes.ModuleIconFactory;
 import generalDatabase.DBControlUnit;
+import helpFX.HelpManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
@@ -240,7 +241,8 @@ public class PamSettingsMenuPane extends PamVBox {
 		PamButton help=new PamButton("Help...");
 		styleButton(help);
 		help.setGraphic(PamGlyphDude.createPamIcon("mdi2h-help-circle-outline", 
-				 PamGuiManagerFX.iconSize));	
+				 PamGuiManagerFX.iconSize));
+		help.setOnAction(e -> HelpManager.getInstance().openHelp());
 		
 		PamButton about=new PamButton("About..."); 
 		styleButton(about);
