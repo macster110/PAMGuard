@@ -458,7 +458,7 @@
 			</build>
 			
 	    </profile>
-		
+	    
 	</profiles>
 
 	<!--  Plugin which creates a .dmg file for MacOS. 
@@ -567,6 +567,13 @@
 			<url>https://repo1.maven.org/maven2</url>
 		</repository>
 
+		<!-- JPro platform repository (required for jpro-mdfx) -->
+		<repository>
+			<id>jpro-sdk</id>
+			<name>JPro SDK</name>
+			<url>https://sandec.jfrog.io/artifactory/repo</url>
+		</repository>
+
 	</repositories>
 
 
@@ -582,6 +589,7 @@
 			</dependency>
 		</dependencies>
 	</dependencyManagement>
+
 	<dependencies>
 
 		<!--jpam project - utilities -->
@@ -764,16 +772,11 @@
 	        <version>1.1</version>
 	    </dependency>
 
-		<!-- CommonMark Markdown parser/renderer for helpFX module https://github.com/commonmark/commonmark-java -->
+		<!-- jpro-mdfx: native JavaFX Markdown renderer (replaces CommonMark + WebView) -->
 		<dependency>
-			<groupId>org.commonmark</groupId>
-			<artifactId>commonmark</artifactId>
-			<version>0.21.0</version>
-		</dependency>
-		<dependency>
-			<groupId>org.commonmark</groupId>
-			<artifactId>commonmark-ext-heading-anchor</artifactId>
-			<version>0.21.0</version>
+			<groupId>one.jpro.platform</groupId>
+			<artifactId>jpro-mdfx</artifactId>
+			<version>0.2.14</version>
 		</dependency>
 
 		<!-- https://search.maven.org/artifact/org.kordamp.ikonli/ikonli-javafx/12.2.0/jar -->

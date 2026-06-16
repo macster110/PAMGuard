@@ -57,7 +57,24 @@ import pamViewFX.fxStyles.PamStylesManagerFX;
  *
  */
 public class PamSettingsMenuPane extends PamVBox {
-	
+
+	// ── Icon constants ────────────────────────────────────────────────────────
+	public static final String ICON_SAVE          = "mdi2c-content-save-outline";
+	public static final String ICON_SAVE_AS       = "mdi2c-content-save-move-outline";
+	public static final String ICON_GENERAL_SETTINGS = "mdi2c-cog";
+	public static final String ICON_MODULE_SETTINGS  = "mdi2c-cogs";
+	public static final String ICON_SOUND_MEDIUM  = "mdi2w-waves";
+	public static final String ICON_DARK_MODE     = "mdi2w-weather-night";
+	public static final String ICON_DATABASE      = "mdi2d-database";
+	public static final String ICON_BINARY        = "mdi2f-file-table";
+	public static final String ICON_STORAGE_MGR   = "mdi2d-database-cog";
+	public static final String ICON_HELP          = "mdi2h-help-circle-outline";
+	public static final String ICON_ABOUT         = "mdi2i-information-outline";
+	public static final String ICON_WEBSITE       = "mdi2e-earth";
+	public static final String ICON_BUG           = "mdi2b-bug";
+	public static final String ICON_UPDATES       = "mdi2r-refresh";
+	// ─────────────────────────────────────────────────────────────────────────
+
 	private double leftInset=60;
 	private double heightSpacer=2; 
 	
@@ -91,16 +108,14 @@ public class PamSettingsMenuPane extends PamVBox {
 			PamSettingManager.getInstance().saveSettings(null);
 		});
 		styleButton(saveConfig);
-		saveConfig.setGraphic(PamGlyphDude.createPamIcon("mdi2c-content-save-outline", 
-				PamGuiManagerFX.iconSize));
+		saveConfig.setGraphic(PamGlyphDude.createPamIcon(ICON_SAVE, PamGuiManagerFX.iconSize));
 		
 		PamButton saveConfigAs=new PamButton("Save as..."); 
 		saveConfigAs.setOnAction((action)->{
 			saveSettingsAs();
 		});
 		styleButton(saveConfigAs);
-		saveConfigAs.setGraphic(PamGlyphDude.createPamIcon("mdi2c-content-save-move-outline", 
-			 PamGuiManagerFX.iconSize));
+		saveConfigAs.setGraphic(PamGlyphDude.createPamIcon(ICON_SAVE_AS, PamGuiManagerFX.iconSize));
 		
 		//Air or water mode
 		ToggleButton toggleButton1 = new ToggleButton("Water");
@@ -128,8 +143,7 @@ public class PamSettingsMenuPane extends PamVBox {
 	    Label mediumLabel = new Label("Sound Medium"); 
 	    mediumLabel.setAlignment(Pos.CENTER_LEFT);
 	    mediumLabel.setPadding(new Insets(0,0,0,15));
-	    mediumLabel.setGraphic(PamGlyphDude.createPamIcon("mdi2w-waves", 
-			 PamGuiManagerFX.iconSize));
+	    mediumLabel.setGraphic(PamGlyphDude.createPamIcon(ICON_SOUND_MEDIUM, PamGuiManagerFX.iconSize));
 		//styleButton(mediumLabel);
 
 	    
@@ -148,13 +162,11 @@ public class PamSettingsMenuPane extends PamVBox {
 		
 		PamButton generalSettings=new PamButton("General Settings..."); 
 		styleButton(generalSettings);
-		generalSettings.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", 
-					 PamGuiManagerFX.iconSize));
+		generalSettings.setGraphic(PamGlyphDude.createPamIcon(ICON_GENERAL_SETTINGS, PamGuiManagerFX.iconSize));
 		
 		MenuButton settings=new MenuButton("Module Settings"); 
 		settings.setPopupSide(Side.RIGHT);
-		settings.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cogs", 
-				 PamGuiManagerFX.iconSize));
+		settings.setGraphic(PamGlyphDude.createPamIcon(ICON_MODULE_SETTINGS, PamGuiManagerFX.iconSize));
 //		settings.setStyle("-fx-background-radius: 0;"
 //				+ " -fx-border-color: transparent; -fx-padding: 0 0 0 0;");
 		
@@ -200,8 +212,7 @@ public class PamSettingsMenuPane extends PamVBox {
 			}
 		}); 
 		styleButton(database);
-		database.setGraphic(PamGlyphDude.createPamIcon("mdi2d-database", 
-				 PamGuiManagerFX.iconSize));
+		database.setGraphic(PamGlyphDude.createPamIcon(ICON_DATABASE, PamGuiManagerFX.iconSize));
 
 		PamButton binaryStorage=new PamButton("Binary Storage..."); 
 		binaryStorage.setOnAction((action)->{
@@ -222,8 +233,7 @@ public class PamSettingsMenuPane extends PamVBox {
 			}
 		}); 
 		styleButton(binaryStorage);
-		binaryStorage.setGraphic(PamGlyphDude.createPamIcon("mdi2f-file-table", 
-				 PamGuiManagerFX.iconSize));
+		binaryStorage.setGraphic(PamGlyphDude.createPamIcon(ICON_BINARY, PamGuiManagerFX.iconSize));
 
 		PamButton storageManager=new PamButton("Storage Manager..."); 
 		storageManager.setOnAction((action)->{
@@ -235,34 +245,29 @@ public class PamSettingsMenuPane extends PamVBox {
 			}
 		});
 		styleButton(storageManager);
-		storageManager.setGraphic(PamGlyphDude.createPamIcon("mdi2d-database-cog", 
-				 PamGuiManagerFX.iconSize));		
+		storageManager.setGraphic(PamGlyphDude.createPamIcon(ICON_STORAGE_MGR, PamGuiManagerFX.iconSize));		
 		
 		PamButton help=new PamButton("Help...");
 		styleButton(help);
-		help.setGraphic(PamGlyphDude.createPamIcon("mdi2h-help-circle-outline", 
+		help.setGraphic(PamGlyphDude.createPamIcon(ICON_HELP, 
 				 PamGuiManagerFX.iconSize));
 		help.setOnAction(e -> HelpManager.getInstance().openHelp());
 		
 		PamButton about=new PamButton("About..."); 
 		styleButton(about);
-		about.setGraphic(PamGlyphDude.createPamIcon("mdi2i-information-outline", 
-				 PamGuiManagerFX.iconSize));
+		about.setGraphic(PamGlyphDude.createPamIcon(ICON_ABOUT, PamGuiManagerFX.iconSize));
 
 		PamButton website=new PamButton("Website"); 
 		styleButton(website);
-		website.setGraphic(PamGlyphDude.createPamIcon("mdi2e-earth", 
-				 PamGuiManagerFX.iconSize));
+		website.setGraphic(PamGlyphDude.createPamIcon(ICON_WEBSITE, PamGuiManagerFX.iconSize));
 		
 		PamButton contact=new PamButton("Found a bug?"); 
 		styleButton(contact);
-		contact.setGraphic(PamGlyphDude.createPamIcon("mdi2b-bug", 
-				 PamGuiManagerFX.iconSize));
+		contact.setGraphic(PamGlyphDude.createPamIcon(ICON_BUG, PamGuiManagerFX.iconSize));
 		
 		PamButton checkForUpdates=new PamButton("Check for updates"); 
 		styleButton(checkForUpdates);
-		checkForUpdates.setGraphic(PamGlyphDude.createPamIcon("mdi2r-refresh", 
-				 PamGuiManagerFX.iconSize));
+		checkForUpdates.setGraphic(PamGlyphDude.createPamIcon(ICON_UPDATES, PamGuiManagerFX.iconSize));
 
 		// ---------- Dark mode toggle ----------
 		PamToggleSwitch darkModeToggle = new PamToggleSwitch("");
@@ -290,7 +295,7 @@ public class PamSettingsMenuPane extends PamVBox {
 		Label darkModeLabel = new Label("Dark Mode");
 		darkModeLabel.setAlignment(Pos.CENTER_LEFT);
 		darkModeLabel.setPadding(new Insets(0, 0, 0, 15));
-		darkModeLabel.setGraphic(PamGlyphDude.createPamIcon("mdi2w-weather-night", PamGuiManagerFX.iconSize));
+		darkModeLabel.setGraphic(PamGlyphDude.createPamIcon(ICON_DARK_MODE, PamGuiManagerFX.iconSize));
 
 		PamHBox darkModeToggleBox = new PamHBox();
 		darkModeToggleBox.setAlignment(Pos.CENTER_RIGHT);

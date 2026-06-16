@@ -88,7 +88,7 @@ public class NoiseBandSettingsPane extends SettingsPane<NoiseBandSettings> {
 	private ObservableList<BandPerformance> bandTableData;
 
 	// --- Bode plot ---
-	private BodePlotPaneFX bodePlotPane;
+	private BodePlotPaneFX2 bodePlotPane;
 
 	/** Validator. */
 	private PamValidator validator;
@@ -120,7 +120,7 @@ public class NoiseBandSettingsPane extends SettingsPane<NoiseBandSettings> {
 		tabPane.getTabs().addAll(settingsTab, tableTab);
 
 		// Right side: Bode plot
-		bodePlotPane = new BodePlotPaneFX(noiseBandControl);
+		bodePlotPane = new BodePlotPaneFX2(noiseBandControl);
 		bodePlotPane.setBandSelectionListener(bandIndex -> {
 			if (bandTable != null && bandIndex >= 0 && bandIndex < bandTableData.size()) {
 				bandTable.getSelectionModel().select(bandIndex);

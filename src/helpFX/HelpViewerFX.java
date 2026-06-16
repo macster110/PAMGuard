@@ -19,6 +19,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import pamViewFX.fxGlyphs.PamGlyphDude;
+import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
 import pamViewFX.fxStyles.PamStylesManagerFX;
 
 /**
@@ -83,15 +84,7 @@ public class HelpViewerFX extends Stage {
 		VBox root = buildLayout();
 
 		Scene scene = new Scene(root, STAGE_PREF_WIDTH, STAGE_PREF_HEIGHT);
-
-		// Apply PAMGuard FX stylesheet if available
-		try {
-			PamStylesManagerFX stylesManager = PamStylesManagerFX.getPamStylesManagerFX();
-			if (stylesManager != null) {
-				scene.getStylesheets().addAll(stylesManager.getCurStyle().getPamCSS());
-			}
-		} catch (Exception ignored) {
-		}
+		scene.getStylesheets().addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());
 
 		setScene(scene);
 		navigateToIndex();
@@ -105,7 +98,7 @@ public class HelpViewerFX extends Stage {
 	 * Navigate to the help index / overview page.
 	 */
 	public void navigateToIndex() {
-		navigateTo(new HelpPoint("index.md"));
+		navigateTo(new HelpPoint("/helpFX/index.md"));
 	}
 
 	/**
@@ -287,23 +280,23 @@ public class HelpViewerFX extends Stage {
 	private static List<HelpNavEntry> buildModuleEntries() {
 		List<HelpNavEntry> list = new ArrayList<>();
 		// Utilities
-		list.add(new HelpNavEntry("Database",            "database.md",                    "utilities"));
-		list.add(new HelpNavEntry("Binary Storage",      "binary_storage.md",              "utilities"));
+		list.add(new HelpNavEntry("Database",            "/generalDatabase/database_help.md",                          "utilities"));
+		list.add(new HelpNavEntry("Binary Storage",      "/binaryFileStorage/binary_storage_help.md",                  "utilities"));
 		// Sound processing
-		list.add(new HelpNavEntry("Sound Acquisition",   "sound_acquisition.md",           "sound"));
-		list.add(new HelpNavEntry("Sound Output",        "sound_output.md",                "sound"));
-		list.add(new HelpNavEntry("FFT Engine",          "fft_engine.md",                  "sound"));
-		list.add(new HelpNavEntry("Filters",             "filters.md",                     "sound"));
-		list.add(new HelpNavEntry("Decimator",           "decimator.md",                   "sound"));
-		list.add(new HelpNavEntry("Noise Band Monitor",  "noise_band_monitor.md",          "sound"));
+		list.add(new HelpNavEntry("Sound Acquisition",   "/Acquisition/sound_acquisition_help.md",                     "sound"));
+		list.add(new HelpNavEntry("Sound Output",        "/soundPlayback/sound_output_help.md",                        "sound"));
+		list.add(new HelpNavEntry("FFT Engine",          "/fftManager/fft_engine_help.md",                             "sound"));
+		list.add(new HelpNavEntry("Filters",             "/Filters/filters_help.md",                                   "sound"));
+		list.add(new HelpNavEntry("Decimator",           "/decimator/decimator_help.md",                               "sound"));
+		list.add(new HelpNavEntry("Noise Band Monitor",  "/noiseBandMonitor/noise_band_monitor_help.md",               "sound"));
 		// Detectors
-		list.add(new HelpNavEntry("Click Detector",      "click_detector.md",              "detector"));
-		list.add(new HelpNavEntry("Click Train Detector","click_train_detector.md",        "detector"));
-		list.add(new HelpNavEntry("Whistle & Moan Detector","whistle_moan_detector.md",    "detector"));
-		list.add(new HelpNavEntry("CPOD Importer",       "cpod_importer.md",               "detector"));
+		list.add(new HelpNavEntry("Click Detector",      "/clickDetector/click_detector_help.md",                      "detector"));
+		list.add(new HelpNavEntry("Click Train Detector","/clickTrainDetector/click_train_help.md",                    "detector"));
+		list.add(new HelpNavEntry("Whistle & Moan Detector","/whistlesAndMoans/whistle_moan_help.md",                  "detector"));
+		list.add(new HelpNavEntry("CPOD Importer",       "/cpod/cpod_help.md",                                         "detector"));
 		// Classifiers
-		list.add(new HelpNavEntry("Matched Template Classifier","matched_template_classifier.md","classifier"));
-		list.add(new HelpNavEntry("Deep Learning Classifier",   "deep_learning_classifier.md",  "classifier"));
+		list.add(new HelpNavEntry("Matched Template Classifier","/matchedTemplateClassifer/matched_click_classifer_help.md","classifier"));
+		list.add(new HelpNavEntry("Deep Learning Classifier",   "/rawDeepLearningClassifier/deep_learning_help.md",         "classifier"));
 		return list;
 	}
 

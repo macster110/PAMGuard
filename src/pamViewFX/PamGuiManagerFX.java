@@ -1,5 +1,6 @@
 package pamViewFX;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -11,14 +12,24 @@ import PamController.PAMControllerGUI;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
+import PamController.PamControllerInterface;
 import PamController.PamGUIManager;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
+import PamController.StorageOptions;
+import PamController.StorageParameters;
+import PamController.soundMedium.GlobalMedium;
+import PamController.soundMedium.GlobalMedium.SoundMedium;
 import PamModel.PamModel;
 import PamModel.PamModuleInfo;
+import PamUtils.PamFileFilter;
+import PamView.ColourScheme;
+import PamView.PamColors;
 import PamView.PamViewInterface;
+import binaryFileStorage.BinaryStore;
 import dataMap.layoutFX.DataMapPaneFX;
 import dataModelFX.DataModelPaneFX;
+import generalDatabase.DBControlUnit;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
@@ -28,9 +39,15 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckMenuItem;
+import javafx.scene.control.CustomMenuItem;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TextField;
 import helpFX.HelpManager;
 import javafx.scene.control.Menu;
@@ -40,10 +57,13 @@ import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.Window;
 import javafx.stage.WindowEvent;
+import pamViewFX.fxGlyphs.PamGlyphDude;
 import pamViewFX.fxNodes.PamBorderPane;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamTabPane;
@@ -51,6 +71,8 @@ import pamViewFX.fxNodes.PamVBox;
 import pamViewFX.fxNodes.internalNode.PamInternalPane;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
 import pamViewFX.fxNodes.pamDialogFX.PamSettingsDialogFX;
+import pamViewFX.fxNodes.utilityPanes.SettingsDialog;
+import pamViewFX.fxSettingsPanes.StorageOptionsPane;
 import pamViewFX.fxStyles.PamAtlantaStyle;
 import pamViewFX.fxStyles.PamDefaultStyle;
 import pamViewFX.fxStyles.PamStylesManagerFX;
@@ -142,7 +164,16 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	 */
 	private  PAMGuiFXSettings pamGuiSettings;
 
-	private Scene scene; 
+	private Scene scene;
+
+	/**
+	 * The system menu bar. On macOS, setUseSystemMenuBar(true) must be called
+	 * AFTER the Stage is shown, so we keep a reference here.
+	 */
+	private MenuBar systemMenuBar;
+
+	/** Storage options pane - lazily created for the Storage Manager menu item. */
+	private StorageOptionsPane storageOptionPane;
 
 	private static PamGuiManagerFX instance;
 
@@ -192,22 +223,240 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		//create new data model. 
 		dataModelFX=stages.get(0).addDataModelTab();
 
-		scene = new Scene(stages.get(0));
+		// Build the MenuBar. setUseSystemMenuBar(true) is deferred until after show().
+		systemMenuBar = buildSystemMenuBar();
+
+		// Wrap PamGuiFX in a VBox with the MenuBar at the top.
+		// On macOS the MenuBar is moved to the native top bar, so don't add it to the
+		// scene graph (it would leave a blank strip at the top of the window).
+		PamVBox sceneRoot = new PamVBox();
+		sceneRoot.setSpacing(0);
+		sceneRoot.setPadding(javafx.geometry.Insets.EMPTY);
+		PamVBox.setVgrow(stages.get(0), javafx.scene.layout.Priority.ALWAYS);
+		String _os = System.getProperty("os.name", "").toLowerCase();
+		systemMenuBar.setMinHeight(0); //needed or we end up with a little bar at the top of the window
+		if (_os.contains("mac")) {
+			sceneRoot.getChildren().addAll(systemMenuBar, stages.get(0));
+		} else {
+			//no system bar if Windows or Linux
+			sceneRoot.getChildren().addAll(stages.get(0));
+		}
+
+		scene = new Scene(sceneRoot);
 		scene.getStylesheets().addAll(getPamCSS());
 
-
-		//		Application.setUserAgentStylesheet(new PrimerDark().getUserAgentStylesheet());
-		//		stages.get(0).prefWidthProperty().bind(scene.widthProperty());
-		//	    stages.get(0).prefHeightProperty().bind(scene.heightProperty());
-
 		primaryStage.setScene(scene);
-		//need to add this for material design icons and fontawesome icons
-		//		scene.getStylesheets().addAll(GlyphsStyle.DEFAULT.getStylePath());
+	}
 
-		//		//need to nudge the displays to show controlled units. 
-		//		notifyModelChanged(PamController.ADD_CONTROLLEDUNIT); 
+	/**
+	 * Build the JavaFX MenuBar for PAMGuard. On macOS, calling
+	 * {@code setUseSystemMenuBar(true)} moves it to the native top menu bar.
+	 * Contains all the functionality that is also present in {@link PamSettingsMenuPane}.
+	 */
+	/** True when running on macOS — the native menu bar does not render JavaFX Node graphics. */
+	private static final boolean IS_MACOS =
+			System.getProperty("os.name", "").toLowerCase().contains("mac");
+
+	/**
+	 * Set a graphic on a MenuItem only when not using the macOS system menu bar.
+	 * The native macOS menu bar silently ignores JavaFX Node graphics, so we skip
+	 * the call entirely to keep the node graph clean.
+	 */
+	private static void setMenuItemGraphic(MenuItem item, String iconCode) {
+		if (!IS_MACOS) {
+			item.setGraphic(PamGlyphDude.createPamIcon(iconCode, iconSize));
+		}
+	}
+
+	private MenuBar buildSystemMenuBar() {
+		MenuBar menuBar = new MenuBar();
+		menuBar.setUseSystemMenuBar(true);
+
+		// ── File menu ─────────────────────────────────────────────────────────
+		Menu fileMenu = new Menu("File");
+
+		MenuItem saveConfig = new MenuItem("Save Configuration");
+		saveConfig.setOnAction(e -> PamSettingManager.getInstance().saveSettings(null));
+
+		MenuItem saveConfigAs = new MenuItem("Save Configuration As...");
+		saveConfigAs.setOnAction(e -> menuBarSaveSettingsAs());
+
+		MenuItem quit = new MenuItem("Quit PAMGuard");
+		quit.setOnAction(e -> primaryStage.close());
+
+		fileMenu.getItems().addAll(saveConfig, saveConfigAs, new SeparatorMenuItem(), quit);
+
+		// ── Settings menu ─────────────────────────────────────────────────────
+		Menu settingsMenu = new Menu("Settings");
+
+		MenuItem generalSettings = new MenuItem("General Settings...");
+		setMenuItemGraphic(generalSettings, PamSettingsMenuPane.ICON_GENERAL_SETTINGS);
+		// General settings opens via the first PamGuiFX if available
+		generalSettings.setOnAction(e -> {
+			// delegate to the first stage's settings if it exposes one
+		});
+
+		// Module Settings submenu — populated dynamically when the menu is shown
+		Menu moduleSettings = new Menu("Module Settings");
+		setMenuItemGraphic(moduleSettings, PamSettingsMenuPane.ICON_MODULE_SETTINGS);
+		moduleSettings.setOnShowing(e -> {
+			moduleSettings.getItems().clear();
+			int nUnits = PamController.getInstance().getNumControlledUnits();
+			for (int i = 0; i < nUnits; i++) {
+				final int n = i;
+				MenuItem mi = new MenuItem(PamController.getInstance().getControlledUnit(i).getUnitName());
+				mi.setOnAction(ev -> menuBarOpenSettingsDialog(PamController.getInstance().getControlledUnit(n)));
+				moduleSettings.getItems().add(mi);
+			}
+		});
+
+		// Sound medium submenu
+		Menu mediumMenu = new Menu("Sound Medium");
+		setMenuItemGraphic(mediumMenu, PamSettingsMenuPane.ICON_SOUND_MEDIUM);
+		MenuItem waterItem = new MenuItem("Water");
+		waterItem.setOnAction(e -> {
+			if (PamController.getInstance().getGlobalMediumManager().getGlobalMediumParameters().currentMedium != SoundMedium.Water)
+				PamController.getInstance().getGlobalMediumManager().setCurrentMedium(SoundMedium.Water);
+		});
+		MenuItem airItem = new MenuItem("Air");
+		airItem.setOnAction(e -> {
+			if (PamController.getInstance().getGlobalMediumManager().getGlobalMediumParameters().currentMedium != SoundMedium.Air)
+				PamController.getInstance().getGlobalMediumManager().setCurrentMedium(SoundMedium.Air);
+		});
+		mediumMenu.getItems().addAll(waterItem, airItem);
+
+		// Dark mode toggle
+		CheckMenuItem darkModeItem = new CheckMenuItem("Dark Mode");
+		setMenuItemGraphic(darkModeItem, PamSettingsMenuPane.ICON_DARK_MODE);
+		boolean isNight = ColourScheme.NIGHTSCHEME.equalsIgnoreCase(
+				PamColors.getInstance().getColourScheme() != null
+						? PamColors.getInstance().getColourScheme().getName() : "");
+		darkModeItem.setSelected(isNight);
+		darkModeItem.selectedProperty().addListener((obs, oldVal, dark) -> {
+			String scheme = dark ? ColourScheme.NIGHTSCHEME : ColourScheme.DAYSCHEME;
+			PamColors.getInstance().setColourScheme(scheme);
+			PamGuiManagerFX guiManager = PamController.getInstance().getGuiManagerFX();
+			if (guiManager != null) guiManager.refreshSceneCSS();
+		});
+
+		settingsMenu.getItems().addAll(generalSettings, moduleSettings, new SeparatorMenuItem(),
+				mediumMenu, darkModeItem);
+
+		// ── Storage menu ──────────────────────────────────────────────────────
+		Menu storageMenu = new Menu("Storage");
+
+		MenuItem storageManager = new MenuItem("Storage Manager...");
+		setMenuItemGraphic(storageManager, PamSettingsMenuPane.ICON_STORAGE_MGR);
+		storageManager.setOnAction(e -> {
+			if (storageOptionPane == null) storageOptionPane = new StorageOptionsPane();
+			storageOptionPane.setParams(StorageOptions.getInstance().getStorageParameters());
+			PamSettingsDialogFX<?> dlg = new PamSettingsDialogFX(storageOptionPane);
+			Optional<?> result = dlg.showAndWait();
+			if (result.isPresent() && result.get() != null)
+				StorageOptions.getInstance().setStorageParameters((StorageParameters) result.get());
+		});
+
+		MenuItem databaseItem = new MenuItem("Database Storage...");
+		setMenuItemGraphic(databaseItem, PamSettingsMenuPane.ICON_DATABASE);
+		databaseItem.setOnAction(e -> {
+			if (DBControlUnit.findDatabaseControl() == null) {
+				boolean add = PamDialogFX.showMessageDialog("No Database Module Found",
+						"No database module has been added to the data model. Would you like to add one now?");
+				if (add) {
+					PamController.getInstance().addModule(PamModuleInfo.findModuleInfo("generalDatabase.DBControlUnit"), "Database");
+					menuBarOpenSettingsDialog(DBControlUnit.findDatabaseControl());
+				}
+			} else {
+				menuBarOpenSettingsDialog(DBControlUnit.findDatabaseControl());
+			}
+		});
+
+		MenuItem binaryItem = new MenuItem("Binary Storage...");
+		setMenuItemGraphic(binaryItem, PamSettingsMenuPane.ICON_BINARY);
+		binaryItem.setOnAction(e -> {
+			if (BinaryStore.findBinaryStoreControl() == null) {
+				boolean add = PamDialogFX.showMessageDialog("No Binary Storage Module Found",
+						"No binary storage module has been added to the data model. Would you like to add one now?");
+				if (add) {
+					PamController.getInstance().addModule(PamModuleInfo.findModuleInfo("binaryFileStorage.BinaryStore"), "Binary Store");
+					menuBarOpenSettingsDialog(BinaryStore.findBinaryStoreControl());
+				}
+			} else {
+				menuBarOpenSettingsDialog(BinaryStore.findBinaryStoreControl());
+			}
+		});
+
+		storageMenu.getItems().addAll(storageManager, databaseItem, binaryItem);
+
+		// ── Help menu ─────────────────────────────────────────────────────────
+		Menu helpMenu = new Menu("Help");
+
+		MenuItem helpItem = new MenuItem("Help...");
+		setMenuItemGraphic(helpItem, PamSettingsMenuPane.ICON_HELP);
+		helpItem.setOnAction(e -> HelpManager.getInstance().openHelp());
 
 
+		MenuItem checkUpdates = new MenuItem("Check for Updates");
+		setMenuItemGraphic(checkUpdates, PamSettingsMenuPane.ICON_UPDATES);
+
+		MenuItem websiteItem = new MenuItem("Website");
+		setMenuItemGraphic(websiteItem, PamSettingsMenuPane.ICON_WEBSITE);
+
+		MenuItem bugItem = new MenuItem("Found a Bug?");
+		setMenuItemGraphic(bugItem, PamSettingsMenuPane.ICON_BUG);
+
+		MenuItem about = new MenuItem("About PAMGuard...");
+		setMenuItemGraphic(about, PamSettingsMenuPane.ICON_ABOUT);
+		about.setOnAction(e -> new PamUtils.Splash(30000,
+				PamController.getInstance() != null ? PamController.getInstance().getRunMode() : 0));
+
+		helpMenu.getItems().addAll(helpItem, checkUpdates, websiteItem, bugItem, new SeparatorMenuItem(), about);
+
+		menuBar.getMenus().addAll(fileMenu, settingsMenu, storageMenu, helpMenu);
+		return menuBar;
+	}
+
+	/**
+	 * Open the settings dialog for a controlled unit (used from the menu bar).
+	 */
+	private void menuBarOpenSettingsDialog(PamControlledUnit controlledUnit) {
+		if (controlledUnit == null) return;
+		if (controlledUnit.getGUI(PamGUIManager.FX) != null) {
+			PamControlledGUIFX pamControlledUnit = (PamControlledGUIFX) controlledUnit.getGUI(PamGUIManager.FX);
+			SettingsDialog<?> newDialog = new SettingsDialog<>(pamControlledUnit.getSettingsPane());
+			newDialog.setResizable(true);
+			newDialog.setOnShown(value -> pamControlledUnit.getSettingsPane().paneInitialized());
+			newDialog.showAndWait().ifPresent(response -> {
+				if (response != null) pamControlledUnit.updateParams();
+			});
+			PamController.getInstance().notifyModelChanged(PamControllerInterface.CHANGED_PROCESS_SETTINGS);
+		}
+	}
+
+	/**
+	 * Save settings to a new psf file (used from the menu bar).
+	 */
+	private void menuBarSaveSettingsAs() {
+		File file = null;
+		String currentfileName = PamSettingManager.getInstance().getSettingsFileName();
+		if (currentfileName != null) file = new File(currentfileName);
+
+		FileChooser fileChooser = new FileChooser();
+		fileChooser.setTitle("Save Settings As");
+		fileChooser.getExtensionFilters().addAll(
+				new ExtensionFilter("PAMGuard settings files", "*.xml", "*.psfx"));
+		if (file != null && file.getParentFile() != null)
+			fileChooser.setInitialDirectory(file.getParentFile());
+
+		File selectedFile = fileChooser.showSaveDialog(primaryStage);
+		if (selectedFile == null) return;
+
+		selectedFile = PamFileFilter.checkFileEnd(selectedFile, PamSettingManager.getCurrentSettingsFileEnd(), true);
+		PamSettingManager.getInstance().setDefaultFile(selectedFile.getAbsolutePath());
+		if (PamSettingManager.remote_psf != null)
+			PamSettingManager.remote_psf = selectedFile.getAbsolutePath();
+		PamSettingManager.getInstance().saveSettings(PamSettingManager.SAVE_PSF);
+		PamController.getInstance().getGuiFrameManager().sortFrameTitles();
 	}
 
 	/**
@@ -836,7 +1085,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 
 	@Override
 	public PamViewInterface initPrimaryView(PamController pamController, PamModel pamModel) {
-		//start everythinG
+		//start everything
 
 		//now restore the settings for the display - this has to happen here as too early everywhere else. 
 		PamSettingManager.getInstance().registerSettings(this);
@@ -845,6 +1094,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		primaryStage.setHeight(pamGuiSettings.height);
 
 		primaryStage.show();
+
 		return primaryView;
 	}
 
@@ -1125,27 +1375,5 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		}
 	}
 
-	/**
-	 * Build a system {@link MenuBar} for the PAMGuardFX main window.
-	 *
-	 * <p>The menu bar provides top-level access to commonly used actions including
-	 * help. Callers should embed the returned {@code MenuBar} at the top of the
-	 * primary scene.</p>
-	 *
-	 * @return a populated {@link MenuBar}
-	 */
-	public MenuBar buildSystemMenuBar() {
-		MenuBar menuBar = new MenuBar();
-
-		// --- Help menu ---
-		Menu helpMenu = new Menu("Help");
-
-		MenuItem helpContentsItem = new MenuItem("Help Contents");
-		helpContentsItem.setOnAction(e -> HelpManager.getInstance().openHelp());
-
-		helpMenu.getItems().add(helpContentsItem);
-		menuBar.getMenus().add(helpMenu);
-		return menuBar;
-	}
 
 }

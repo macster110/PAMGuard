@@ -4,75 +4,60 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 
-import org.commonmark.ext.heading.anchor.HeadingAnchorExtension;
-import org.commonmark.parser.Parser;
-import org.commonmark.renderer.html.HtmlRenderer;
+import one.jpro.platform.mdfx.MarkdownView;
 
-import javafx.concurrent.Worker;
+import javafx.scene.Node;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.scene.web.WebEngine;
-import javafx.scene.web.WebView;
+
+import PamView.ColourScheme;
+import PamView.PamColors;
+import pamViewFX.fxStyles.PamStylesManagerFX;
 
 /**
- * A JavaFX pane that renders a Markdown help file inside a {@link WebView}.
+ * A JavaFX pane that renders a Markdown help file using {@link MarkdownView}
+ * from the jpro-mdfx library.
  *
- * <p>Markdown is converted to HTML using the CommonMark parser
- * ({@code org.commonmark}) and then displayed with PAMGuard-themed CSS that is
- * bundled inside the {@code helpFX/docs/} resource directory.</p>
- *
- * <p>Navigation to a named heading anchor is performed automatically after the
- * page finishes loading.</p>
+ * <p>Markdown files are loaded from the classpath using an absolute path
+ * (e.g. {@code /clickDetector/click_detector_help.md}).  The PAMGuard FX
+ * stylesheet is applied so the content inherits the current CSA theme.
+ * Images referenced relative to the markdown file's package directory are
+ * resolved via the classpath.</p>
  *
  * @author PAMGuard team
  */
 public class MarkdownHelpPane extends VBox {
 
-	/** Resource root used for all help Markdown files. */
-	static final String DOCS_ROOT = "/helpFX/docs/";
+	/** Classpath root for the help index page (in the helpFX package). */
+	static final String HELP_FX_ROOT = "/helpFX/";
 
-	/** CSS resource bundled alongside the Markdown files. */
-	private static final String CSS_RESOURCE = DOCS_ROOT + "helpFX_style.css";
+	/** Our custom mdfx variable-override CSS. */
+	private static final String HELPFX_CSS = "/helpFX/helpfx.css";
 
-	/** CommonMark parser (shared, thread-confined to FX thread). */
-	private static final Parser PARSER;
+	private final ScrollPane scrollPane;
+	private PamMarkdownView mdView;
 
-	/** CommonMark HTML renderer (shared). */
-	private static final HtmlRenderer RENDERER;
-
-	static {
-		List<org.commonmark.Extension> extensions =
-				List.of(HeadingAnchorExtension.create());
-		PARSER = Parser.builder()
-				.extensions(extensions)
-				.build();
-		RENDERER = HtmlRenderer.builder()
-				.extensions(extensions)
-				.build();
-	}
-
-	private final WebView webView;
-	private final WebEngine engine;
-
-	/** Anchor to scroll to after the page finishes loading; may be null. */
-	private String pendingAnchor;
+	/** The classpath directory prefix for the currently displayed file, e.g. {@code /rawDeepLearningClassifier/} */
+	private String currentBaseDir = "/helpFX/";
 
 	public MarkdownHelpPane() {
-		webView = new WebView();
-		engine = webView.getEngine();
-		VBox.setVgrow(webView, Priority.ALWAYS);
-		getChildren().add(webView);
+		scrollPane = new ScrollPane();
+		scrollPane.setFitToWidth(true);
+		scrollPane.setFitToHeight(true);
+		VBox.setVgrow(scrollPane, Priority.ALWAYS);
 
-		// Scroll to anchor once the page has finished loading
-		engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
-			if (newState == Worker.State.SUCCEEDED && pendingAnchor != null) {
-				scrollToAnchor(pendingAnchor);
-				pendingAnchor = null;
-			}
-		});
+		// Apply PAMGuard dialog CSS to the outer ScrollPane so container colours match the theme
+		applyPamStylesheets(scrollPane);
+
+		getChildren().add(scrollPane);
 	}
 
 	/**
@@ -85,74 +70,187 @@ public class MarkdownHelpPane extends VBox {
 			displayIndex();
 			return;
 		}
-		displayMarkdown(helpPoint.getMarkdownFile(), helpPoint.getAnchor());
+		displayMarkdown(helpPoint.getMarkdownFile());
 	}
 
-	/**
-	 * Display the help index / overview page.
-	 */
+	/** Display the help index / overview page. */
 	public void displayIndex() {
-		displayMarkdown("index.md", null);
+		displayMarkdown(HELP_FX_ROOT + "index.md");
 	}
 
 	/**
-	 * Load a Markdown file (relative to the docs resource root) and display it,
-	 * optionally scrolling to the specified heading anchor.
+	 * Load and display a Markdown file by its absolute classpath path.
 	 *
-	 * @param markdownFile file name or relative path, e.g. {@code "click_detector.md"}
-	 * @param anchor       optional heading anchor id, or {@code null}
+	 * @param classpathPath absolute classpath path, e.g. {@code /clickDetector/click_detector_help.md}
 	 */
-	public void displayMarkdown(String markdownFile, String anchor) {
-		String markdownText = loadResource(DOCS_ROOT + markdownFile);
+	public void displayMarkdown(String classpathPath) {
+		String path = classpathPath.startsWith("/") ? classpathPath : "/" + classpathPath;
+
+		// Derive the base directory for resolving relative image paths
+		int lastSlash = path.lastIndexOf('/');
+		currentBaseDir = (lastSlash > 0) ? path.substring(0, lastSlash + 1) : "/";
+
+		String markdownText = loadResource(path);
 		if (markdownText == null) {
-			markdownText = "# Help not found\n\nCould not load `" + markdownFile + "`.";
+			markdownText = "# Help not found\n\nCould not load `" + path + "`.";
 		}
-		String css = loadResource(CSS_RESOURCE);
-		String html = buildHtmlPage(markdownText, css);
-		pendingAnchor = anchor;
-		engine.loadContent(html, "text/html");
+
+		if (mdView == null) {
+			mdView = new PamMarkdownView(markdownText);
+			mdView.setMaxWidth(Double.MAX_VALUE);
+			scrollPane.setContent(mdView);
+		} else {
+			mdView.setMdString(markdownText);
+		}
+
+		// Apply background / foreground inline style so mdfx picks up the correct
+		// base colours in both day and night mode.
+		applyThemeStyle(mdView);
+
+		scrollPane.setVvalue(0);
+	}
+
+	/**
+	 * Apply PAMGuard dialog stylesheets to a node's stylesheet list.
+	 * This is used for the outer ScrollPane container.
+	 */
+	private void applyPamStylesheets(javafx.scene.Node node) {
+		try {
+			PamStylesManagerFX sm = PamStylesManagerFX.getPamStylesManagerFX();
+			if (sm != null && sm.getCurStyle() != null) {
+				List<String> css = sm.getCurStyle().getDialogCSS();
+				if (css != null) {
+					if (node instanceof javafx.scene.Parent) {
+						((javafx.scene.Parent) node).getStylesheets().addAll(css);
+					}
+				}
+			}
+		} catch (Exception ignored) {
+		}
+	}
+
+	/**
+	 * Set an inline style on the MarkdownView so that {@code -fx-base} and
+	 * {@code -fx-text-base-color} resolve to the correct values for the
+	 * current day/night colour scheme.  The {@code helpfx.css} stylesheet then
+	 * maps these to the {@code -mdfx-*} variables used internally by mdfx.
+	 */
+	private void applyThemeStyle(PamMarkdownView view) {
+		boolean isNight = false;
+		try {
+			isNight = ColourScheme.NIGHTSCHEME.equals(
+					PamColors.getInstance().getColourScheme().getName());
+		} catch (Exception ignored) {
+		}
+
+		if (isNight) {
+			// Dark background, light text
+			view.setStyle(
+				"-fx-base: #2b2b2b;" +
+				"-fx-background: #2b2b2b;" +
+				"-fx-text-base-color: #e0e0e0;" +
+				"-fx-background-color: #2b2b2b;"
+			);
+		} else {
+			// Light background, dark text (PAMGuard default: rgb(240,240,240))
+			view.setStyle(
+				"-fx-base: #f0f0f0;" +
+				"-fx-background: #f0f0f0;" +
+				"-fx-text-base-color: #1a1a1a;" +
+				"-fx-background-color: #f0f0f0;"
+			);
+		}
+	}
+
+	// -------------------------------------------------------------------------
+	// Inner subclass that fixes CSS injection and image loading
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Subclass of {@link MarkdownView} that:
+	 * <ul>
+	 *   <li>Injects the {@code helpfx.css} stylesheet (overrides mdfx colour variables)
+	 *       via {@link #getDefaultStylesheets()}</li>
+	 *   <li>Loads relative image paths from the classpath via {@link #generateImage(String)}</li>
+	 * </ul>
+	 */
+	private class PamMarkdownView extends MarkdownView {
+
+		PamMarkdownView(String mdString) {
+			super(mdString);
+			getStyleClass().add("markdown-view");
+		}
+
+		/**
+		 * Called by mdfx once in the constructor to build the full stylesheet list.
+		 * We return the mdfx defaults PLUS our {@code helpfx.css} which overrides
+		 * the {@code -mdfx-*} colour variables to use PAMGuard's CSS inherited values.
+		 */
+		@Override
+		protected List<String> getDefaultStylesheets() {
+			List<String> sheets = new ArrayList<>(super.getDefaultStylesheets());
+			URL css = MarkdownHelpPane.class.getResource(HELPFX_CSS);
+			if (css != null) {
+				sheets.add(css.toExternalForm());
+			}
+			return sheets;
+		}
+
+		/**
+		 * Called by mdfx for every {@code ![alt](src)} Markdown image tag.
+		 * Resolves {@code src} as a classpath resource relative to the directory
+		 * of the currently loaded {@code .md} file.
+		 */
+		@Override
+		public Node generateImage(String src) {
+			URL url = resolveUrl(src);
+
+			if (url != null) {
+				try {
+					ImageView iv = new ImageView(new Image(url.toExternalForm(), true));
+					iv.setPreserveRatio(true);
+					// Bind width to the view so images scale with the pane
+					iv.fitWidthProperty().bind(widthProperty().subtract(32));
+					iv.setSmooth(true);
+					return iv;
+				} catch (Exception ignored) {
+				}
+			}
+
+			// Fallback to mdfx default behaviour
+			return super.generateImage(src);
+		}
+
+		/**
+		 * Resolve an image {@code src} to a classpath URL.
+		 * Resolution order:
+		 * <ol>
+		 *   <li>Absolute URL (http/https/file)</li>
+		 *   <li>Absolute classpath path (starts with {@code /})</li>
+		 *   <li>Relative to {@link #currentBaseDir} (e.g. {@code resources/foo.png}
+		 *       resolved against {@code /rawDeepLearningClassifier/})</li>
+		 * </ol>
+		 */
+		private URL resolveUrl(String src) {
+			if (src == null || src.isEmpty()) return null;
+			try {
+				// 1. Absolute HTTP/file URL
+				if (src.contains("://")) return new URL(src);
+				// 2. Absolute classpath path
+				if (src.startsWith("/")) return MarkdownHelpPane.class.getResource(src);
+				// 3. Relative to the current markdown file's package directory
+				return MarkdownHelpPane.class.getResource(currentBaseDir + src);
+			} catch (Exception e) {
+				return null;
+			}
+		}
 	}
 
 	// -------------------------------------------------------------------------
 	// Private helpers
 	// -------------------------------------------------------------------------
 
-	/**
-	 * Convert Markdown to a complete HTML document with embedded CSS.
-	 */
-	private static String buildHtmlPage(String markdownText, String css) {
-		org.commonmark.node.Node document = PARSER.parse(markdownText);
-		String body = RENDERER.render(document);
-		StringBuilder sb = new StringBuilder();
-		sb.append("<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n");
-		sb.append("<style>\n");
-		if (css != null) {
-			sb.append(css);
-		} else {
-			sb.append(defaultCss());
-		}
-		sb.append("\n</style>\n</head>\n<body>\n");
-		sb.append(body);
-		sb.append("\n</body>\n</html>\n");
-		return sb.toString();
-	}
-
-	/** Scroll the WebView to the element with the given id. */
-	private void scrollToAnchor(String anchor) {
-		try {
-			engine.executeScript(
-					"var el = document.getElementById('" + anchor + "');" +
-					"if (el) { el.scrollIntoView(true); }");
-		} catch (Exception e) {
-			// Non-fatal: anchor may not exist in the page
-		}
-	}
-
-	/**
-	 * Load a classpath resource as a UTF-8 string.
-	 *
-	 * @return the resource content, or {@code null} if not found
-	 */
+	/** Load a classpath resource as a UTF-8 string; returns {@code null} if not found. */
 	private static String loadResource(String path) {
 		try (InputStream is = MarkdownHelpPane.class.getResourceAsStream(path)) {
 			if (is == null) return null;
@@ -160,30 +258,11 @@ public class MarkdownHelpPane extends VBox {
 				StringBuilder sb = new StringBuilder();
 				char[] buf = new char[4096];
 				int n;
-				while ((n = reader.read(buf)) != -1) {
-					sb.append(buf, 0, n);
-				}
+				while ((n = reader.read(buf)) != -1) sb.append(buf, 0, n);
 				return sb.toString();
 			}
 		} catch (IOException e) {
 			return null;
 		}
-	}
-
-	/** Minimal fallback CSS if the bundled stylesheet cannot be found. */
-	private static String defaultCss() {
-		return "body { font-family: sans-serif; margin: 20px; line-height: 1.6; }\n"
-			 + "h1, h2, h3 { color: #2c3e50; }\n"
-			 + "code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }\n"
-			 + "pre { background: #f4f4f4; padding: 10px; border-radius: 3px; overflow-x: auto; }\n"
-			 + "a { color: #3498db; }\n"
-			 + "table { border-collapse: collapse; width: 100%; }\n"
-			 + "th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n"
-			 + "th { background-color: #f2f2f2; }\n";
-	}
-
-	/** @return the underlying {@link WebView} */
-	public WebView getWebView() {
-		return webView;
 	}
 }

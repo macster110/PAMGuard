@@ -1,24 +1,22 @@
 package helpFX;
 
 /**
- * Identifies a location in the PAMGuardFX help system: a Markdown file path
- * (relative to the helpFX/docs resource root) and an optional heading anchor
- * within that file.
+ * Identifies a location in the PAMGuardFX help system: an absolute classpath
+ * path to a Markdown file and an optional heading anchor within that file.
  *
- * <p>Example usage:</p>
+ * <p>The path should be an absolute classpath path, e.g.:
  * <pre>
- *     // Open the Sound Acquisition overview
- *     HelpPoint hp = new HelpPoint("sound_acquisition.md");
- *
- *     // Open directly at a heading anchor
- *     HelpPoint hp2 = new HelpPoint("click_detector.md", "configuration");
+ *     new HelpPoint("/clickDetector/click_detector_help.md");
+ *     new HelpPoint("/clickDetector/click_detector_help.md", "configuration");
+ *     new HelpPoint("/helpFX/index.md");
  * </pre>
+ * </p>
  *
  * @author PAMGuard team
  */
 public class HelpPoint {
 
-	/** Path to the Markdown file, relative to the helpFX/docs classpath root. */
+	/** Absolute classpath path to the Markdown file (e.g. {@code /clickDetector/click_detector_help.md}). */
 	private final String markdownFile;
 
 	/**
@@ -30,8 +28,7 @@ public class HelpPoint {
 	/**
 	 * Create a help point pointing at the top of a help file.
 	 *
-	 * @param markdownFile classpath-relative path inside {@code helpFX/docs/},
-	 *                     e.g. {@code "sound_acquisition.md"}
+	 * @param markdownFile absolute classpath path to the Markdown file
 	 */
 	public HelpPoint(String markdownFile) {
 		this(markdownFile, null);
@@ -40,24 +37,21 @@ public class HelpPoint {
 	/**
 	 * Create a help point pointing at a specific heading anchor inside a help file.
 	 *
-	 * @param markdownFile classpath-relative path inside {@code helpFX/docs/},
-	 *                     e.g. {@code "click_detector.md"}
-	 * @param anchor       heading anchor (lower-case, hyphen-separated), e.g.
-	 *                     {@code "configuration"} or {@code null} for the top of the page
+	 * @param markdownFile absolute classpath path to the Markdown file
+	 * @param anchor       heading anchor, or {@code null} for the top of the page
 	 */
 	public HelpPoint(String markdownFile, String anchor) {
 		this.markdownFile = markdownFile;
 		this.anchor = anchor;
 	}
 
-	/** @return the Markdown file path (relative to helpFX/docs resource root) */
+	/** @return the absolute classpath path to the Markdown file */
 	public String getMarkdownFile() {
 		return markdownFile;
 	}
 
 	/**
-	 * @return the optional heading anchor, or {@code null} if the whole page
-	 *         should be shown from the top
+	 * @return the optional heading anchor, or {@code null}
 	 */
 	public String getAnchor() {
 		return anchor;
