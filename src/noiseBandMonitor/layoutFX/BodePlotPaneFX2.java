@@ -269,7 +269,8 @@ public class BodePlotPaneFX2 extends PamBorderPane {
 	 */
 	private Color probeCssColor(String cssVar) {
 		if (getScene() == null) return null;
-		if (!(getScene().getRoot() instanceof javafx.scene.layout.Pane pRoot)) return null;
+		if (!(getScene().getRoot() instanceof javafx.scene.layout.Pane)) return null;
+		javafx.scene.layout.Pane pRoot = (javafx.scene.layout.Pane) getScene().getRoot();
 
 		javafx.scene.layout.Region probe = new javafx.scene.layout.Region();
 		probe.setStyle("-fx-background-color: " + cssVar + ";");
@@ -285,7 +286,7 @@ public class BodePlotPaneFX2 extends PamBorderPane {
 		javafx.scene.layout.Background bg = probe.getBackground();
 		if (bg != null && !bg.getFills().isEmpty()) {
 			javafx.scene.paint.Paint p = bg.getFills().get(0).getFill();
-			if (p instanceof Color c) result = c;
+			if (p instanceof Color) result = (Color) p;
 		}
 		pRoot.getChildren().remove(probe);
 		return result;
@@ -303,7 +304,7 @@ public class BodePlotPaneFX2 extends PamBorderPane {
 	 */
 	private void updateThemeColors() {
 		if (getScene() == null) return;
-		if (!(getScene().getRoot() instanceof javafx.scene.layout.Pane pRoot)) return;
+		if (!(getScene().getRoot() instanceof javafx.scene.layout.Pane)) return;
 
 		// ── 1. Canvas / plot background ──────────────────────────────────────
 		Background bg = this.getBackground();
@@ -311,7 +312,7 @@ public class BodePlotPaneFX2 extends PamBorderPane {
 		if (bg != null && !bg.getFills().isEmpty()) {
 			javafx.scene.paint.Paint p = bg.getFills().get(0).getFill();
 
-			if (p instanceof Color c) result = c;
+			if (p instanceof Color) result = (Color) p;
 		}
 
 		themeBackground = result;

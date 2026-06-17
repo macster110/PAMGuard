@@ -21,7 +21,9 @@ import clickTrainDetector.classification.CTClassifier;
 import clickTrainDetector.classification.CTClassifierManager;
 import clickTrainDetector.clickTrainAlgorithms.CTAlgorithmInfoManager;
 import clickTrainDetector.clickTrainAlgorithms.ClickTrainAlgorithm;
+import clickTrainDetector.clickTrainAlgorithms.adaptive.AdaptiveClickTrainAlgorithm;
 import clickTrainDetector.clickTrainAlgorithms.mht.MHTClickTrainAlgorithm;
+import clickTrainDetector.clickTrainAlgorithms.ukf.UKFClickTrainAlgorithm;
 import clickTrainDetector.layout.CTFXGUI;
 import clickTrainDetector.layout.CTSwingGUI;
 import clickTrainDetector.layout.warnings.CTWarningManager;
@@ -173,7 +175,9 @@ public class ClickTrainControl extends PamControlledUnit implements PamSettings 
 		clickTrainAlgorithms= new ArrayList<ClickTrainAlgorithm>(); 
 
 		/*****Click Train Algorithms******/
-		clickTrainAlgorithms.add(new MHTClickTrainAlgorithm(this)); 
+		clickTrainAlgorithms.add(new MHTClickTrainAlgorithm(this));
+		clickTrainAlgorithms.add(new AdaptiveClickTrainAlgorithm(this));
+		clickTrainAlgorithms.add(new UKFClickTrainAlgorithm(this));
 		//clickTrainAlgorithms.add(new RatioClickTrainAlgorithm(this));
 		//		clickTrainAlgorithms.add(new TestAlgorithm(this));
 		

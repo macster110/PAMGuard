@@ -10,6 +10,14 @@ The PAMGuard click train detector module is used to detect and then classify rep
 
 PAMGuard’s click train detector utilises both a detection and classification stage to extract click trains from recordings. 
 
+The detection stage can use one of three interchangeable algorithms, selected from the **Click Train Detector Algorithm** dropdown in the settings pane (Figure 2):
+
+- **MHT detector** – the original multi-hypothesis tracking algorithm (described immediately below). Very general and powerful but has a large number of parameters to tune.
+- **Adaptive detector** – uses the same multi-hypothesis search but with a self-calibrating scoring function that learns each train’s behaviour, so it needs only a handful of intuitive parameters. See *The Adaptive Detector* below.
+- **UKF detector** – a tracking-by-detection approach based on an Unscented Kalman Filter, a learned affinity metric and two-stage assignment. See *The UKF Detector* below.
+
+All three take the same click detections as input and produce click trains; they differ only in how they decide which clicks belong to the same train. The classification, localisation and visualisation stages described later are shared by all three algorithms.
+
 The detection stage is currently based on a multi hypothesis tracking (MHT) algorithm. This algorithm considers all possible combinations of transient detections creating a large hypothesis matrix which holds potential click trains. As more clicks are added to the hypothesis matrix it grows exponentially and so, to prevent a computer running out memory, it is regularly “pruned” to keep only the most likely click trains over time. The assigned likelihood of a click train is based on number of properties which can be defined in by the user. For example, a user might select, ICI, Amplitude and Correlation as variables to score click trains; this would mean that combinations of clicks with slowly changing ICI, amplitude and waveforms would be favoured by the algorithm and stay in the hypothesis matrix. Other properties such as bearing, click length and peak frequency can also be selected.  A graphical explanation of the click train detection algorithm is shown in Figure 1 and a more detailed explanation of the be found in Macaulay (2019). 
 
 ![](resources/mht_diagram.png)
@@ -94,6 +102,99 @@ The advanced settings (see Figure 4) are a series of additional factors that pre
 ***Coast penalty:***  add a penalty for “coasting” i.e. when an expected click, based on ICI, is not present in the click train. This penalty is multiplied by the number of coasts i.e. the likely number of missed clicks based on ICI  
 
 ***New Track Penalty:***  if a track hypothesis is newly added in the hypothesis matrix, then add a minor penalty factor. This is added until the number of click trains exceeds No. New Track Clicks
+
+## The Adaptive Detector
+
+The Adaptive detector was designed to address the main drawback of the MHT detector: the large number of interacting parameters (a variance coefficient and minimum error for every descriptor, plus several bonus/penalty factors). It uses the **same multi-hypothesis tracking search** as the MHT detector — so it copes equally well with multiple overlapping click trains — but replaces the χ<sup>2</sup> scoring with a **self-calibrating, predictive-residual** model that needs only a handful of intuitive settings.
+
+### How it scores click trains
+
+For each possible click train the algorithm predicts the next click’s properties (inter-click interval, amplitude and, where available, bearing) from the train’s own recent history. When a new click is considered for the train, the algorithm measures the *residual* between the observed and predicted value and standardises it using a scale that it **estimates from the train itself** (a robust median-absolute-deviation of recent residuals). In other words, instead of you telling the algorithm how much each descriptor is allowed to vary, the algorithm learns the expected variability of each train as it grows. A small physically-meaningful “floor” (scaled by a single sensitivity control) stops a perfectly regular train from rejecting tiny deviations.
+
+The residuals from each enabled feature are combined into a single robust score (a Huber loss makes it tolerant to the occasional outlier click), and every click that fits well earns a small “reward” that favours longer, complete trains and prevents fragmentation. Gaps are bridged automatically by recognising that a click arriving after a pause spans several inter-click intervals (coasting), and trains whose median ICI exceeds the maximum are rejected.
+
+Because the score is normalised by the number of available features, the **same settings work whether or not bearing or waveform data are present**, which makes the detector suitable for single-channel data (no bearing), multi-channel data (with bearing) and data without waveforms.
+
+### Settings
+
+***Max. ICI:*** the absolute maximum inter-click interval (in seconds) allowed within a click train. Trains whose median ICI exceeds this are rejected.
+
+***Sensitivity:*** a single slider from *loose* to *tight*. Loose detects more clicks but may merge nearby trains; tight is stricter and produces cleaner but possibly more fragmented trains. This scales the minimum residual “floor” used for every feature, replacing the per-descriptor variance settings of the MHT detector.
+
+***Detection probability:*** the expected fraction of clicks that are detected (0–1). Lower values let the detector bridge more missed clicks (coasts); higher values keep trains tighter.
+
+***Features used:*** toggle which click properties are used to group clicks. *Inter-click interval (ICI)* and *Amplitude* are available for any data; *Bearing* is enabled only when the source provides a bearing; *Waveform correlation* (which groups clicks by waveform similarity, and also refines the ICI measurement) is enabled only when waveform data are present. Features that the data cannot provide are greyed out automatically.
+
+## The UKF Detector
+
+The UKF detector takes a different, “tracking-by-detection” approach borrowed from modern multi-object tracking. Rather than searching all possible combinations of clicks, it maintains a set of active tracks and, as each new batch of clicks arrives, decides which click (if any) extends each track. The pipeline is:
+
+```
+click detections
+  → UKF state prediction      (predict each track's next click)
+  → learned affinity metric   (a small neural network scores each pairing)
+  → two-stage assignment      (Hungarian algorithm, ByteTrack style)
+  → UKF state update          (correct each track with its matched click)
+```
+
+### Unscented Kalman Filter
+
+Each track is modelled by an **Unscented Kalman Filter (UKF)**. The filter’s state holds the (log) inter-click interval together with a slow drift term, plus amplitude and bearing when those features are enabled. The UKF predicts where and when the next click of a train should appear, and after a click is assigned it updates the track’s state. The “unscented” formulation correctly handles the non-linear parts of the model — the logarithmic ICI (which keeps intervals positive and treats proportional changes consistently) and the circular nature of bearing.
+
+### Learned affinity metric
+
+For every candidate (track, detection) pairing the detector builds a short feature vector — chiefly the *Mahalanobis distance* between the detection and the track’s prediction, plus the individual ICI, amplitude and bearing innovations and how overdue the track is — and passes it through a small neural network that returns an **affinity** between 0 and 1 (1 = a certain match). By default a built-in network reproduces a sensible statistical gate (high affinity when a detection lies close to the prediction, falling off smoothly with distance). Advanced users can supply their own trained network instead (see *Custom affinity network* below).
+
+### Two-stage (ByteTrack) assignment
+
+The affinities become costs in a **Hungarian assignment**, which finds the globally best matching of clicks to tracks in each batch (this is what lets the detector resolve ambiguous situations where two clicks could each belong to either of two tracks). Following the ByteTrack approach, assignment is done in two stages: loud, **high-confidence** clicks are matched first, then the remaining quieter, **low-confidence** clicks are matched against any tracks that are still unassigned. The amplitude threshold separating high- from low-confidence clicks is set by the user, so they can decide how the data are split. Unmatched high-confidence clicks start new tracks; tracks that miss too many clicks are closed and saved.
+
+### Settings
+
+***Max. ICI:*** the absolute maximum inter-click interval (seconds) allowed within a train.
+
+***Frame window:*** the duration of the batching window. Clicks within a window are assigned jointly by the Hungarian algorithm. It should be set below the shortest expected ICI so that successive clicks of one train fall in different windows.
+
+***Max. coasts:*** the maximum number of consecutive missed clicks before a track is closed.
+
+***Min. train length:*** the minimum number of clicks for a track to be saved.
+
+***Features used:*** ICI is always tracked; *Amplitude* and *Bearing* (when available) can be toggled on or off.
+
+***Two-stage association:*** enable the ByteTrack-style high/low-confidence split, and set the **Confidence amplitude** (dB) threshold that separates the two. Set the threshold to 0 to treat all clicks as high-confidence (a single assignment stage).
+
+> **Note:** if you enable two-stage association *and* track amplitude, the amplitude model can itself reject the quiet clicks the second stage is meant to recover (because they genuinely differ in amplitude). For low-confidence recovery driven purely by timing, turn the *Amplitude* feature off.
+
+### Custom affinity network
+
+The affinity metric is a small multi-layer perceptron (MLP). The repository ships with default weights that reproduce a Gaussian/Mahalanobis gate, but you can train your own network and load it from a JSON file by ticking **Use custom affinity network** and selecting the file. A malformed file, or one whose input size does not match, is ignored and the default network is used (a warning is logged).
+
+The JSON file describes the network’s weights and biases:
+
+```json
+{
+  "weights": [
+    [[-0.5, 0.0, 0.0, 0.0, 0.0]],
+    [[4.0]]
+  ],
+  "biases": [
+    [3.0],
+    [0.0]
+  ]
+}
+```
+
+- **`weights`** is a 3-D array indexed `[layer][output node][input node]`.
+- **`biases`** is a 2-D array indexed `[layer][output node]`.
+- The number of layers is the length of `weights` (which must equal the length of `biases`). Each hidden layer uses a **tanh** activation; the final layer uses a **sigmoid**, so the network’s single output is an affinity in the range 0–1.
+- The input dimension (the length of each inner row of the first layer’s weights) **must be 5** — the size of the feature vector. The five inputs, in order, are:
+  - **0** – Mahalanobis distance between the detection and the track’s predicted measurement.
+  - **1** – normalised absolute log-ICI innovation.
+  - **2** – normalised absolute amplitude innovation (0 when amplitude is not tracked).
+  - **3** – normalised absolute bearing innovation (0 when bearing is not tracked).
+  - **4** – how overdue the track is (time since its last click ÷ its expected ICI).
+
+The example above is the built-in default network: a single `5 → 1 → 1` gate whose hidden unit computes `tanh(3.0 − 0.5 × Mahalanobis)` and whose output is `sigmoid(4.0 × hidden)`. This gives an affinity of ~1 for a detection right on the prediction, 0.5 at a Mahalanobis distance of 6, and ~0 beyond. A trained network can use more hidden units and make use of all five inputs; simply provide the corresponding `weights` and `biases` arrays.
 
 ## Classification
 
