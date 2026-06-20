@@ -175,9 +175,9 @@ public class ClickTrainControl extends PamControlledUnit implements PamSettings 
 		clickTrainAlgorithms= new ArrayList<ClickTrainAlgorithm>(); 
 
 		/*****Click Train Algorithms******/
-		clickTrainAlgorithms.add(new MHTClickTrainAlgorithm(this));
 		clickTrainAlgorithms.add(new AdaptiveClickTrainAlgorithm(this));
 		clickTrainAlgorithms.add(new UKFClickTrainAlgorithm(this));
+		clickTrainAlgorithms.add(new MHTClickTrainAlgorithm(this));
 		//clickTrainAlgorithms.add(new RatioClickTrainAlgorithm(this));
 		//		clickTrainAlgorithms.add(new TestAlgorithm(this));
 		
