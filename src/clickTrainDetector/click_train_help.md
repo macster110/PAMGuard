@@ -13,7 +13,7 @@ PAMGuard’s click train detector utilises both a detection and classification s
 The detection stage can use one of three interchangeable algorithms, selected from the **Click Train Detector Algorithm** dropdown in the settings pane (Figure 2):
 
 - **MHT detector** – the original multi-hypothesis tracking algorithm (described immediately below). Very general and powerful but has a large number of parameters to tune.
-- **Adaptive detector** – uses the same multi-hypothesis search but with a self-calibrating scoring function that learns each train’s behaviour, so it needs only a handful of intuitive parameters. See *The Adaptive Detector* below.
+- **Adaptive MHT detector** – uses the same multi-hypothesis search but with a self-calibrating scoring function that learns each train’s behaviour, so it needs only a handful of intuitive parameters. See *The Adaptive Detector* below.
 - **UKF detector** – a tracking-by-detection approach based on an Unscented Kalman Filter, a learned affinity metric and two-stage assignment. See *The UKF Detector* below.
 
 All three take the same click detections as input and produce click trains; they differ only in how they decide which clicks belong to the same train. The classification, localisation and visualisation stages described later are shared by all three algorithms.

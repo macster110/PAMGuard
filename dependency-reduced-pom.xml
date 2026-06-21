@@ -323,6 +323,11 @@
       <id>central</id>
       <url>https://repo1.maven.org/maven2</url>
     </repository>
+    <repository>
+      <id>jpro-sdk</id>
+      <name>JPro SDK</name>
+      <url>https://sandec.jfrog.io/artifactory/repo</url>
+    </repository>
   </repositories>
   <dependencies>
     <dependency>

@@ -295,12 +295,12 @@ public class WhistleToneDialog extends PamDialog {
 		}
 		// The methods we really need are numbers  0, 1 and 3
 		// the Gaussian smoothing is optional. 
-		int[] required = {0, 1, 3};
-		for (int i = 0; i < required.length; i++) {
-			if (!spectrogramNoiseDialogPanel.hasProcessed(required[i])) {
-				return false;
-			}
-		}
+//		int[] required = {0, 1, 3};
+//		for (int i = 0; i < required.length; i++) {
+//			if (!spectrogramNoiseDialogPanel.hasProcessed(required[i])) {
+//				return false;
+//			}
+//		}
 		return true;
 	}
 	

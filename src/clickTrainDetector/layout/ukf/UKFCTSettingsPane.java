@@ -27,6 +27,7 @@ import pamViewFX.fxNodes.PamGridPane;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamSpinner;
 import pamViewFX.fxNodes.PamVBox;
+import pamViewFX.fxNodes.flipPane.PamFlipPane;
 import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 
 /**
@@ -51,6 +52,9 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 	private PamToggleSwitch useCustomAffinity;
 	private TextField affinityFileField;
 	private PamButton affinityBrowseButton;
+	private PamButton trainNetworkButton;
+	private PamFlipPane flipPane;
+	private UKFAffinityTrainPane trainPane;
 
 	private static final String TIP_AMPLITUDE = "Track amplitude consistency (in addition to ICI).";
 	private static final String TIP_BEARING =
@@ -79,7 +83,34 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		super(null);
 		this.ukfClickTrainAlgorithm = ukfClickTrainAlgorithm;
 		mainPane = new PamBorderPane();
-		mainPane.setCenter(createPane());
+
+		// front = the settings (which include the "Train affinity network…" button);
+		// back = the training pane. Flipping is triggered by that button.
+		Pane front = createPane();
+		trainPane = new UKFAffinityTrainPane(ukfClickTrainAlgorithm, this::onNetworkTrained);
+
+		flipPane = new PamFlipPane();
+		flipPane.getAdvLabel().setText("Train Affinity Network");
+		flipPane.setFrontContent(front);
+		flipPane.setAdvPaneContent(trainPane.getNode());
+
+		trainNetworkButton.setOnAction(e -> {
+			trainPane.refresh();
+			flipPane.flipToBack();
+		});
+
+		mainPane.setCenter(flipPane);
+	}
+
+	/**
+	 * Called when training has produced and saved a network file: point the custom
+	 * affinity controls at it and flip back to the settings.
+	 */
+	private void onNetworkTrained(java.io.File file) {
+		useCustomAffinity.setSelected(true);
+		affinityFileField.setText(file.getAbsolutePath());
+		enableAffinityControls(true);
+		flipPane.flipToFront();
 	}
 
 	private Pane createPane() {
@@ -114,7 +145,9 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		PamVBox holder = new PamVBox();
 		holder.setSpacing(8);
 		holder.setPadding(new Insets(10, 0, 0, 0));
-		holder.getChildren().addAll(title, grid, createFeaturePane(), createTwoStagePane(), createAffinityPane());
+		holder.getChildren().addAll(title, grid, new javafx.scene.control.Separator(), createFeaturePane(),
+				new javafx.scene.control.Separator(), createTwoStagePane(), new javafx.scene.control.Separator(),
+				createAffinityPane());
 		return holder;
 	}
 
@@ -138,10 +171,15 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		fileBox.setSpacing(5);
 		fileBox.getChildren().addAll(affinityFileField, affinityBrowseButton);
 
+		// the action is wired in the constructor, once the flip pane exists.
+		trainNetworkButton = new PamButton("Train affinity network…");
+		trainNetworkButton.setTooltip(new Tooltip(
+				"Train the affinity network from manually-annotated click trains, then save and use it."));
+
 		PamVBox box = new PamVBox();
 		box.setSpacing(5);
 		box.setPadding(new javafx.geometry.Insets(5, 0, 0, 0));
-		box.getChildren().addAll(label, useCustomAffinity, fileBox);
+		box.getChildren().addAll(label, useCustomAffinity, fileBox, trainNetworkButton);
 		return box;
 	}
 

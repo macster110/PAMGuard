@@ -38,15 +38,57 @@ public class DeepWhistleMask implements PamFFTMask {
 	private static final double DEFUALT_MASK_VALUE = 0;
 
 	/**
+	 * Lower clip bound applied to the log-magnitude before normalisation
+	 * (min_clip in the MATLAB silbido code).
+	 */
+	private static final double MIN_CLIP = 0.0;
+
+	/**
+	 * Upper clip bound applied to the log-magnitude before normalisation
+	 * (max_clip in the MATLAB silbido code).
+	 */
+	private static final double MAX_CLIP = 6.0;
+
+	/**
+	 * The MATLAB silbido reference analysis window length in seconds (~2 ms).
+	 * Used to compute the FFT-length term of the log-magnitude offset.
+	 */
+	private static final double MATLAB_WINDOW_SECONDS = 0.002;
+
+	/**
+	 * Bit scale (bits minus the sign bit) of the integer audio the model was
+	 * trained on. MATLAB {@code dtDeepWhistle.m} scales all audio to a 16-bit
+	 * integer equivalent, so the full-scale value is 2<sup>15</sup>.
+	 */
+	private static final int REFERENCE_BIT_SCALE = 15;
+
+	/**
+	 * Optional manual fine-tune (in log10 units) added to the computed
+	 * log-magnitude offset. Leave at 0 unless re-validating the model input
+	 * against the MATLAB reference (compare_java_model_input.m) shows the bulk
+	 * of the distribution is consistently shifted.
+	 */
+	private static final double LOG_OFFSET_ADJUST = 0.0;
+
+	/**
 	 * FFT length used in the model
 	 */
-	private DeepWhistleProcess maksedFFTProcess;
+	private MaskedFFTProcess maksedFFTProcess;
 
 
 	Predictor<float[][], float[]> specPredictor;
 
-	//TEMP
-	String modelPath = "/Users/jdjm/Dropbox/PAMGuard_dev/Deep_Learning/deepWhistle/DWC-I.pt";
+	/**
+	 * URL to the downloadable DeepWhistle model. The model is hosted as a release
+	 * asset (a zip containing the model file and a README) in the PAMGuard
+	 * deeplearningmodels repository on GitHub.
+	 */
+	public static final String MODEL_URL = "https://github.com/PAMGuard/deeplearningmodels/releases/download/1.0/deep_whistle_1.zip";
+
+	/**
+	 * Name of the model file to locate inside the downloaded archive.
+	 */
+	public static final String MODEL_FILE_NAME = "DWC-I.pt";
 
 	/**
 	 * Model info
@@ -68,8 +110,17 @@ public class DeepWhistleMask implements PamFFTMask {
 	int count = 0;
 	
 	
-	public DeepWhistleMask(DeepWhistleProcess maksedFFTProcess) {
+	public DeepWhistleMask(MaskedFFTProcess maksedFFTProcess) {
 		this.maksedFFTProcess = maksedFFTProcess;
+	}
+
+	/**
+	 * Get the DeepWhistle parameters from the process.
+	 *
+	 * @return the DeepWhistle parameters.
+	 */
+	private DeepWhistleParamters getDeepWhistleParameters() {
+		return (DeepWhistleParamters) maksedFFTProcess.getMaskFFTParams();
 	}
 
 	@Override
@@ -89,9 +140,16 @@ public class DeepWhistleMask implements PamFFTMask {
 		int fftHop = fftDataBlock.getFftHop();
 
 		MaskedFFTParamters fftParams = this.maksedFFTProcess.getMaskFFTParams();
-		
+
+		String modelPath = fftParams.modelPath;
+		if (modelPath == null) {
+			System.err.println("DeepWhistleMask: no model has been downloaded - model path is null. "
+					+ "Open the settings and select a mask to download the model.");
+			return false;
+		}
+
 		//define some model info
-		modelInfo = new DeepWhistleInfo(fftLen, fftHop, 5000.0f , 50000.0f , (float) fftParams.bufferSeconds);		
+		modelInfo = new DeepWhistleInfo(fftLen, fftHop, 5000.0f , 50000.0f , (float) fftParams.bufferSeconds);
 
 		//create the transforms
 		transformParams = createTrasnforms( modelInfo);
@@ -157,32 +215,101 @@ public class DeepWhistleMask implements PamFFTMask {
 
 
 	/**
-	 * Create the transform params used in deepWhistle pre-processing
+	 * Create the transform params used in deepWhistle pre-processing.
+	 * <p>
+	 * This reproduces the MATLAB silbido pre-processing in <code>dtDeepWhistle.m</code>:
+	 * <pre>
+	 *   freq trim -&gt; log10(|FFT|) -&gt; clip to [0,6] -&gt; (x-0)/(6-0)
+	 * </pre>
+	 * The MATLAB code runs on <b>unscaled int16-equivalent</b> audio with <b>no window</b>,
+	 * so its log-magnitudes naturally fall in [0,6]. PAMGuard instead supplies FFTs of
+	 * <b>amplitude-normalised (&plusmn;1)</b> audio with a window applied, so the magnitudes
+	 * are smaller by a fixed factor. We correct for this with a single additive offset in
+	 * log space (see {@link #computeLogMagnitudeOffset()}) which is derived from the actual
+	 * FFT settings (window gain, FFT length, sample rate) and therefore adjusts
+	 * automatically if those settings change - unlike the previous hard-coded
+	 * SPEC_ADD(2.1)/SPEC_PRODUCT(2) calibration which was tuned for one configuration.
+	 *
 	 * @param modelInfo - the model info
-	 * @return
+	 * @return the list of transform parameters.
 	 */
 	private ArrayList<DLTransfromParams> createTrasnforms(DeepWhistleInfo modelInfo){
 
 
 		ArrayList<DLTransfromParams> dlTransformParamsArr = new ArrayList<DLTransfromParams>();
 
-		//so that transforms are
-		// spectrogram - create a spectrogram - note silbido does not use a window function weirdly...
-		//then trim the frequency
-		//multiply by log10. 
-		///clamp the values between mac_clip and min_clip - this is between 0 and 6 in Silbido
-		//transforms
-		//Then do a min mac normalisation
-		//	dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPECTROGRAM, 1024,512)); 
-		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPECFREQTRIM, modelInfo.minFreq, modelInfo.maxFreq)); 
+		//additive log-space offset which maps PAMGuard's amplitude-normalised, windowed FFT
+		//magnitude onto the unscaled, un-windowed magnitude scale the model was trained on.
+		double logOffset = computeLogMagnitudeOffset();
+
+		System.out.println("DeepWhistleMask: log-magnitude offset = " + logOffset);
+
+		//1) trim to the model frequency range
+		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPECFREQTRIM, modelInfo.minFreq, modelInfo.maxFreq));
+		//2) log10 of the magnitude spectrogram
 		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPEC_LOG10));
-		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPEC_ADD, 2.1));
-		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPEC_PRODUCT, 2));
-		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPECCLAMP, 0, 6.));
-		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPECNORMALISE_MINIMAX, 0, 6)); 
+		//3) shift onto the int16/no-window magnitude scale used by the MATLAB model
+		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPEC_ADD, logOffset));
+		//4) clamp to [min_clip, max_clip] (0 and 6 in silbido)
+		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPECCLAMP, MIN_CLIP, MAX_CLIP));
+		//5) min-max normalise using the same fixed bounds (NOT per-block) i.e. (x-0)/(6-0)
+		dlTransformParamsArr.add(new SimpleTransformParams(DLTransformType.SPECNORMALISE_MINIMAX, MIN_CLIP, MAX_CLIP));
 
 
-		return dlTransformParamsArr; 
+		return dlTransformParamsArr;
+	}
+
+	/**
+	 * Compute the additive offset (in log10 units) which maps PAMGuard's FFT magnitude
+	 * onto the magnitude scale the MATLAB silbido model was trained on.
+	 * <p>
+	 * MATLAB ({@code dtDeepWhistle.m}) computes {@code log10(abs(fft(audio)))} where:
+	 * <ul>
+	 * <li>{@code audio} is unscaled and scaled to a 16-bit-integer equivalent (full scale
+	 *     2<sup>15</sup>) for any bit depth, and</li>
+	 * <li>no window function is applied, and</li>
+	 * <li>the FFT length corresponds to a ~2 ms analysis window.</li>
+	 * </ul>
+	 * PAMGuard supplies FFTs of amplitude-normalised (&plusmn;1) audio with a window applied
+	 * and a (possibly different) FFT length. Using broadband/noise statistics - which set the
+	 * [0,6] clip range - the expected magnitudes relate as:
+	 * <pre>
+	 *   |X_matlab|   ~ &sigma;&middot;2^15 &middot; sqrt(N_matlab)                 (no window)
+	 *   |X_pamguard| ~ &sigma;        &middot; sqrt(N_pamguard) &middot; windowGain  (windowed)
+	 * </pre>
+	 * so the required offset is
+	 * <pre>
+	 *   log10(|X_matlab|/|X_pamguard|) =
+	 *       15&middot;log10(2) + 0.5&middot;log10(N_matlab/N_pamguard) - log10(windowGain)
+	 * </pre>
+	 * where {@code windowGain} is the RMS window gain reported by the FFT data block
+	 * (1.0 for a rectangular window, ~0.61 for Hann). Because every term is read from the
+	 * live FFT settings, the offset self-adjusts when the FFT length or window changes.
+	 *
+	 * @return the additive log10 offset.
+	 */
+	private double computeLogMagnitudeOffset() {
+
+		FFTDataBlock fftDataBlock = maksedFFTProcess.getInputFFTData();
+
+		int fftLen = fftDataBlock.getFftLength();
+		double sampleRate = fftDataBlock.getSampleRate();
+
+		//RMS gain of the window PAMGuard applied (1.0 = rectangular, ~0.61 = Hann).
+		double windowGain = fftDataBlock.getDataGain(0);
+		if (!(windowGain > 0)) {
+			windowGain = 1.0;
+		}
+
+		//MATLAB analyses ~2 ms windows: N = round(fs*0.002)+1
+		int matlabFFTLen = (int) Math.round(sampleRate * MATLAB_WINDOW_SECONDS) + 1;
+
+		double offset = REFERENCE_BIT_SCALE * Math.log10(2.0)
+				+ 0.5 * Math.log10(((double) matlabFFTLen) / ((double) fftLen))
+				- Math.log10(windowGain)
+				+ LOG_OFFSET_ADJUST;
+
+		return offset;
 	}
 
 	private float getSampleRate() {
@@ -310,7 +437,7 @@ public class DeepWhistleMask implements PamFFTMask {
 //					maskVal = 0.0;
 //				}
 				
-				if (maskVal<this.maksedFFTProcess.getDeepWhistleParameters().confidenceThreshold) {
+				if (maskVal<getDeepWhistleParameters().confidenceThreshold) {
 					maskVal = 0.0;
 				}
 

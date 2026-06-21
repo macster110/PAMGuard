@@ -201,6 +201,9 @@ public class UKFTracker {
 		double[][][] measCache = new double[candTracks.size()][dets.size()][];
 		for (int r = 0; r < candTracks.size(); r++) {
 			ClickTrack track = tracks.get(candTracks.get(r));
+			// the unscented measurement prediction depends only on the track, so compute
+			// it once and reuse it for every candidate detection.
+			UnscentedKalmanFilter.Prediction prediction = track.predictMeasurement();
 			for (int c = 0; c < dets.size(); c++) {
 				PamDataUnit<?, ?> det = dets.get(c);
 				double t = timeSeconds(det);
@@ -211,7 +214,7 @@ public class UKFTracker {
 				}
 				double[] z = track.measurement(t, det.getAmplitudeDB(), bearingOf(det));
 				measCache[r][c] = z;
-				double aff = affinity.affinity(features(track, z, t));
+				double aff = affinity.affinity(associationFeatures(track, z, t, params, prediction));
 				cost[r][c] = aff < params.minAffinity ? FORBIDDEN_COST : -Math.log(aff);
 			}
 		}
@@ -234,14 +237,32 @@ public class UKFTracker {
 	}
 
 	/**
-	 * Build the affinity feature vector for a (track, detection) pairing. Only
-	 * feature 0 (Mahalanobis distance) is used by the default network; the rest
-	 * exist for a trained network.
+	 * Build the affinity feature vector for a (track, detection) pairing. Used by
+	 * both association (here) and by {@code AffinityTrainer} when generating
+	 * training examples, so that the trained network sees exactly the same features
+	 * as inference. Only feature 0 (Mahalanobis distance) is used by the default
+	 * network; the rest exist for a trained network.
+	 *
+	 * @param track  - the candidate track.
+	 * @param z      - the candidate measurement (from {@link ClickTrack#measurement}).
+	 * @param t      - the candidate click's time in seconds.
+	 * @param params - the UKF parameters (for the measurement-noise normalisers).
 	 */
-	private double[] features(ClickTrack track, double[] z, double t) {
+	public static double[] associationFeatures(ClickTrack track, double[] z, double t, UKFParams params) {
+		return associationFeatures(track, z, t, params, track.predictMeasurement());
+	}
+
+	/**
+	 * As {@link #associationFeatures(ClickTrack, double[], double, UKFParams)} but
+	 * against a precomputed {@link UnscentedKalmanFilter.Prediction}, so the
+	 * expensive unscented transform is done once per track rather than once per
+	 * candidate detection.
+	 */
+	public static double[] associationFeatures(ClickTrack track, double[] z, double t, UKFParams params,
+			UnscentedKalmanFilter.Prediction prediction) {
 		double[] f = new double[FEATURE_DIM];
-		f[0] = track.mahalanobis(z);
-		double[] innov = track.getModel().measResidual(z, track.measurementPrediction());
+		f[0] = track.mahalanobis(z, prediction);
+		double[] innov = track.getModel().measResidual(z, prediction.zPred());
 		f[1] = Math.abs(innov[0]) / Math.sqrt(params.iciMeasNoise);
 		if (track.getModel().usesAmplitude()) {
 			f[2] = Math.abs(innov[track.getModel().ampMeasIndex()]) / Math.sqrt(params.ampMeasNoise);
@@ -260,11 +281,11 @@ public class UKFTracker {
 
 	/* -------------------- feature extraction from a data unit -------------------- */
 
-	private static double timeSeconds(PamDataUnit<?, ?> dataUnit) {
+	public static double timeSeconds(PamDataUnit<?, ?> dataUnit) {
 		return dataUnit.getTimeMilliseconds() / 1000.0;
 	}
 
-	private static double bearingOf(PamDataUnit<?, ?> dataUnit) {
+	public static double bearingOf(PamDataUnit<?, ?> dataUnit) {
 		if (dataUnit.getLocalisation() != null && dataUnit.getLocalisation().getAngles() != null
 				&& dataUnit.getLocalisation().getAngles().length > 0) {
 			return dataUnit.getLocalisation().getAngles()[0];

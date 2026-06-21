@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 /**
  * A small multi-layer perceptron used as the learned affinity metric for
@@ -127,6 +129,32 @@ public class AffinityNN implements CTAffinity {
 					"Affinity network input dimension is " + inputDim + " but " + expectedInputDim + " is required");
 		}
 		return new AffinityNN(spec.weights, spec.biases);
+	}
+
+	/**
+	 * Write this network to a JSON file in the {@link #fromFile} format.
+	 */
+	public void writeJson(File file) throws IOException {
+		ObjectMapper mapper = new ObjectMapper();
+		ObjectNode root = mapper.createObjectNode();
+		ArrayNode wNode = root.putArray("weights");
+		for (double[][] layer : weights) {
+			ArrayNode layerNode = wNode.addArray();
+			for (double[] row : layer) {
+				ArrayNode rowNode = layerNode.addArray();
+				for (double v : row) {
+					rowNode.add(v);
+				}
+			}
+		}
+		ArrayNode bNode = root.putArray("biases");
+		for (double[] layer : biases) {
+			ArrayNode layerNode = bNode.addArray();
+			for (double v : layer) {
+				layerNode.add(v);
+			}
+		}
+		mapper.writerWithDefaultPrettyPrinter().writeValue(file, root);
 	}
 
 	/** JSON binding for a custom affinity network file. */

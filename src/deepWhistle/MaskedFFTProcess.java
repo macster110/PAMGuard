@@ -48,6 +48,13 @@ public abstract class MaskedFFTProcess extends PamProcess {
      */
     private PamFFTMask mask = new DummyFFTMask();
 
+    /**
+     * The mask type the current mask was created from. Used to detect when the
+     * user has selected a different mask so the mask is only recreated when
+     * necessary.
+     */
+    private FFTMaskType currentMaskType = null;
+
 
     public MaskedFFTProcess(DeepWhistleControl control) {
         super(control, null);
@@ -225,7 +232,18 @@ public abstract class MaskedFFTProcess extends PamProcess {
                 return t;
             });
         }
-        
+
+        // create the mask based on the selected mask type. Only recreate the mask
+        // if the user has selected a different mask type so we don't needlessly
+        // reload the model.
+        if (params.maskType != null && (this.mask == null || currentMaskType != params.maskType)) {
+            PamFFTMask newMask = params.maskType.createMask(this);
+            if (newMask != null) {
+                setMask(newMask);
+                currentMaskType = params.maskType;
+            }
+        }
+
         //init the mask - this may contain complex model
         boolean mask = this.mask.initMask();
         if (!mask) {

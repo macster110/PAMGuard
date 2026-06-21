@@ -176,14 +176,63 @@ public class UnscentedKalmanFilter {
 	}
 
 	/**
+	 * A reusable snapshot of the current predicted measurement and the inverse of
+	 * its innovation covariance. Computing this involves a full unscented transform
+	 * (sigma points, Cholesky, matrix inversion) but depends only on the track's
+	 * state, not on any candidate detection - so during association it should be
+	 * computed once per track and reused for every candidate detection.
+	 */
+	public static final class Prediction {
+		private final double[] zPred;
+		private final double[][] sInv;
+
+		private Prediction(double[] zPred, double[][] sInv) {
+			this.zPred = zPred;
+			this.sInv = sInv;
+		}
+
+		/** The predicted measurement. */
+		public double[] zPred() {
+			return zPred;
+		}
+	}
+
+	/**
+	 * Compute the predicted measurement and inverse innovation covariance once, for
+	 * reuse against many candidate detections. Does not modify the filter.
+	 */
+	public Prediction predictMeasurement() {
+		double[][] sigmas = sigmaPoints();
+		double[][] zSig = new double[sigmas.length][];
+		for (int i = 0; i < sigmas.length; i++) {
+			zSig[i] = model.h(sigmas[i]);
+		}
+		double[] zMean = model.measMean(zSig, wm);
+		double[][] s = copy(model.measurementNoise());
+		for (int i = 0; i < sigmas.length; i++) {
+			double[] dz = model.measResidual(zSig[i], zMean);
+			addOuter(s, dz, dz, wc[i]);
+		}
+		return new Prediction(zMean, invert(s));
+	}
+
+	/**
+	 * Mahalanobis distance of a candidate measurement against a precomputed
+	 * {@link Prediction} (cheap: just a residual and a quadratic form).
+	 */
+	public double mahalanobis(double[] z, Prediction prediction) {
+		double[] innov = model.measResidual(z, prediction.zPred);
+		return quadratic(innov, prediction.sInv);
+	}
+
+	/**
 	 * Mahalanobis distance (normalised innovation squared) of a candidate
 	 * measurement against the current predicted measurement, without modifying the
-	 * filter.
+	 * filter. Recomputes the prediction each call - prefer
+	 * {@link #mahalanobis(double[], Prediction)} in hot loops.
 	 */
 	public double mahalanobis(double[] z) {
-		double[] innov = model.measResidual(z, predictedMeasurement());
-		double[][] Sinv = invert(predictedMeasurementCov());
-		return quadratic(innov, Sinv);
+		return mahalanobis(z, predictMeasurement());
 	}
 
 	public double[] getState() {

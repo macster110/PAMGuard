@@ -129,13 +129,13 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		detectionProbSlider.setPrefWidth(160);
 		detectionProbSlider.setTooltip(new Tooltip(TIP_DETPROB));
 		grid.add(tipLabel("Detection prob.", TIP_DETPROB), 0, row);
-		grid.add(detectionProbSlider, 1, row);
+		grid.add(labelledSlider(detectionProbSlider, "lenient", "strict"), 1, row);
 		row++;
 
 		PamVBox holder = new PamVBox();
 		holder.setSpacing(8);
 		holder.setPadding(new Insets(10, 0, 0, 0));
-		holder.getChildren().addAll(title, grid, createFeaturePane());
+		holder.getChildren().addAll(title, grid, new javafx.scene.control.Separator(), createFeaturePane());
 
 		return holder;
 	}
@@ -178,13 +178,22 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 	}
 
 	/**
-	 * Wrap a slider with min/max text labels.
+	 * Wrap a slider with min/max text labels and a live numeric value readout.
 	 */
 	private Pane labelledSlider(Slider slider, String minLabel, String maxLabel) {
+		// snap to clean 0.05 steps and give keyboard/scroll a sensible increment.
+		slider.setBlockIncrement(0.05);
+		slider.setMinorTickCount(1);
+		slider.setSnapToTicks(true);
+
+		Label value = new Label();
+		value.setMinWidth(32);
+		value.textProperty().bind(slider.valueProperty().asString("%.2f"));
+
 		PamHBox box = new PamHBox();
 		box.setAlignment(Pos.CENTER_LEFT);
 		box.setSpacing(5);
-		box.getChildren().addAll(new Label(minLabel), slider, new Label(maxLabel));
+		box.getChildren().addAll(new Label(minLabel), slider, new Label(maxLabel), value);
 		return box;
 	}
 

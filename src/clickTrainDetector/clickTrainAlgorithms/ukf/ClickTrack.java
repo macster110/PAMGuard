@@ -64,6 +64,20 @@ public class ClickTrack {
 		return ukf.predictedMeasurement();
 	}
 
+	/**
+	 * Snapshot the predicted measurement and inverse innovation covariance once, to
+	 * be reused (via {@link #mahalanobis(double[], UnscentedKalmanFilter.Prediction)})
+	 * against many candidate detections in the same frame.
+	 */
+	public UnscentedKalmanFilter.Prediction predictMeasurement() {
+		return ukf.predictMeasurement();
+	}
+
+	/** Mahalanobis distance of a candidate against a precomputed prediction. */
+	public double mahalanobis(double[] z, UnscentedKalmanFilter.Prediction prediction) {
+		return ukf.mahalanobis(z, prediction);
+	}
+
 	/** Build a measurement vector for a candidate click. */
 	public double[] measurement(double timeSeconds, double amp, double bearing) {
 		double ici = timeSeconds - lastTimeSeconds;
