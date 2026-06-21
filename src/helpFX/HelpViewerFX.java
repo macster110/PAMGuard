@@ -5,12 +5,14 @@ import java.util.List;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
+import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.image.Image;
@@ -18,8 +20,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import pamViewFX.PamGuiManagerFX;
 import pamViewFX.fxGlyphs.PamGlyphDude;
+import pamViewFX.fxNodes.PamBorderPane;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import pamViewFX.fxStyles.PamStylesManagerFX;
 
 /**
@@ -60,6 +65,12 @@ public class HelpViewerFX extends Stage {
 	private Button backButton;
 	private Button forwardButton;
 
+	/** Toggles the dark / light theme of both the window chrome and the content. */
+	private PamToggleSwitch themeToggle;
+
+	/** Root pane; carries the {@code help-root} (and {@code dark}) style classes. */
+	private VBox rootPane;
+
 	/** All registered module help entries (drives the navigation tree). */
 	private static final List<HelpNavEntry> MODULE_ENTRIES = buildModuleEntries();
 
@@ -81,13 +92,45 @@ public class HelpViewerFX extends Stage {
 
 		contentPane = new MarkdownHelpPane();
 		navTree = buildNavTree();
-		VBox root = buildLayout();
+		rootPane = buildLayout();
 
-		Scene scene = new Scene(root, STAGE_PREF_WIDTH, STAGE_PREF_HEIGHT);
-		scene.getStylesheets().addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());
+		Scene scene = new Scene(rootPane, STAGE_PREF_WIDTH, STAGE_PREF_HEIGHT);
+		
+		java.net.URL css = HelpViewerFX.class.getResource("/helpFX/helpviewer.css");
+		if (css != null) {
+			scene.getStylesheets().addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());	
+		}
+
+		// Dark theme by default (matching the rendered help content).
+		applyTheme(true);
 
 		setScene(scene);
 		navigateToIndex();
+	}
+
+	/**
+	 * Apply the dark or light theme to both the window chrome (via the
+	 * {@code help-root} stylesheet) and the rendered help content.
+	 *
+	 * @param dark {@code true} for dark, {@code false} for light
+	 */
+	private void applyTheme(boolean dark) {
+		if (contentPane != null) {
+			contentPane.setDarkMode(dark);
+		}
+//		if (rootPane != null) {
+//			rootPane.getStyleClass().remove("dark");
+//			if (dark) {
+//				rootPane.getStyleClass().add("dark");
+//			}
+//		}
+		if (themeToggle != null) {
+			themeToggle.setSelected(dark);
+//			themeToggle.setGraphic(PamGlyphDude.createPamIcon(
+//					dark ? "mdi2w-weather-night" : "mdi2w-weather-sunny", 16));
+			themeToggle.setTooltip(new javafx.scene.control.Tooltip(
+					dark ? "Switch to light theme" : "Switch to dark theme"));
+		}
 	}
 
 	// =========================================================================
@@ -145,12 +188,17 @@ public class HelpViewerFX extends Stage {
 		forwardButton.setOnAction(e -> navigateForward());
 
 		Label titleLabel = new Label("PAMGuard Help");
-		titleLabel.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
+		titleLabel.setStyle("-fx-font-size: 16; -fx-font-weight: bold;");
 		HBox.setHgrow(titleLabel, Priority.ALWAYS);
 
+		// Dark / light theme toggle (GitHub-style). Configured by applyTheme().
+		themeToggle = new PamToggleSwitch("Dark Text Mode");
+		themeToggle.selectedProperty().addListener((obs, wasSelected, isSelected) -> applyTheme(isSelected));
+
 		HBox toolbar = new HBox(8, backButton, forwardButton, new Separator(Orientation.VERTICAL), titleLabel);
+		toolbar.setAlignment(Pos.CENTER_LEFT);
 		toolbar.setPadding(new Insets(6, 10, 6, 10));
-		toolbar.setStyle("-fx-background-color: derive(-fx-base, 5%);");
+//		toolbar.getStyleClass().add("help-toolbar");
 
 		// --- Nav tree (left) ---
 		ScrollPane navScroll = new ScrollPane(navTree);
@@ -163,8 +211,14 @@ public class HelpViewerFX extends Stage {
 		SplitPane split = new SplitPane(navScroll, contentPane);
 		split.setDividerPositions(NAV_PREF_WIDTH / STAGE_PREF_WIDTH);
 		VBox.setVgrow(split, Priority.ALWAYS);
+		
+		PamBorderPane splitBorder = new PamBorderPane();
+		splitBorder.setLeft(toolbar);
+		splitBorder.setRight(themeToggle);
 
-		VBox root = new VBox(toolbar, split);
+
+		VBox root = new VBox(splitBorder, split);
+//		root.getStyleClass().add("help-root");
 		VBox.setVgrow(split, Priority.ALWAYS);
 		return root;
 	}

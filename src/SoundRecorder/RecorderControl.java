@@ -75,6 +75,9 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 	// add an X3 file type, for use with Decimus ONLY.  This is a cludge - the correct place would be in the X3 library as a real AudioFileFormat object
     public static final Type X3 = new Type("X3", "x3");
 
+	// SoundTrap .sud file type (X3-compressed audio), written via SudFileStorage / SudAudioOutputStream.
+	public static final Type SUD = new Type("SUD", "sud");
+
 
 	ArrayList<RecorderView> recorderViews = new ArrayList<RecorderView>();
 
@@ -436,7 +439,10 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 	void selectRecorderStorage() {
 		//		AudioFileFormat.Type.
 		if (recorderSettings.getFileType() == AudioFileFormat.Type.WAVE) {
-			recorderStorage = new WavFileStorage(this); 
+			recorderStorage = new WavFileStorage(this);
+		}
+		else if (recorderSettings.getFileType() == SUD) {
+			recorderStorage = new SudFileStorage(this);
 		}
 		else {
 			recorderStorage = new PamAudioFileStorage(this);

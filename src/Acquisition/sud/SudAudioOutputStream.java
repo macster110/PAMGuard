@@ -37,7 +37,7 @@ import org.pamguard.x3.x3.X3FrameEncode;
  * }
  * </pre>
  *
- * @author PAMGuard
+ * @author Jamie Macaulay
  */
 public class SudAudioOutputStream implements Closeable {
 

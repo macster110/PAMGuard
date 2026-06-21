@@ -1,16 +1,10 @@
 package clickDetector.offlineFuncs;
 
-import java.util.ArrayList;
 import java.util.Hashtable;
-import java.util.List;
-
 import clickDetector.ClickDetection;
-import GPS.GpsData;
 import Localiser.detectionGroupLocaliser.GroupDetection;
 import PamController.PamController;
-import PamUtils.PamCalendar;
 import PamView.PamColors;
-import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 
 /**

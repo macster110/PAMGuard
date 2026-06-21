@@ -4,33 +4,52 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 
-import one.jpro.platform.mdfx.MarkdownView;
+import org.commonmark.Extension;
+import org.commonmark.ext.gfm.tables.TablesExtension;
+import org.commonmark.node.Node;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.AttributeProvider;
+import org.commonmark.renderer.html.AttributeProviderContext;
+import org.commonmark.renderer.html.AttributeProviderFactory;
+import org.commonmark.renderer.html.HtmlRenderer;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.w3c.dom.events.Event;
+import org.w3c.dom.events.EventListener;
+import org.w3c.dom.events.EventTarget;
 
-import javafx.scene.Node;
-import javafx.scene.control.ScrollPane;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
+import javafx.concurrent.Worker.State;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-
-import PamView.ColourScheme;
-import PamView.PamColors;
-import pamViewFX.fxStyles.PamStylesManagerFX;
+import javafx.scene.web.WebEngine;
+import javafx.scene.web.WebView;
 
 /**
- * A JavaFX pane that renders a Markdown help file using {@link MarkdownView}
- * from the jpro-mdfx library.
+ * A JavaFX pane that renders a Markdown help file as HTML inside a
+ * {@link WebView}.
  *
- * <p>Markdown files are loaded from the classpath using an absolute path
- * (e.g. {@code /clickDetector/click_detector_help.md}).  The PAMGuard FX
- * stylesheet is applied so the content inherits the current CSA theme.
- * Images referenced relative to the markdown file's package directory are
- * resolved via the classpath.</p>
+ * <p>Markdown is converted to HTML with the <a href=
+ * "https://github.com/commonmark/commonmark-java">commonmark-java</a> library
+ * and wrapped in a GitHub-flavoured stylesheet ({@code github-markdown.css}) so
+ * the rendered help looks like Markdown on GitHub. Using a {@code WebView} means
+ * images scale to the available width (via {@code img &#123;max-width:100%&#125;}
+ * in the CSS), which the previous renderer could not do.</p>
+ *
+ * <p>Markdown files are loaded from the classpath using an absolute path (e.g.
+ * {@code /clickDetector/click_detector_help.md}). Images referenced relative to
+ * the Markdown file's package directory are resolved from the classpath and
+ * embedded directly into the HTML as {@code data:} URIs, so they render
+ * regardless of how PAMGuard is packaged (IDE classes folder or jar). External
+ * {@code http(s)} links open in the system browser rather than navigating the
+ * help pane away from its content.</p>
  *
  * @author PAMGuard team
  */
@@ -39,25 +58,45 @@ public class MarkdownHelpPane extends VBox {
 	/** Classpath root for the help index page (in the helpFX package). */
 	static final String HELP_FX_ROOT = "/helpFX/";
 
-	/** Our custom mdfx variable-override CSS. */
-	private static final String HELPFX_CSS = "/helpFX/helpfx.css";
+	/** GitHub-flavoured stylesheet applied to the rendered HTML. */
+	private static final String GITHUB_CSS = "/helpFX/github-markdown.css";
 
-	private final ScrollPane scrollPane;
-	private PamMarkdownView mdView;
+	private final WebView webView;
+	private final WebEngine engine;
+
+	private final Parser parser;
+	private final HtmlRenderer renderer;
 
 	/** The classpath directory prefix for the currently displayed file, e.g. {@code /rawDeepLearningClassifier/} */
-	private String currentBaseDir = "/helpFX/";
+	private String currentBaseDir = HELP_FX_ROOT;
+
+	/** Cached contents of {@link #GITHUB_CSS}, inlined into every rendered page. */
+	private final String cssText;
+
+	/** Whether the rendered content uses the dark palette. Dark by default. */
+	private boolean darkMode = true;
+
+	/** The most recently rendered body HTML, kept so the theme can be re-applied without re-parsing. */
+	private String lastBodyHtml;
 
 	public MarkdownHelpPane() {
-		scrollPane = new ScrollPane();
-		scrollPane.setFitToWidth(true);
-		scrollPane.setFitToHeight(true);
-		VBox.setVgrow(scrollPane, Priority.ALWAYS);
+		webView = new WebView();
+		engine = webView.getEngine();
+		VBox.setVgrow(webView, Priority.ALWAYS);
+		getChildren().add(webView);
 
-		// Apply PAMGuard dialog CSS to the outer ScrollPane so container colours match the theme
-		applyPamStylesheets(scrollPane);
+		// GitHub-flavoured pipe tables (used by e.g. cpod_help.md).
+		List<Extension> extensions = List.of(TablesExtension.create());
+		parser = Parser.builder().extensions(extensions).build();
+		renderer = HtmlRenderer.builder()
+				.extensions(extensions)
+				.attributeProviderFactory(new ImageAttributeProviderFactory())
+				.build();
 
-		getChildren().add(scrollPane);
+		String css = loadResource(GITHUB_CSS);
+		cssText = (css != null) ? css : "";
+
+		installLinkHandler();
 	}
 
 	/**
@@ -95,154 +134,174 @@ public class MarkdownHelpPane extends VBox {
 			markdownText = "# Help not found\n\nCould not load `" + path + "`.";
 		}
 
-		if (mdView == null) {
-			mdView = new PamMarkdownView(markdownText);
-			mdView.setMaxWidth(Double.MAX_VALUE);
-			scrollPane.setContent(mdView);
-		} else {
-			mdView.setMdString(markdownText);
-		}
-
-		// Apply background / foreground inline style so mdfx picks up the correct
-		// base colours in both day and night mode.
-		applyThemeStyle(mdView);
-
-		scrollPane.setVvalue(0);
+		Node document = parser.parse(markdownText);
+		lastBodyHtml = renderer.render(document);
+		engine.loadContent(buildHtmlDocument(lastBodyHtml));
 	}
 
 	/**
-	 * Apply PAMGuard dialog stylesheets to a node's stylesheet list.
-	 * This is used for the outer ScrollPane container.
+	 * Switch the rendered content between the dark and light palette and re-render
+	 * the current page. The chrome of {@link HelpViewerFX} is themed separately.
+	 *
+	 * @param dark {@code true} for the dark palette, {@code false} for light
 	 */
-	private void applyPamStylesheets(javafx.scene.Node node) {
+	public void setDarkMode(boolean dark) {
+		if (this.darkMode == dark) {
+			return;
+		}
+		this.darkMode = dark;
+		if (lastBodyHtml != null) {
+			engine.loadContent(buildHtmlDocument(lastBodyHtml));
+		}
+	}
+
+	/** @return {@code true} if the content is currently rendered with the dark palette. */
+	public boolean isDarkMode() {
+		return darkMode;
+	}
+
+	// -------------------------------------------------------------------------
+	// HTML assembly
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Wrap rendered Markdown HTML in a full HTML document with the GitHub
+	 * stylesheet inlined. A {@code dark} body class is added in night mode so the
+	 * stylesheet can switch to GitHub's dark palette.
+	 */
+	private String buildHtmlDocument(String bodyHtml) {
+		String bodyClass = darkMode ? "markdown-body dark" : "markdown-body";
+
+		return "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+				+ "<style>\n" + cssText + "\n</style></head>"
+				+ "<body class=\"" + bodyClass + "\">\n" + bodyHtml + "\n</body></html>";
+	}
+
+	// -------------------------------------------------------------------------
+	// Image handling – embed classpath images as data: URIs
+	// -------------------------------------------------------------------------
+
+	private class ImageAttributeProviderFactory implements AttributeProviderFactory {
+		@Override
+		public AttributeProvider create(AttributeProviderContext context) {
+			return new ImageAttributeProvider();
+		}
+	}
+
+	/**
+	 * Rewrites the {@code src} of every {@code <img>} so that classpath-relative
+	 * images are embedded as {@code data:} URIs. Absolute web URLs are left
+	 * untouched.
+	 */
+	private class ImageAttributeProvider implements AttributeProvider {
+		@Override
+		public void setAttributes(Node node, String tagName, Map<String, String> attributes) {
+			if (!"img".equals(tagName)) {
+				return;
+			}
+			String dataUri = resolveImageToDataUri(attributes.get("src"));
+			if (dataUri != null) {
+				attributes.put("src", dataUri);
+			}
+		}
+	}
+
+	/**
+	 * Resolve an image {@code src} to a {@code data:} URI by reading it from the
+	 * classpath. Returns {@code null} (leaving the original {@code src} in place)
+	 * for absolute web URLs or when the resource cannot be found.
+	 */
+	private String resolveImageToDataUri(String src) {
+		if (src == null || src.isEmpty()) {
+			return null;
+		}
+		if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) {
+			return null; // keep original src
+		}
+		URL url = src.startsWith("/")
+				? MarkdownHelpPane.class.getResource(src)
+				: MarkdownHelpPane.class.getResource(currentBaseDir + src);
+		if (url == null) {
+			return null;
+		}
+		try (InputStream is = url.openStream()) {
+			byte[] bytes = is.readAllBytes();
+			return "data:" + guessMimeType(src) + ";base64," + Base64.getEncoder().encodeToString(bytes);
+		} catch (IOException e) {
+			return null;
+		}
+	}
+
+	private static String guessMimeType(String name) {
+		String n = name.toLowerCase();
+		if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
+		if (n.endsWith(".gif")) return "image/gif";
+		if (n.endsWith(".svg")) return "image/svg+xml";
+		if (n.endsWith(".bmp")) return "image/bmp";
+		if (n.endsWith(".webp")) return "image/webp";
+		return "image/png";
+	}
+
+	// -------------------------------------------------------------------------
+	// Link handling – open external links in the system browser
+	// -------------------------------------------------------------------------
+
+	/**
+	 * After each page load, attach a click listener to every {@code <a>} so that
+	 * external links open in the system browser and other links do not blank the
+	 * page (the WebView has no document base for relative navigation).
+	 */
+	private void installLinkHandler() {
+		engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
+			if (newState != State.SUCCEEDED) {
+				return;
+			}
+			Document doc = engine.getDocument();
+			if (doc == null) {
+				return;
+			}
+			NodeList anchors = doc.getElementsByTagName("a");
+			for (int i = 0; i < anchors.getLength(); i++) {
+				if (anchors.item(i) instanceof EventTarget) {
+					((EventTarget) anchors.item(i)).addEventListener("click", linkListener, false);
+				}
+			}
+		});
+	}
+
+	private final EventListener linkListener = new EventListener() {
+		@Override
+		public void handleEvent(Event ev) {
+			EventTarget target = ev.getCurrentTarget();
+			if (!(target instanceof Element)) {
+				return;
+			}
+			String href = ((Element) target).getAttribute("href");
+			if (href == null || href.isEmpty() || href.startsWith("#")) {
+				// allow normal in-page anchor scrolling
+				return;
+			}
+			// Do not let the WebView navigate away from the help content.
+			ev.preventDefault();
+			if (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:")) {
+				openInBrowser(href);
+			}
+		}
+	};
+
+	/** Open a URL in the system default browser, off the JavaFX thread. */
+	private static void openInBrowser(String url) {
 		try {
-			PamStylesManagerFX sm = PamStylesManagerFX.getPamStylesManagerFX();
-			if (sm != null && sm.getCurStyle() != null) {
-				List<String> css = sm.getCurStyle().getDialogCSS();
-				if (css != null) {
-					if (node instanceof javafx.scene.Parent) {
-						((javafx.scene.Parent) node).getStylesheets().addAll(css);
+			if (java.awt.Desktop.isDesktopSupported()
+					&& java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
+				new Thread(() -> {
+					try {
+						java.awt.Desktop.getDesktop().browse(new URI(url));
+					} catch (Exception ignored) {
 					}
-				}
+				}, "help-open-browser").start();
 			}
 		} catch (Exception ignored) {
-		}
-	}
-
-	/**
-	 * Set an inline style on the MarkdownView so that {@code -fx-base} and
-	 * {@code -fx-text-base-color} resolve to the correct values for the
-	 * current day/night colour scheme.  The {@code helpfx.css} stylesheet then
-	 * maps these to the {@code -mdfx-*} variables used internally by mdfx.
-	 */
-	private void applyThemeStyle(PamMarkdownView view) {
-		boolean isNight = false;
-		try {
-			isNight = ColourScheme.NIGHTSCHEME.equals(
-					PamColors.getInstance().getColourScheme().getName());
-		} catch (Exception ignored) {
-		}
-
-		if (isNight) {
-			// Dark background, light text
-			view.setStyle(
-				"-fx-base: #2b2b2b;" +
-				"-fx-background: #2b2b2b;" +
-				"-fx-text-base-color: #e0e0e0;" +
-				"-fx-background-color: #2b2b2b;"
-			);
-		} else {
-			// Light background, dark text (PAMGuard default: rgb(240,240,240))
-			view.setStyle(
-				"-fx-base: #f0f0f0;" +
-				"-fx-background: #f0f0f0;" +
-				"-fx-text-base-color: #1a1a1a;" +
-				"-fx-background-color: #f0f0f0;"
-			);
-		}
-	}
-
-	// -------------------------------------------------------------------------
-	// Inner subclass that fixes CSS injection and image loading
-	// -------------------------------------------------------------------------
-
-	/**
-	 * Subclass of {@link MarkdownView} that:
-	 * <ul>
-	 *   <li>Injects the {@code helpfx.css} stylesheet (overrides mdfx colour variables)
-	 *       via {@link #getDefaultStylesheets()}</li>
-	 *   <li>Loads relative image paths from the classpath via {@link #generateImage(String)}</li>
-	 * </ul>
-	 */
-	private class PamMarkdownView extends MarkdownView {
-
-		PamMarkdownView(String mdString) {
-			super(mdString);
-			getStyleClass().add("markdown-view");
-		}
-
-		/**
-		 * Called by mdfx once in the constructor to build the full stylesheet list.
-		 * We return the mdfx defaults PLUS our {@code helpfx.css} which overrides
-		 * the {@code -mdfx-*} colour variables to use PAMGuard's CSS inherited values.
-		 */
-		@Override
-		protected List<String> getDefaultStylesheets() {
-			List<String> sheets = new ArrayList<>(super.getDefaultStylesheets());
-			URL css = MarkdownHelpPane.class.getResource(HELPFX_CSS);
-			if (css != null) {
-				sheets.add(css.toExternalForm());
-			}
-			return sheets;
-		}
-
-		/**
-		 * Called by mdfx for every {@code ![alt](src)} Markdown image tag.
-		 * Resolves {@code src} as a classpath resource relative to the directory
-		 * of the currently loaded {@code .md} file.
-		 */
-		@Override
-		public Node generateImage(String src) {
-			URL url = resolveUrl(src);
-
-			if (url != null) {
-				try {
-					ImageView iv = new ImageView(new Image(url.toExternalForm(), true));
-					iv.setPreserveRatio(true);
-					// Bind width to the view so images scale with the pane
-					iv.fitWidthProperty().bind(widthProperty().subtract(32));
-					iv.setSmooth(true);
-					return iv;
-				} catch (Exception ignored) {
-				}
-			}
-
-			// Fallback to mdfx default behaviour
-			return super.generateImage(src);
-		}
-
-		/**
-		 * Resolve an image {@code src} to a classpath URL.
-		 * Resolution order:
-		 * <ol>
-		 *   <li>Absolute URL (http/https/file)</li>
-		 *   <li>Absolute classpath path (starts with {@code /})</li>
-		 *   <li>Relative to {@link #currentBaseDir} (e.g. {@code resources/foo.png}
-		 *       resolved against {@code /rawDeepLearningClassifier/})</li>
-		 * </ol>
-		 */
-		private URL resolveUrl(String src) {
-			if (src == null || src.isEmpty()) return null;
-			try {
-				// 1. Absolute HTTP/file URL
-				if (src.contains("://")) return new URL(src);
-				// 2. Absolute classpath path
-				if (src.startsWith("/")) return MarkdownHelpPane.class.getResource(src);
-				// 3. Relative to the current markdown file's package directory
-				return MarkdownHelpPane.class.getResource(currentBaseDir + src);
-			} catch (Exception e) {
-				return null;
-			}
 		}
 	}
 
