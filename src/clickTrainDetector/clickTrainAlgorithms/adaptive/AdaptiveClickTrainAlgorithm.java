@@ -43,7 +43,7 @@ import clickTrainDetector.localisation.CTLocalisation;
  */
 public class AdaptiveClickTrainAlgorithm implements ClickTrainAlgorithm, PamSettings {
 
-	public static final String ADAPTIVE_NAME = "Adaptive detector";
+	public static final String ADAPTIVE_NAME = "Adaptive MHT detector";
 
 	/**
 	 * The time in millis between updates of the active (unconfirmed) click trains.
