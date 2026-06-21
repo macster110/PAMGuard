@@ -631,7 +631,7 @@ public class SegmenterProcess extends PamProcess {
 				//				System.out.println(": " + Math.abs(currentRawChunks[i].getTimeMilliseconds()  - timeMilliseconds) + " : " +  1000*currentRawChunks[i].getRawDataPointer()[0]/this.getSampleRate()); 
 
 				//current time milliseconds is referenced from the first chunk with samples added. But, this can mean, especially for long period of times and multiple 
-				//chunks that things get a bit out of sync. So make a quick check to ensure that time millis is roughly correct. If not then fix. 
+				//chunks that things get a bit out of sync. So make a quick check to ensure that time millis is roughly correct. If not then fix.
 				//Note: this is no longer needed because PAMGuard now updates the time in millis at the start of each file. This was causing issues with low samplerate data 
 				//where the time drift was consistently more than the threshold.
 //				if (Math.abs(((double) currentRawChunks[i].getTimeMilliseconds() + 1000.*currentRawChunks[i].getRawDataPointer()[0]/this.getSampleRate()) - timeMilliseconds)>MAX_MILLIS_DRIFT) {
