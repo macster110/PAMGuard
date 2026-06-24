@@ -110,6 +110,10 @@ public class MaskedFFTSettingsPane extends DynamicSettingsPane<MaskedFFTParamter
 		sourcePane.addSelectionListener((obsVal, newVal, oldVal) -> {
 			//update the frequency resolution pane.
 			resolutionPane.setParams((FFTDataBlock) sourcePane.getSource());
+			//let the mask pane re-validate against the new source.
+			if (currentMaskPane != null) {
+				currentMaskPane.setFFTSource(getSelectedFFTSource());
+			}
 		});
 
 		vBox.getChildren().add(sourcePane);
@@ -187,10 +191,23 @@ public class MaskedFFTSettingsPane extends DynamicSettingsPane<MaskedFFTParamter
     		if (params != null) {
     			currentMaskPane.setParams(params);
     		}
+    		currentMaskPane.setFFTSource(getSelectedFFTSource());
     	}
     	else {
     		maskPaneHolder.setCenter(null);
     	}
+    }
+
+    /**
+     * Get the currently selected FFT data source, or null if none / not an FFT block.
+     *
+     * @return the selected FFT data block.
+     */
+    private FFTDataBlock getSelectedFFTSource() {
+    	if (sourcePane.getSource() instanceof FFTDataBlock) {
+    		return (FFTDataBlock) sourcePane.getSource();
+    	}
+    	return null;
     }
 
     /**

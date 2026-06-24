@@ -30,6 +30,13 @@ import ai.djl.translate.TranslateException;
 import fftManager.FFTDataBlock;
 import fftManager.FFTDataUnit;
 
+
+/**
+ * 
+ * Implements the DeepWhistle model as a PAMGuard FFT mask. The model is downloaded from the PAMGuard deeplearningmodels GitHub repository
+ * 
+ * @author Jamie Macaulay
+ */
 public class DeepWhistleMask implements PamFFTMask {
 
 	/**
@@ -383,8 +390,17 @@ public class DeepWhistleMask implements PamFFTMask {
 		
 		//transform the batch of FFT data units into the model input format
 		FreqTransform freqTransform = transformFFTBatch(batch);
-		
-		double[] freqLimits=freqTransform.getFreqlims(); 
+
+		double[] freqLimits=freqTransform.getFreqlims();
+
+		//The SPECFREQTRIM transform reports the *requested* frequency range (the model's
+		//nominal 5-50 kHz) rather than the range actually kept. When the Nyquist frequency
+		//is below the requested maximum (e.g. a 48 kHz file, Nyquist 24 kHz) the spectrogram
+		//- and therefore the mask - only spans up to Nyquist. If we don't clamp the upper
+		//limit here the mask is mapped to the wrong FFT bins (the whistles end up outside the
+		//masked regions). See getMaskValueForBin which uses these limits.
+		double nyquist = maksedFFTProcess.getInputFFTData().getSampleRate() / 2.0;
+		freqLimits = new double[] { freqLimits[0], Math.min(freqLimits[1], nyquist) };
 
 		float[][] dataF =  DLUtils.toFloatArray(freqTransform.getSpecTransfrom().getTransformedData());
 

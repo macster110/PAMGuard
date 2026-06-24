@@ -1,5 +1,6 @@
 package deepWhistle;
 
+import fftManager.FFTDataBlock;
 import javafx.scene.layout.Pane;
 
 /**
@@ -32,5 +33,17 @@ public abstract class FFTMaskSettingsPane {
 	 * @param params - the parameters to update.
 	 */
 	public abstract void getParams(MaskedFFTParamters params);
+
+	/**
+	 * Notify the pane of the currently selected FFT data source. Masks can use
+	 * this to check that the source is configured correctly for the model (e.g.
+	 * the correct FFT length and hop) and warn / offer to fix it. The default
+	 * implementation does nothing.
+	 *
+	 * @param fftSource - the selected FFT data source, or null if none.
+	 */
+	public void setFFTSource(FFTDataBlock fftSource) {
+		// default: no-op
+	}
 
 }
