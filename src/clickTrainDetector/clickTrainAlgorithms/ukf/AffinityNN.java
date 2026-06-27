@@ -54,6 +54,41 @@ public class AffinityNN implements CTAffinity {
 		return weights[0][0].length;
 	}
 
+	/**
+	 * The number of layers (hidden layers plus the output layer).
+	 */
+	public int numLayers() {
+		return weights.length;
+	}
+
+	/**
+	 * The output size (number of nodes) of each layer, in order. The last entry is
+	 * the network's output dimension.
+	 */
+	public int[] layerOutputSizes() {
+		int[] sizes = new int[weights.length];
+		for (int i = 0; i < weights.length; i++) {
+			sizes[i] = weights[i].length;
+		}
+		return sizes;
+	}
+
+	/**
+	 * The total number of trainable parameters (all weights plus all biases).
+	 */
+	public int numParameters() {
+		int n = 0;
+		for (double[][] layer : weights) {
+			for (double[] row : layer) {
+				n += row.length;
+			}
+		}
+		for (double[] layer : biases) {
+			n += layer.length;
+		}
+		return n;
+	}
+
 	@Override
 	public double affinity(double[] features) {
 		double[] activations = features;

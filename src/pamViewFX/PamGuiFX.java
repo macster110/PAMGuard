@@ -407,7 +407,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 	 */
 	public DataModelPaneFX addDataModelTab() {
 		
-		PamGuiTabFX newTab = new PamGuiTabFX(new TabInfo("Data Model"), this);
+		PamGuiTabFX newTab = new PamGuiTabFX(new TabInfo(TabInfo.DATA_MODEL_TAB_NAME), this);
 		
         newTab.setClosable(false); //can't close a data model
         newTab.setDetachable(false);

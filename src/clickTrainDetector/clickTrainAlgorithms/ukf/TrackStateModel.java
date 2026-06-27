@@ -166,7 +166,7 @@ public class TrackStateModel implements UKFModel {
 			r[ampMeas][ampMeas] = params.ampMeasNoise;
 		}
 		if (useBearing) {
-			r[bearingMeas][bearingMeas] = params.bearingMeasNoise;
+			r[bearingMeas][bearingMeas] = params.bearingMeasNoiseRad2();
 		}
 		return r;
 	}

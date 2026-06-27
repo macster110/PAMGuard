@@ -202,17 +202,39 @@ public class AdaptiveClickTrainAlgorithm implements ClickTrainAlgorithm, PamSett
 				}
 				TrackDataUnits trackUnits = MHTClickTrainAlgorithm.getTrackDataUnits(mhtKernel,
 						trackBitSet.trackBitSet, mhtKernel.getKCount());
-				trackUnits.chi2Value = trackBitSet.chi2Track.getChi2();
+				// note: chi2Track.getChi2() is the kernel's log-likelihood-ratio selection
+				// score, which is intentionally negative for long consistent trains. Store the
+				// non-negative mean chi^2 consistency metric on the click train instead.
+				CTAlgorithmInfo algorithmInfo = trackBitSet.chi2Track.getMHTChi2Info();
+				trackUnits.chi2Value = consistencyChi2(algorithmInfo);
 				if (Double.isNaN(trackUnits.chi2Value)) {
 					trackUnits.chi2Value = 0.1;
 				}
-				saveClickTrain(trackUnits, trackBitSet.chi2Track.getMHTChi2Info());
+				saveClickTrain(trackUnits, algorithmInfo);
 			}
 		} catch (Exception e) {
 			System.out.printf("Handled AdaptiveClickTrainAlgorithm Exception %s in grabDoneTrains: %s\n",
 					e.getClass().getSimpleName(), e.getMessage());
 		}
 		mhtKernel.clearConfirmedTracks();
+	}
+
+	/**
+	 * The chi^2 consistency metric to report for a click train. This is the
+	 * non-negative mean Huber chi^2 per click per feature (the value shown as
+	 * "Mean X²" in the info panel), <i>not</i> the kernel's internal
+	 * log-likelihood-ratio selection score returned by
+	 * {@link clickTrainDetector.clickTrainAlgorithms.mht.MHTChi2#getChi2()}, which is
+	 * intentionally negative for long, consistent trains.
+	 *
+	 * @param algorithmInfo - the info produced by the track's chi^2 calculator.
+	 * @return the non-negative chi^2 consistency metric.
+	 */
+	private static double consistencyChi2(CTAlgorithmInfo algorithmInfo) {
+		if (algorithmInfo instanceof AdaptiveCTInfo) {
+			return ((AdaptiveCTInfo) algorithmInfo).getMeanChi2();
+		}
+		return Double.NaN;
 	}
 
 	/**
@@ -259,7 +281,7 @@ public class AdaptiveClickTrainAlgorithm implements ClickTrainAlgorithm, PamSett
 			}
 			TempCTDataUnit tempDataUnit = new TempCTDataUnit(trackUnits.dataUnits.get(0).getTimeMilliseconds(),
 					trackUnits.dataUnits);
-			tempDataUnit.setCTChi2(trackBitSet.chi2Track.getChi2());
+			tempDataUnit.setCTChi2(consistencyChi2(trackBitSet.chi2Track.getMHTChi2Info()));
 			clickTrainControl.getClickTrainProcess().getUnconfirmedCTDataBlock().addPamData(tempDataUnit);
 			tempDataUnit.setLocalisation(
 					new CTLocalisation(tempDataUnit, null, clickTrainControl.getClickTrainParams().ctLocParams));

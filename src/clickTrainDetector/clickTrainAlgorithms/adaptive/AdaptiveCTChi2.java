@@ -49,11 +49,6 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 	private static final double AMP_FLOOR_DB = 2.5;
 
 	/**
-	 * Minimum residual scale ("floor") for bearing, in degrees, at sensitivity 0.5.
-	 */
-	private static final double BEARING_FLOOR_DEG = 3.0;
-
-	/**
 	 * Scale (at sensitivity 0.5) for the waveform-correlation penalty. Correlation is
 	 * an absolute cue: a genuine train has consistently high consecutive correlation,
 	 * so the penalty is based on -log(correlation) rather than a self-calibrated
@@ -198,7 +193,7 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 				if (bearing != null) {
 					Double b = getBearing(newDataUnit);
 					if (b != null) {
-						double c = bearing.score(b, floorMult * Math.toRadians(BEARING_FLOOR_DEG));
+						double c = bearing.score(b, floorMult * Math.toRadians(params.bearingFloorDeg));
 						if (!Double.isNaN(c)) {
 							clickHuber += c;
 							clickFeatures++;
@@ -235,7 +230,7 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 				if (bearing != null) {
 					Double b = getBearing(newDataUnit);
 					if (b != null) {
-						bearing.score(b, floorMult * Math.toRadians(BEARING_FLOOR_DEG));
+						bearing.score(b, floorMult * Math.toRadians(params.bearingFloorDeg));
 					}
 				}
 				// ICI and correlation both need a previous included click - nothing to seed.

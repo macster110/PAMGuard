@@ -4,14 +4,20 @@ import PamController.SettingsPane;
 import PamDetection.LocContents;
 import PamguardMVC.PamDataBlock;
 import clickTrainDetector.ClickTrainControl;
+import clickTrainDetector.clickTrainAlgorithms.ukf.AffinityNN;
 import clickTrainDetector.clickTrainAlgorithms.ukf.UKFClickTrainAlgorithm;
 import clickTrainDetector.clickTrainAlgorithms.ukf.UKFParams;
+import clickTrainDetector.clickTrainAlgorithms.ukf.UKFTracker;
+import clickTrainDetector.clickTrainAlgorithms.ukf.DefaultUKFParams;
+import clickTrainDetector.clickTrainAlgorithms.ukf.DefaultUKFParams.DefaultUKFSpecies;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import java.io.File;
 
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
@@ -43,6 +49,7 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 
 	private PamToggleSwitch useAmplitude;
 	private PamToggleSwitch useBearing;
+	private PamSpinner<Double> bearingFloorSpinner;
 	private PamSpinner<Double> maxICISpinner;
 	private PamSpinner<Double> frameDurationSpinner;
 	private PamSpinner<Integer> maxCoastSpinner;
@@ -51,6 +58,7 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 	private PamSpinner<Double> confidenceAmplitudeSpinner;
 	private PamToggleSwitch useCustomAffinity;
 	private TextField affinityFileField;
+	private Label affinityInfoLabel;
 	private PamButton affinityBrowseButton;
 	private PamButton trainNetworkButton;
 	private PamFlipPane flipPane;
@@ -59,6 +67,10 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 	private static final String TIP_AMPLITUDE = "Track amplitude consistency (in addition to ICI).";
 	private static final String TIP_BEARING =
 			"Track bearing consistency. Available only for multi-channel data that provides a bearing.";
+	private static final String TIP_BEARING_FLOOR =
+			"The minimum bearing jump (degrees) tolerated between clicks - the bearing measurement-noise\n"
+					+ "floor. Bearings are normally smooth, so keep this small. Raise it for species with noisy\n"
+					+ "bearings (e.g. harbour porpoise, whose narrowband clicks give poor bearing measurements).";
 	private static final String TIP_MAXICI =
 			"The absolute maximum inter-click interval allowed within a click train (seconds).";
 	private static final String TIP_FRAME =
@@ -147,8 +159,30 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		holder.setPadding(new Insets(10, 0, 0, 0));
 		holder.getChildren().addAll(title, grid, new javafx.scene.control.Separator(), createFeaturePane(),
 				new javafx.scene.control.Separator(), createTwoStagePane(), new javafx.scene.control.Separator(),
-				createAffinityPane());
+				createAffinityPane(), new javafx.scene.control.Separator(), createDefaultSpeciesPane());
 		return holder;
+	}
+
+	/**
+	 * Create a pane allowing the user to load default settings, optionally tuned for
+	 * a particular species.
+	 * @return pane for selecting default species settings.
+	 */
+	private Pane createDefaultSpeciesPane() {
+		MenuButton speciesChoiceBox = new MenuButton("Select Species");
+		for (DefaultUKFSpecies species : DefaultUKFSpecies.values()) {
+			MenuItem menuItem = new MenuItem(DefaultUKFParams.getDefaultSpeciesName(species));
+			menuItem.setOnAction(action -> setParams(DefaultUKFParams.getDefaultUKFParams(species,
+					ukfClickTrainAlgorithm.getClickTrainControl().getParentDataBlock())));
+			speciesChoiceBox.getItems().add(menuItem);
+		}
+
+		PamHBox box = new PamHBox();
+		box.setSpacing(5);
+		box.setAlignment(Pos.CENTER_RIGHT);
+		box.setPadding(new Insets(5, 0, 0, 0));
+		box.getChildren().addAll(new Label("Optimise for Species"), speciesChoiceBox);
+		return box;
 	}
 
 	private Pane createAffinityPane() {
@@ -171,6 +205,14 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		fileBox.setSpacing(5);
 		fileBox.getChildren().addAll(affinityFileField, affinityBrowseButton);
 
+		// summary feedback on the network that is (or would be) used.
+		affinityInfoLabel = new Label();
+		affinityInfoLabel.setWrapText(true);
+		affinityInfoLabel.setFont(Font.font(null, 10));
+		affinityInfoLabel.setPadding(new Insets(0, 0, 0, 5));
+		// refresh the summary whenever the file path changes.
+		affinityFileField.textProperty().addListener((o, ov, nv) -> updateAffinityInfo());
+
 		// the action is wired in the constructor, once the flip pane exists.
 		trainNetworkButton = new PamButton("Train affinity network…");
 		trainNetworkButton.setTooltip(new Tooltip(
@@ -179,8 +221,39 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		PamVBox box = new PamVBox();
 		box.setSpacing(5);
 		box.setPadding(new javafx.geometry.Insets(5, 0, 0, 0));
-		box.getChildren().addAll(label, useCustomAffinity, fileBox, trainNetworkButton);
+		box.getChildren().addAll(label, useCustomAffinity, fileBox, affinityInfoLabel, trainNetworkButton);
 		return box;
+	}
+
+	/**
+	 * Update the summary label below the file field with information about the
+	 * network that will be used: the built-in default, or the custom network loaded
+	 * from the selected file (or an error if it cannot be loaded).
+	 */
+	private void updateAffinityInfo() {
+		if (affinityInfoLabel == null) {
+			return;
+		}
+		String path = affinityFileField.getText() == null ? "" : affinityFileField.getText().trim();
+		if (!useCustomAffinity.isSelected() || path.isEmpty()) {
+			affinityInfoLabel.setStyle("");
+			affinityInfoLabel.setText("Using the built-in default (Gaussian-gating) network.");
+			return;
+		}
+		try {
+			AffinityNN network = AffinityNN.fromFile(new File(path), UKFTracker.FEATURE_DIM);
+			int[] sizes = network.layerOutputSizes();
+			StringBuilder arch = new StringBuilder().append(network.inputDim());
+			for (int size : sizes) {
+				arch.append(" → ").append(size);
+			}
+			affinityInfoLabel.setStyle("");
+			affinityInfoLabel.setText(String.format("Loaded network: %s  (%d layer%s, %d parameters)", arch.toString(),
+					network.numLayers(), network.numLayers() == 1 ? "" : "s", network.numParameters()));
+		} catch (Exception e) {
+			affinityInfoLabel.setStyle("-fx-text-fill: red;");
+			affinityInfoLabel.setText("Could not load network: " + e.getMessage());
+		}
 	}
 
 	private void browseForNetwork() {
@@ -202,6 +275,7 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 	private void enableAffinityControls(boolean useCustom) {
 		affinityFileField.setDisable(!useCustom);
 		affinityBrowseButton.setDisable(!useCustom);
+		updateAffinityInfo();
 	}
 
 	private Pane createFeaturePane() {
@@ -216,10 +290,21 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		useBearing = new PamToggleSwitch("Bearing");
 		useBearing.setTooltip(new Tooltip(TIP_BEARING));
 
+		bearingFloorSpinner = doubleSpinner(0.0, 180.0, 3.0, 0.5);
+		bearingFloorSpinner.setTooltip(new Tooltip(TIP_BEARING_FLOOR));
+		PamHBox bearingFloorBox = new PamHBox();
+		bearingFloorBox.setAlignment(Pos.CENTER_LEFT);
+		bearingFloorBox.setSpacing(5);
+		bearingFloorBox.setPadding(new Insets(0, 0, 0, 20));
+		bearingFloorBox.getChildren().addAll(tipLabel("Bearing jump floor", TIP_BEARING_FLOOR), bearingFloorSpinner,
+				new Label("°"));
+		// the floor only applies when bearing tracking is on.
+		useBearing.selectedProperty().addListener((o, ov, nv) -> bearingFloorSpinner.setDisable(!nv));
+
 		PamVBox box = new PamVBox();
 		box.setSpacing(5);
 		box.setPadding(new Insets(5, 0, 0, 0));
-		box.getChildren().addAll(label, iciLabel, useAmplitude, useBearing);
+		box.getChildren().addAll(label, iciLabel, useAmplitude, useBearing, bearingFloorBox);
 		return box;
 	}
 
@@ -285,6 +370,7 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		boolean bearingAvailable = block != null && block.getLocalisationContents() != null
 				&& block.getLocalisationContents().hasLocContent(LocContents.HAS_BEARING);
 		useBearing.setDisable(!bearingAvailable);
+		bearingFloorSpinner.setDisable(!bearingAvailable || !useBearing.isSelected());
 	}
 
 	@Override
@@ -292,6 +378,7 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		UKFParams params = currParams.clone();
 		params.useAmplitude = useAmplitude.isSelected();
 		params.useBearing = useBearing.isSelected();
+		params.bearingFloorDeg = bearingFloorSpinner.getValue();
 		params.maxICI = maxICISpinner.getValue();
 		params.frameDuration = frameDurationSpinner.getValue();
 		params.maxCoast = maxCoastSpinner.getValue();
@@ -309,6 +396,7 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 	public void setParams(UKFParams input) {
 		useAmplitude.setSelected(input.useAmplitude);
 		useBearing.setSelected(input.useBearing);
+		bearingFloorSpinner.getValueFactory().setValue(input.bearingFloorDeg);
 		maxICISpinner.getValueFactory().setValue(input.maxICI);
 		frameDurationSpinner.getValueFactory().setValue(input.frameDuration);
 		maxCoastSpinner.getValueFactory().setValue(input.maxCoast);

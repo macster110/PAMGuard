@@ -14,6 +14,7 @@ import clickTrainDetector.CTDataUnit;
 import clickTrainDetector.ClickTrainControl;
 import clickTrainDetector.clickTrainAlgorithms.CTAlgorithmInfoLogging;
 import clickTrainDetector.clickTrainAlgorithms.ClickTrainAlgorithm;
+import clickTrainDetector.clickTrainAlgorithms.mht.StandardMHTChi2;
 import clickTrainDetector.layout.CTDetectorGraphics;
 import clickTrainDetector.layout.ukf.UKFCTGraphics;
 
@@ -160,7 +161,16 @@ public class UKFClickTrainAlgorithm implements ClickTrainAlgorithm, PamSettings 
 		CTDataUnit dataUnit = new CTDataUnit(clicks.get(0).getTimeMilliseconds());
 		dataUnit.addSubDetections(clicks);
 		dataUnit.setCTAlgorithmInfo(new UKFCTInfo(track.expectedICI(), track.size(), featureNames(track.getModel())));
-		dataUnit.setCTChi2(0.0);
+
+		// assign a chi^2 quality metric using the same calculation as the MHT and
+		// adaptive algorithms, so the value is comparable across detectors.
+		double chi2 = StandardMHTChi2.calcTrackChi2(clicks, track.getModel().usesAmplitude(),
+				track.getModel().usesBearing());
+		if (Double.isNaN(chi2)) {
+			chi2 = 0.1;
+		}
+		dataUnit.setCTChi2(chi2);
+
 		clickTrainControl.getClickTrainDataBlock().addPamData(dataUnit);
 	}
 

@@ -268,7 +268,7 @@ public class UKFTracker {
 			f[2] = Math.abs(innov[track.getModel().ampMeasIndex()]) / Math.sqrt(params.ampMeasNoise);
 		}
 		if (track.getModel().usesBearing()) {
-			f[3] = Math.abs(innov[track.getModel().bearingMeasIndex()]) / Math.sqrt(params.bearingMeasNoise);
+			f[3] = Math.abs(innov[track.getModel().bearingMeasIndex()]) / Math.toRadians(params.bearingFloorDeg);
 		}
 		f[4] = (t - track.getLastTimeSeconds()) / Math.max(track.expectedICI(), 1e-3);
 		return f;

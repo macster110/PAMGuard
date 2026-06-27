@@ -2,7 +2,12 @@ package pamViewFX;
 
 import java.util.ArrayList;
 
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Tab;
+import javafx.scene.control.TextField;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.stage.Stage;
@@ -117,8 +122,109 @@ public class PamGuiTabFX extends PamTabFX {
 		if (newContent!=null) addInternalPane(newContent);
 		
 		super.setContent(contentHolder);
-		
+
 		setPanesEditable(editable);
+
+		//allow the user to right-click the tab header to rename it.
+		setupRenameContextMenu();
+	}
+
+	/**
+	 * Add a context menu to the tab header which allows the user to rename the
+	 * tab by right-clicking on it.
+	 */
+	private void setupRenameContextMenu() {
+		Label label = getLabel();
+		if (label == null) return;
+
+		ContextMenu contextMenu = new ContextMenu();
+		MenuItem renameItem = new MenuItem("Rename tab...");
+		renameItem.setOnAction(e -> startRename());
+		contextMenu.getItems().add(renameItem);
+
+		label.setOnContextMenuRequested(e -> {
+			contextMenu.show(label, e.getScreenX(), e.getScreenY());
+			e.consume();
+		});
+
+		//also allow a double-click to start renaming.
+		label.setOnMouseClicked(e -> {
+			if (e.getClickCount() == 2) {
+				startRename();
+				e.consume();
+			}
+		});
+	}
+
+	/**
+	 * Begin an inline rename of the tab. The tab header label is temporarily
+	 * replaced with a text field. The new name is committed when the user
+	 * presses Enter or the field loses focus, and cancelled with Escape.
+	 */
+	public void startRename() {
+		Label label = getLabel();
+		if (label == null) return;
+
+		TextField textField = new TextField(getName());
+		textField.setPrefWidth(Math.max(80, label.getWidth() + 20));
+
+		//guard so the name is only committed once (Enter then focus-loss would otherwise fire twice).
+		final boolean[] committed = {false};
+
+		Runnable finish = () -> {
+			if (committed[0]) return;
+			committed[0] = true;
+			String newName = textField.getText() == null ? "" : textField.getText().trim();
+			//restore the label as the tab graphic.
+			setGraphic(label);
+			if (!newName.isEmpty() && !newName.equals(getName())) {
+				renameTab(newName);
+			}
+		};
+
+		textField.setOnAction(e -> finish.run());
+		textField.focusedProperty().addListener((obs, wasFocused, isFocused) -> {
+			if (!isFocused) finish.run();
+		});
+		textField.setOnKeyPressed(e -> {
+			if (e.getCode() == KeyCode.ESCAPE) {
+				//cancel: restore the label without renaming.
+				committed[0] = true;
+				setGraphic(label);
+				e.consume();
+			}
+		});
+
+		setGraphic(textField);
+		textField.selectAll();
+		textField.requestFocus();
+	}
+
+	/**
+	 * Rename the tab. Updates the visible header text, the stored {@link TabInfo}
+	 * and the tab name referenced by any user displays held in this tab so that
+	 * the display-to-tab association is preserved when settings are saved and
+	 * restored.
+	 * @param newName - the new tab name.
+	 */
+	public void renameTab(String newName) {
+		if (newName == null || newName.trim().isEmpty()) return;
+		newName = newName.trim();
+
+		//update the visible label and drag text.
+		setLabelText(newName);
+
+		//update the stored tab info used for persistence.
+		tabInfo.tabName = newName;
+
+		//update the tab name referenced by any displays within this tab so the
+		//display-to-tab link survives a save/restore (see PamGuiManagerFX.getDisplayTab).
+		for (PamGuiInternalPane internalPane : internalPanes) {
+			UserDisplayNodeFX node = internalPane.getUserDisplayNode();
+			if (node != null && node.getDisplayParams() != null) {
+				node.getDisplayParams().tabName = newName;
+			}
+		}
 	}
 	
 	/**

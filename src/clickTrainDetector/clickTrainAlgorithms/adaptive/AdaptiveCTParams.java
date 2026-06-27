@@ -63,6 +63,15 @@ public class AdaptiveCTParams extends MHTChi2Params implements Serializable, Clo
 	public boolean useBearing = true;
 
 	/**
+	 * The bearing "jump floor" in degrees - the minimum scale used to standardise
+	 * bearing residuals. Bearings are normally smooth and do not jump around, so a
+	 * small value keeps bearing a strong separation cue. Raise it for species whose
+	 * bearings are inherently noisy (e.g. harbour porpoise, whose narrowband clicks
+	 * give poor bearing measurements) so that genuine trains are not broken up.
+	 */
+	public double bearingFloorDeg = 3.0;
+
+	/**
 	 * Use waveform cross-correlation (similarity) to group clicks - and to refine
 	 * the ICI measurement. Automatically ignored when no waveform data is
 	 * available. More accurate but more processor intensive.

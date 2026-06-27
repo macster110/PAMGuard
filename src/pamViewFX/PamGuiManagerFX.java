@@ -1290,11 +1290,15 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	private Serializable prepareSerialisedSettings(){
 		ArrayList<TabInfo> tabInfos = new ArrayList<TabInfo>();
 		for (int i=0; i<this.getPamGuiFXList().size(); i++) {
-			for (int j=0; j<this.getPamGuiFXList().get(i).getNumTabs(); j++) {
-				tabInfos.add(this.getPamGuiFXList().get(i).getTab(i).getTabInfo()); 
+			PamGuiFX stage = this.getPamGuiFXList().get(i);
+			for (int j=0; j<stage.getNumTabs(); j++) {
+				PamGuiTabFX tab = stage.getTab(j);
+				//the Data Model tab is always recreated on startup, so don't persist it.
+				if (TabInfo.DATA_MODEL_TAB_NAME.equals(tab.getName())) continue;
+				tabInfos.add(tab.getTabInfo());
 			}
 		}
-		pamGuiSettings.tabInfos=tabInfos; 
+		pamGuiSettings.tabInfos=tabInfos;
 		pamGuiSettings.width = primaryStage.getWidth();
 		pamGuiSettings.height = primaryStage.getHeight();
 		pamGuiSettings.fullscreen = primaryStage.isFullScreen();
@@ -1321,10 +1325,37 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	 * @param pamGuiSettings - the GUI parameters. 
 	 */
 	private void setParams(PAMGuiFXSettings pamGuiSettings2) {
-		//set all the correct tabs. Do not want to replace tabs that already exist here so
+		//Recreate the saved tabs (empty) before any displays are added. This preserves
+		//tab names (including user renames), tab order and any tabs that have no displays.
+		//Displays loaded later are matched back to these tabs by name in getDisplayTab().
+		//
+		//This runs early in startup (from restoreSettings, via initPrimaryView) at which
+		//point only the Data Model tab exists, so we simply add any other saved tabs.
+		if (pamGuiSettings2 == null || pamGuiSettings2.tabInfos == null) return;
 
-		//TODO
+		PamGuiFX primaryStageFX = stages.get(0);
+		for (TabInfo tabInfo : pamGuiSettings2.tabInfos) {
+			if (tabInfo == null || tabInfo.tabName == null) continue;
+			//the Data Model tab already exists - never duplicate it.
+			if (TabInfo.DATA_MODEL_TAB_NAME.equals(tabInfo.tabName)) continue;
+			//don't create a tab that already exists (matched by name).
+			if (tabExists(tabInfo.tabName)) continue;
+			//recreate the tab empty; displays are added to it later by name.
+			primaryStageFX.addPamTab(new TabInfo(tabInfo.tabName), null, true);
+		}
+	}
 
+	/**
+	 * Check whether a tab with the given name already exists in any open window.
+	 * @param tabName - the tab name to look for.
+	 * @return true if a tab with this name exists.
+	 */
+	private boolean tabExists(String tabName) {
+		if (tabName == null) return false;
+		for (PamGuiTabFX tab : getAllTabs()) {
+			if (tabName.equals(tab.getName())) return true;
+		}
+		return false;
 	}
 
 	public Window getPrimaryStage() {

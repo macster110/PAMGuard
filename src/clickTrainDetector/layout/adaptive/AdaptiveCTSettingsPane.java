@@ -7,10 +7,14 @@ import PamguardMVC.RawDataHolder;
 import clickTrainDetector.ClickTrainControl;
 import clickTrainDetector.clickTrainAlgorithms.adaptive.AdaptiveCTParams;
 import clickTrainDetector.clickTrainAlgorithms.adaptive.AdaptiveClickTrainAlgorithm;
+import clickTrainDetector.clickTrainAlgorithms.adaptive.DefaultAdaptiveParams;
+import clickTrainDetector.clickTrainAlgorithms.adaptive.DefaultAdaptiveParams.DefaultAdaptiveSpecies;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.Slider;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.Tooltip;
@@ -51,6 +55,8 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 
 	private PamToggleSwitch useBearing;
 
+	private PamSpinner<Double> bearingFloorSpinner;
+
 	private PamToggleSwitch useCorrelation;
 
 	public AdaptiveCTSettingsPane(AdaptiveClickTrainAlgorithm adaptiveClickTrainAlgorithm) {
@@ -83,6 +89,11 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 	private static final String TIP_BEARING =
 			"Group clicks by the consistency of their bearing. Available only for multi-channel data\n"
 					+ "that provides a bearing.";
+
+	private static final String TIP_BEARING_FLOOR =
+			"The minimum bearing jump (degrees) tolerated between clicks. Bearings are normally smooth,\n"
+					+ "so keep this small. Raise it for species with noisy bearings (e.g. harbour porpoise,\n"
+					+ "whose narrowband clicks give poor bearing measurements).";
 
 	private static final String TIP_CORRELATION =
 			"Group clicks by waveform similarity (cross correlation), and refine the ICI measurement.\n"
@@ -135,9 +146,32 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		PamVBox holder = new PamVBox();
 		holder.setSpacing(8);
 		holder.setPadding(new Insets(10, 0, 0, 0));
-		holder.getChildren().addAll(title, grid, new javafx.scene.control.Separator(), createFeaturePane());
+		holder.getChildren().addAll(title, grid, new javafx.scene.control.Separator(), createFeaturePane(),
+				new javafx.scene.control.Separator(), createDefaultSpeciesPane());
 
 		return holder;
+	}
+
+	/**
+	 * Create a pane allowing the user to load default settings, optionally tuned for
+	 * a particular species.
+	 * @return pane for selecting default species settings.
+	 */
+	private Pane createDefaultSpeciesPane() {
+		MenuButton speciesChoiceBox = new MenuButton("Select Species");
+		for (DefaultAdaptiveSpecies species : DefaultAdaptiveSpecies.values()) {
+			MenuItem menuItem = new MenuItem(DefaultAdaptiveParams.getDefaultSpeciesName(species));
+			menuItem.setOnAction(action -> setParams(DefaultAdaptiveParams.getDefaultAdaptiveParams(species,
+					adaptiveClickTrainAlgorithm.getClickTrainControl().getParentDataBlock())));
+			speciesChoiceBox.getItems().add(menuItem);
+		}
+
+		PamHBox pamHBox = new PamHBox();
+		pamHBox.setSpacing(5);
+		pamHBox.setAlignment(Pos.CENTER_RIGHT);
+		pamHBox.setPadding(new Insets(5, 0, 0, 0));
+		pamHBox.getChildren().addAll(new Label("Optimise for Species"), speciesChoiceBox);
+		return pamHBox;
 	}
 
 	/**
@@ -157,13 +191,27 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		useBearing = new PamToggleSwitch("Bearing");
 		useBearing.setTooltip(new Tooltip(TIP_BEARING));
 
+		bearingFloorSpinner = new PamSpinner<>(0.0, 180.0, 3.0, 0.5);
+		bearingFloorSpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+		bearingFloorSpinner.setEditable(true);
+		bearingFloorSpinner.setPrefWidth(90);
+		bearingFloorSpinner.setTooltip(new Tooltip(TIP_BEARING_FLOOR));
+		PamHBox bearingFloorBox = new PamHBox();
+		bearingFloorBox.setAlignment(Pos.CENTER_LEFT);
+		bearingFloorBox.setSpacing(5);
+		bearingFloorBox.setPadding(new Insets(0, 0, 0, 20));
+		bearingFloorBox.getChildren().addAll(tipLabel("Bearing jump floor", TIP_BEARING_FLOOR), bearingFloorSpinner,
+				new Label("°"));
+		// the floor only applies when bearing grouping is on.
+		useBearing.selectedProperty().addListener((o, ov, nv) -> bearingFloorSpinner.setDisable(!nv));
+
 		useCorrelation = new PamToggleSwitch("Waveform correlation");
 		useCorrelation.setTooltip(new Tooltip(TIP_CORRELATION));
 
 		PamVBox box = new PamVBox();
 		box.setSpacing(5);
 		box.setPadding(new Insets(5, 0, 0, 0));
-		box.getChildren().addAll(label, useICI, useAmplitude, useBearing, useCorrelation);
+		box.getChildren().addAll(label, useICI, useAmplitude, useBearing, bearingFloorBox, useCorrelation);
 		return box;
 	}
 
@@ -216,6 +264,7 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		boolean waveformAvailable = block != null && RawDataHolder.class.isAssignableFrom(block.getUnitClass());
 
 		useBearing.setDisable(!bearingAvailable);
+		bearingFloorSpinner.setDisable(!bearingAvailable || !useBearing.isSelected());
 		useCorrelation.setDisable(!waveformAvailable);
 	}
 
@@ -228,6 +277,7 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		params.useICI = useICI.isSelected();
 		params.useAmplitude = useAmplitude.isSelected();
 		params.useBearing = useBearing.isSelected();
+		params.bearingFloorDeg = bearingFloorSpinner.getValue();
 		params.useCorrelation = useCorrelation.isSelected();
 		return params;
 	}
@@ -240,6 +290,7 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		useICI.setSelected(input.useICI);
 		useAmplitude.setSelected(input.useAmplitude);
 		useBearing.setSelected(input.useBearing);
+		bearingFloorSpinner.getValueFactory().setValue(input.bearingFloorDeg);
 		useCorrelation.setSelected(input.useCorrelation);
 		updateFeatureAvailability(null);
 	}

@@ -67,8 +67,30 @@ public class UKFParams implements Serializable, Cloneable, ManagedParameters {
 	public double iciMeasNoise = 0.02;
 	/** Measurement noise variance of amplitude (dB^2). */
 	public double ampMeasNoise = 4.0;
-	/** Measurement noise variance of bearing (rad^2). */
-	public double bearingMeasNoise = Math.toRadians(3) * Math.toRadians(3);
+
+	/**
+	 * The bearing "jump floor" in degrees - the minimum bearing change tolerated
+	 * between consecutive clicks. This is the bearing measurement-noise floor: the
+	 * bearing innovation always includes at least this much uncertainty, so the
+	 * association gate is never tighter than this however confident the track is.
+	 * Bearings are normally smooth so this is small (a few degrees); raise it for
+	 * species whose bearings are inherently noisy (e.g. harbour porpoise, whose
+	 * narrowband clicks give poor bearing measurements) so genuine trains are not
+	 * broken up.
+	 */
+	public double bearingFloorDeg = 3.0;
+
+	/**
+	 * The bearing measurement-noise variance (rad^2) derived from
+	 * {@link #bearingFloorDeg}. This is the floor added to the predicted bearing
+	 * variance when forming the innovation covariance.
+	 *
+	 * @return the bearing measurement-noise variance in rad^2.
+	 */
+	public double bearingMeasNoiseRad2() {
+		double rad = Math.toRadians(bearingFloorDeg);
+		return rad * rad;
+	}
 
 	/**
 	 * Minimum affinity (0-1) for a track-detection pair to be associated. Pairs
