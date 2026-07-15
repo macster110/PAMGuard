@@ -32,19 +32,44 @@ public class UnscentedKalmanFilter {
 	private double lastNIS;
 
 	/**
+	 * The default sigma-point spread. Van der Merwe's canonical value is a very
+	 * small alpha (~1e-3), which is appropriate when the state is high-dimensional
+	 * and the dynamics are strongly nonlinear near the mean. Here the state is small
+	 * and the only nonlinearity is the circular bearing mean, so an alpha that small
+	 * collapses the sigma points essentially onto the mean and the filter degrades to
+	 * a linearised (EKF-like) update that never exercises the unscented transform.
+	 * A spread of 1.0 (with kappa 0 this gives lambda 0, a well-conditioned "standard"
+	 * unscented transform) places the sigma points a genuine standard deviation out,
+	 * so circular-bearing spread and any future nonlinearity in the model are captured.
+	 */
+	public static final double DEFAULT_ALPHA = 1.0;
+	private static final double DEFAULT_BETA = 2.0;
+	private static final double DEFAULT_KAPPA = 0.0;
+
+	/**
 	 * @param model - the process/measurement model.
 	 * @param x0    - initial state mean.
 	 * @param P0    - initial state covariance.
 	 */
 	public UnscentedKalmanFilter(UKFModel model, double[] x0, double[][] P0) {
+		this(model, x0, P0, DEFAULT_ALPHA, DEFAULT_BETA, DEFAULT_KAPPA);
+	}
+
+	/**
+	 * @param model - the process/measurement model.
+	 * @param x0    - initial state mean.
+	 * @param P0    - initial state covariance.
+	 * @param alpha - sigma-point spread (0 &lt; alpha &lt;= 1). Larger spreads the
+	 *                sigma points further from the mean; see {@link #DEFAULT_ALPHA}.
+	 * @param beta  - prior-knowledge term (2 is optimal for a Gaussian).
+	 * @param kappa - secondary scaling (usually 0).
+	 */
+	public UnscentedKalmanFilter(UKFModel model, double[] x0, double[][] P0, double alpha, double beta, double kappa) {
 		this.model = model;
 		this.n = model.stateDim();
 		this.x = x0.clone();
 		this.P = copy(P0);
 
-		double alpha = 1e-3;
-		double beta = 2.0;
-		double kappa = 0.0;
 		this.lambda = alpha * alpha * (n + kappa) - n;
 
 		int nSig = 2 * n + 1;
@@ -55,6 +80,30 @@ public class UnscentedKalmanFilter {
 		for (int i = 1; i < nSig; i++) {
 			wm[i] = wc[i] = 1.0 / (2 * (n + lambda));
 		}
+	}
+
+	/**
+	 * Copy constructor - clones the mutable state (mean and covariance) and shares
+	 * the immutable model and precomputed sigma-point weights. Used to branch a whole
+	 * tracker state for multi-hypothesis (N-scan) search.
+	 */
+	private UnscentedKalmanFilter(UnscentedKalmanFilter src) {
+		this.model = src.model;
+		this.n = src.n;
+		this.x = src.x.clone();
+		this.P = copy(src.P);
+		this.wm = src.wm.clone();
+		this.wc = src.wc.clone();
+		this.lambda = src.lambda;
+		// the last-update diagnostics are recomputed on the next update, so are not copied.
+	}
+
+	/**
+	 * An independent copy of this filter (cloned mean and covariance). The model and
+	 * sigma-point weights are shared as they are immutable.
+	 */
+	public UnscentedKalmanFilter copy() {
+		return new UnscentedKalmanFilter(this);
 	}
 
 	/**

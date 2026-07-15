@@ -214,38 +214,4 @@ public class PamAutoConfigDialog extends JDialog {
         setVisible(true);
         return selectedConfig;
     }
-
-    // Small demo main to run the dialog standalone for quick testing.
-    public static void main(String[] args) {
-        // Create a few dummy PamAutoConfig implementations for demo
-        List<PamAutoConfig> demo = new ArrayList<>();
-        demo.add(new PamAutoConfig() {
-            public boolean isConfigValid(PamFileImport importHandler) { return true; }
-            public String getConfigDescription() { return "Air config for species A"; }
-            public String[] getSpeciesList() { return new String[]{"Species A", "Species B"}; }
-            public String getConfigName() { return "Air Config 1"; }
-            public SoundMedium getGlobalMediumSettings() { return SoundMedium.Air; }
-        });
-        demo.add(new PamAutoConfig() {
-            public boolean isConfigValid(PamFileImport importHandler) { return true; }
-            public String getConfigDescription() { return "Water config only"; }
-            public String[] getSpeciesList() { return new String[]{"Species C"}; }
-            public String getConfigName() { return "Water Config"; }
-            public SoundMedium getGlobalMediumSettings() { return SoundMedium.Water; }
-        });
-        demo.add(new PamAutoConfig() {
-            public boolean isConfigValid(PamFileImport importHandler) { return true; }
-            public String getConfigDescription() { return "Both media, many species"; }
-            public String[] getSpeciesList() { return new String[]{"Species A", "Species C"}; }
-            public String getConfigName() { return "Both Config"; }
-            public SoundMedium getGlobalMediumSettings() { return null; }
-        });
-
-        SwingUtilities.invokeLater(() -> {
-            PamAutoConfigDialog dlg = new PamAutoConfigDialog(null, demo);
-            PamAutoConfig sel = dlg.showDialog();
-            System.out.println("Selected: " + (sel == null ? "<none>" : sel.getConfigName()));
-            System.exit(0);
-        });
-    }
 }

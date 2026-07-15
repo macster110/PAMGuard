@@ -2,9 +2,15 @@ package pamViewFX.fxNodes.sliders;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
+import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.CustomMenuItem;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -54,16 +60,150 @@ public class ColourRangeSlider extends PamRangeSlider {
 	private ColourArrayType colourMap = ColourArrayType.RED;
 
 	/**
-	 * Create the colour range slider. 
+	 * Context menu allowing the user to type new absolute (min/max) limits.
+	 */
+	private ContextMenu limitsContextMenu;
+
+	/**
+	 * Text field for the minimum (low) absolute limit.
+	 */
+	private TextField minField;
+
+	/**
+	 * Text field for the maximum (high) absolute limit.
+	 */
+	private TextField maxField;
+
+	/**
+	 * Optional callback run after the user applies new absolute limits, e.g. so an
+	 * owner can persist the new limits and recolour.
+	 */
+	private Runnable onLimitsChanged;
+
+	/**
+	 * Create the colour range slider.
 	 */
 	public ColourRangeSlider() {
 		super();
+		initLimitsContextMenu();
 	}
 
 
 	public ColourRangeSlider(Orientation orientation) {
 		super();
 		this.orientationProperty().set(orientation);
+		initLimitsContextMenu();
+	}
+
+	/**
+	 * Create the right-click context menu which lets the user change the absolute
+	 * (min/max) limits of the slider by typing in new values.
+	 */
+	private void initLimitsContextMenu() {
+		minField = new TextField();
+		maxField = new TextField();
+		minField.setPrefColumnCount(6);
+		maxField.setPrefColumnCount(6);
+
+		Button applyButton = new Button("Apply");
+		applyButton.setOnAction(e -> applyLimitsAndHide());
+		//allow Enter in either field to apply.
+		minField.setOnAction(e -> applyLimitsAndHide());
+		maxField.setOnAction(e -> applyLimitsAndHide());
+
+		GridPane grid = new GridPane();
+		grid.setHgap(5);
+		grid.setVgap(5);
+		grid.setPadding(new Insets(5));
+		grid.add(new Label("Limits"), 0, 0, 2, 1);
+		grid.add(new Label("Min"), 0, 1);
+		grid.add(minField, 1, 1);
+		grid.add(new Label("Max"), 0, 2);
+		grid.add(maxField, 1, 2);
+		grid.add(applyButton, 1, 3);
+
+		CustomMenuItem menuItem = new CustomMenuItem(grid);
+		//keep the menu open while the user types / clicks in the fields.
+		menuItem.setHideOnClick(false);
+
+		limitsContextMenu = new ContextMenu(menuItem);
+
+		setOnContextMenuRequested(e -> {
+			//prefill with the current limits each time the menu is shown.
+			minField.setText(formatLimit(getMin()));
+			maxField.setText(formatLimit(getMax()));
+			limitsContextMenu.show(this, e.getScreenX(), e.getScreenY());
+			e.consume();
+		});
+	}
+
+	/**
+	 * Format a limit value for display, trimming a trailing ".0" for whole numbers.
+	 */
+	private String formatLimit(double value) {
+		if (value == Math.rint(value) && !Double.isInfinite(value)) {
+			return Long.toString((long) value);
+		}
+		return Double.toString(value);
+	}
+
+	/**
+	 * Parse and apply the limits from the text fields, then hide the menu.
+	 */
+	private void applyLimitsAndHide() {
+		if (applyLimits()) {
+			limitsContextMenu.hide();
+		}
+	}
+
+	/**
+	 * Parse the min/max text fields and apply them as the slider's absolute limits.
+	 * The thumb (low/high) values are clamped to stay within the new limits. Invalid
+	 * input (non-numeric, or max not greater than min) is ignored.
+	 *
+	 * @return true if valid limits were applied.
+	 */
+	private boolean applyLimits() {
+		double newMin;
+		double newMax;
+		try {
+			newMin = Double.parseDouble(minField.getText().trim());
+			newMax = Double.parseDouble(maxField.getText().trim());
+		}
+		catch (NumberFormatException ex) {
+			return false;
+		}
+		if (newMax <= newMin) {
+			return false;
+		}
+
+		//expand the max first so we never transiently have min > max, then shrink.
+		setMax(Math.max(getMax(), newMax));
+		setMin(newMin);
+		setMax(newMax);
+
+		//keep the thumbs within the new limits.
+		if (getLowValue() < newMin) {
+			setLowValue(newMin);
+		}
+		if (getHighValue() > newMax) {
+			setHighValue(newMax);
+		}
+
+		if (onLimitsChanged != null) {
+			onLimitsChanged.run();
+		}
+		return true;
+	}
+
+	/**
+	 * Set a callback which is run after the user applies new absolute limits via the
+	 * right-click menu. Owners can use this to persist the new limits and recolour.
+	 *
+	 * @param onLimitsChanged the callback, or null to clear.
+	 */
+	public void setOnLimitsChanged(Runnable onLimitsChanged) {
+		this.onLimitsChanged = onLimitsChanged;
 	}
 
 	/**

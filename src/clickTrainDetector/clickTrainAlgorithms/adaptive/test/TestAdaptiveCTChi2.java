@@ -34,6 +34,7 @@ public class TestAdaptiveCTChi2 {
 	public static void main(String[] args) {
 
 		testSingleRegularTrain();
+		testAcceleratingBuzz();
 		testTwoInterleavedTrains();
 		testThreeInterleavedTrains();
 		testCoastingGap();
@@ -69,6 +70,26 @@ public class TestAdaptiveCTChi2 {
 			assertTrue("Single regular train: recovers most clicks (got " + trains.get(0) + "/30)",
 					trains.get(0) >= 25);
 		}
+	}
+
+	/**
+	 * A single train whose ICI shrinks click by click (a terminal buzz) should stay
+	 * one train. This is the case the trend-aware ICI predictor is for: a random-walk
+	 * ICI model charges a residual at every click of a steadily accelerating train,
+	 * whereas the linear-trend predictor sees the acceleration as consistent. Tracked
+	 * on ICI alone (amplitude/bearing disabled) so the ICI model is what is under
+	 * test.
+	 */
+	private static void testAcceleratingBuzz() {
+		List<SimpleClick> clicks = new ArrayList<>();
+		// ICI decreasing linearly from 0.18s down to ~0.03s over 30 clicks.
+		generateBuzz(clicks, 0, 1.0, 0.18, 0.03, 0.002, 118, 30, new Random(40));
+		AdaptiveCTParams params = defaultParams();
+		params.useAmplitude = false;
+		params.useBearing = false;
+		List<Integer> trains = runKernel(clicks, params, false, false);
+		assertTrue("Accelerating buzz stays one train (got " + trains.size() + " sizes " + trains + ")",
+				trains.size() == 1 && trains.get(0) >= 25);
 	}
 
 	/**
@@ -325,6 +346,33 @@ public class TestAdaptiveCTChi2 {
 				wf[j] = waveform[j] * (1 + 0.02 * random.nextGaussian());
 			}
 			clicks.add(new SimpleClick(uidStart + i, Double.valueOf(t), Double.valueOf(a), null, wf, SR));
+			t += ici + random.nextGaussian() * iciJitter;
+		}
+	}
+
+	/**
+	 * Generate a "buzz" train whose ICI decreases linearly from {@code ici0} to
+	 * {@code ici1} over {@code n} clicks (with jitter), and append it to the list.
+	 * Single channel, no bearing.
+	 *
+	 * @param clicks    - list to append to.
+	 * @param uidStart  - starting UID for clicks in this train.
+	 * @param t0        - start time in seconds.
+	 * @param ici0      - initial inter-click interval in seconds.
+	 * @param ici1      - final inter-click interval in seconds.
+	 * @param iciJitter - standard deviation of the ICI jitter in seconds.
+	 * @param amp       - amplitude in dB.
+	 * @param n         - number of clicks.
+	 * @param random    - random source.
+	 */
+	private static void generateBuzz(List<SimpleClick> clicks, int uidStart, double t0, double ici0, double ici1,
+			double iciJitter, double amp, int n, Random random) {
+		double t = t0;
+		for (int i = 0; i < n; i++) {
+			double a = amp + random.nextGaussian();
+			clicks.add(new SimpleClick(uidStart + i, t, a, SR));
+			double frac = n > 1 ? (double) i / (n - 1) : 0;
+			double ici = ici0 + (ici1 - ici0) * frac;
 			t += ici + random.nextGaussian() * iciJitter;
 		}
 	}

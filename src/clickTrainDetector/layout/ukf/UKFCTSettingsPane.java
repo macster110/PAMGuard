@@ -20,6 +20,7 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TitledPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -54,8 +55,14 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 	private PamSpinner<Double> frameDurationSpinner;
 	private PamSpinner<Integer> maxCoastSpinner;
 	private PamSpinner<Integer> minLengthSpinner;
+	private PamSpinner<Integer> confirmHitsSpinner;
 	private PamToggleSwitch twoStage;
 	private PamSpinner<Double> confidenceAmplitudeSpinner;
+	private PamSpinner<Integer> nScanDepthSpinner;
+	private PamSpinner<Integer> beamWidthSpinner;
+	private PamSpinner<Integer> nScanKBestSpinner;
+	private PamSpinner<Double> nScanCoastCostSpinner;
+	private PamSpinner<Double> nScanNewTrackCostSpinner;
 	private PamToggleSwitch useCustomAffinity;
 	private TextField affinityFileField;
 	private Label affinityInfoLabel;
@@ -79,6 +86,27 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 	private static final String TIP_MAXCOAST =
 			"Maximum number of consecutive missed clicks (coasts) before a track is closed.";
 	private static final String TIP_MINLENGTH = "Minimum number of clicks for a track to be saved.";
+	private static final String TIP_CONFIRM =
+			"Number of clicks a track must gather before it is 'confirmed'. Until then it is tentative\n"
+					+ "and is only offered clicks after every confirmed track has claimed one, so a new (possibly\n"
+					+ "spurious) track cannot steal a click from an established train. 2 to the minimum train length.";
+	private static final String TIP_NSCAN_DEPTH =
+			"Multi-hypothesis association deferral, in frames. 0 uses greedy single-frame association\n"
+					+ "(each frame's assignment is committed immediately). A positive value keeps the best few\n"
+					+ "global assignments for this many frames before committing, so an ambiguous association\n"
+					+ "(e.g. two trains crossing) can be corrected by later evidence. 4-8 is a reasonable range.";
+	private static final String TIP_BEAMWIDTH =
+			"Number of competing global hypotheses kept in the N-scan search. Larger explores more\n"
+					+ "association possibilities at proportionally more processing cost.";
+	private static final String TIP_NSCAN_KBEST =
+			"Number of best assignments (Murty k-best) generated per hypothesis per frame in the N-scan\n"
+					+ "search. Larger considers more alternatives at more processing cost.";
+	private static final String TIP_NSCAN_COAST =
+			"Cost (nats) charged in the N-scan search when an active, currently-due track is left without\n"
+					+ "a click in a frame. Should be cheaper than accepting a clearly wrong match.";
+	private static final String TIP_NSCAN_NEWTRACK =
+			"Cost (nats) charged in the N-scan search when a loud click is not associated to any existing\n"
+					+ "track and instead starts a new one.";
 	private static final String TIP_TWOSTAGE =
 			"Use ByteTrack-style two-stage association: associate loud (high-confidence) clicks first,\n"
 					+ "then recover quiet (low-confidence) clicks against the remaining tracks.";
@@ -139,7 +167,7 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		grid.add(tipLabel("Max. ICI", TIP_MAXICI), 0, row);
 		grid.add(withUnit(maxICISpinner, "s"), 1, row++);
 
-		frameDurationSpinner = doubleSpinner(0.001, Double.MAX_VALUE, 0.05, 0.01);
+		frameDurationSpinner = doubleSpinner(0.001, Double.MAX_VALUE, 0.02, 0.01);
 		frameDurationSpinner.setTooltip(new Tooltip(TIP_FRAME));
 		grid.add(tipLabel("Frame window", TIP_FRAME), 0, row);
 		grid.add(withUnit(frameDurationSpinner, "s"), 1, row++);
@@ -154,13 +182,70 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		grid.add(tipLabel("Min. train length", TIP_MINLENGTH), 0, row);
 		grid.add(minLengthSpinner, 1, row++);
 
+		confirmHitsSpinner = intSpinner(2, 100, 3);
+		confirmHitsSpinner.setTooltip(new Tooltip(TIP_CONFIRM));
+		grid.add(tipLabel("Confirm after", TIP_CONFIRM), 0, row);
+		grid.add(withUnit(confirmHitsSpinner, "clicks"), 1, row++);
+
 		PamVBox holder = new PamVBox();
 		holder.setSpacing(8);
 		holder.setPadding(new Insets(10, 0, 0, 0));
 		holder.getChildren().addAll(title, grid, new javafx.scene.control.Separator(), createFeaturePane(),
-				new javafx.scene.control.Separator(), createTwoStagePane(), new javafx.scene.control.Separator(),
-				createAffinityPane(), new javafx.scene.control.Separator(), createDefaultSpeciesPane());
+				new javafx.scene.control.Separator(), createTwoStagePane(), createNScanPane(),
+				new javafx.scene.control.Separator(), createAffinityPane(), new javafx.scene.control.Separator(),
+				createDefaultSpeciesPane());
 		return holder;
+	}
+
+	/**
+	 * Create the collapsible advanced pane for multi-hypothesis (N-scan) association.
+	 * Collapsed by default; the sub-controls are disabled when the deferral depth is
+	 * 0 (greedy association).
+	 */
+	private Node createNScanPane() {
+		PamGridPane grid = new PamGridPane();
+		grid.setHgap(5);
+		grid.setVgap(8);
+		int row = 0;
+
+		nScanDepthSpinner = intSpinner(0, 100, 7);
+		nScanDepthSpinner.setTooltip(new Tooltip(TIP_NSCAN_DEPTH));
+		grid.add(tipLabel("N-scan depth", TIP_NSCAN_DEPTH), 0, row);
+		grid.add(withUnit(nScanDepthSpinner, "frames"), 1, row++);
+
+		beamWidthSpinner = intSpinner(1, 50, 3);
+		beamWidthSpinner.setTooltip(new Tooltip(TIP_BEAMWIDTH));
+		grid.add(tipLabel("Beam width", TIP_BEAMWIDTH), 0, row);
+		grid.add(beamWidthSpinner, 1, row++);
+
+		nScanKBestSpinner = intSpinner(1, 20, 3);
+		nScanKBestSpinner.setTooltip(new Tooltip(TIP_NSCAN_KBEST));
+		grid.add(tipLabel("Assignments (k-best)", TIP_NSCAN_KBEST), 0, row);
+		grid.add(nScanKBestSpinner, 1, row++);
+
+		nScanCoastCostSpinner = doubleSpinner(0.0, Double.MAX_VALUE, 1.5, 0.5);
+		nScanCoastCostSpinner.setTooltip(new Tooltip(TIP_NSCAN_COAST));
+		grid.add(tipLabel("Coast cost", TIP_NSCAN_COAST), 0, row);
+		grid.add(withUnit(nScanCoastCostSpinner, "nats"), 1, row++);
+
+		nScanNewTrackCostSpinner = doubleSpinner(0.0, Double.MAX_VALUE, 2.5, 0.5);
+		nScanNewTrackCostSpinner.setTooltip(new Tooltip(TIP_NSCAN_NEWTRACK));
+		grid.add(tipLabel("New-track cost", TIP_NSCAN_NEWTRACK), 0, row);
+		grid.add(withUnit(nScanNewTrackCostSpinner, "nats"), 1, row++);
+
+		// the beam sub-controls only matter when deferral is on.
+		nScanDepthSpinner.valueProperty().addListener((o, ov, nv) -> setNScanControlsDisabled(nv == null || nv == 0));
+
+		TitledPane titled = new TitledPane("Multi-hypothesis association (N-scan)", grid);
+		titled.setExpanded(false);
+		return titled;
+	}
+
+	private void setNScanControlsDisabled(boolean disabled) {
+		beamWidthSpinner.setDisable(disabled);
+		nScanKBestSpinner.setDisable(disabled);
+		nScanCoastCostSpinner.setDisable(disabled);
+		nScanNewTrackCostSpinner.setDisable(disabled);
 	}
 
 	/**
@@ -383,8 +468,14 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		params.frameDuration = frameDurationSpinner.getValue();
 		params.maxCoast = maxCoastSpinner.getValue();
 		params.minTrackLength = minLengthSpinner.getValue();
+		params.confirmHits = confirmHitsSpinner.getValue();
 		params.twoStage = twoStage.isSelected();
 		params.confidenceAmplitude = confidenceAmplitudeSpinner.getValue();
+		params.nScanDepth = nScanDepthSpinner.getValue();
+		params.beamWidth = beamWidthSpinner.getValue();
+		params.nScanKBest = nScanKBestSpinner.getValue();
+		params.nScanCoastCost = nScanCoastCostSpinner.getValue();
+		params.nScanNewTrackCost = nScanNewTrackCostSpinner.getValue();
 		params.useCustomAffinity = useCustomAffinity.isSelected();
 		params.affinityNetworkFile = affinityFileField.getText() == null || affinityFileField.getText().trim().isEmpty()
 				? null
@@ -401,9 +492,16 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		frameDurationSpinner.getValueFactory().setValue(input.frameDuration);
 		maxCoastSpinner.getValueFactory().setValue(input.maxCoast);
 		minLengthSpinner.getValueFactory().setValue(input.minTrackLength);
+		confirmHitsSpinner.getValueFactory().setValue(input.confirmHits);
 		twoStage.setSelected(input.twoStage);
 		confidenceAmplitudeSpinner.getValueFactory().setValue(input.confidenceAmplitude);
 		confidenceAmplitudeSpinner.setDisable(!input.twoStage);
+		nScanDepthSpinner.getValueFactory().setValue(input.nScanDepth);
+		beamWidthSpinner.getValueFactory().setValue(input.beamWidth);
+		nScanKBestSpinner.getValueFactory().setValue(input.nScanKBest);
+		nScanCoastCostSpinner.getValueFactory().setValue(input.nScanCoastCost);
+		nScanNewTrackCostSpinner.getValueFactory().setValue(input.nScanNewTrackCost);
+		setNScanControlsDisabled(input.nScanDepth == 0);
 		useCustomAffinity.setSelected(input.useCustomAffinity);
 		affinityFileField.setText(input.affinityNetworkFile == null ? "" : input.affinityNetworkFile);
 		enableAffinityControls(input.useCustomAffinity);

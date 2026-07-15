@@ -110,7 +110,6 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 	private double totalScore = 0;
 
 	/* ---- ICI state ---- */
-	private double lastICI = Double.NaN;
 	private double[] iciResiduals = new double[WINDOW];
 	private int iciResCount = 0;
 	private double[] iciWindow = new double[WINDOW];
@@ -165,7 +164,7 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 				// missed); estimate how many and score the effective per-interval ICI so a
 				// bridged click is not penalised as a giant ICI outlier.
 				double rawICI = idiManager.calcTime(lastIncludedUnit, newDataUnit);
-				double pred = predictedICI();
+				double pred = predictNextICI();
 				int nGap = 1;
 				if (!Double.isNaN(pred) && pred > 0) {
 					nGap = Math.max(1, (int) Math.round(rawICI / pred));
@@ -260,27 +259,36 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 
 	/**
 	 * Score an inter-click interval against the track's recent ICI history.
+	 * <p>
+	 * The residual is measured against a robust <i>linear trend</i> prediction of
+	 * the next ICI (see {@link #predictNextICI()}), not simply the previous ICI.
+	 * This means a steadily accelerating or decelerating train - most importantly a
+	 * terminal buzz, where the ICI shrinks click by click - is treated as consistent
+	 * (its residual about the trend is small) rather than being penalised for a
+	 * non-zero first difference at every click. When there is too little history for
+	 * a slope the predictor falls back to the previous ICI, so short trains behave
+	 * exactly as before.
 	 *
 	 * @param ici       - the ICI in seconds.
 	 * @param floorMult - the sensitivity-derived floor multiplier.
 	 * @return the Huber-squared contribution, or NaN if this is the first ICI.
 	 */
 	private double scoreICI(double ici, double floorMult) {
-		if (Double.isNaN(lastICI)) {
-			lastICI = ici;
+		double pred = predictNextICI();
+		if (Double.isNaN(pred)) {
+			// first ICI in the track - nothing to predict against yet.
 			pushICIWindow(ici);
 			return Double.NaN;
 		}
-		double resid = ici - lastICI;
-		// floor proportional to the ICI magnitude (short ICI trains tolerate
-		// proportionally less absolute jitter), plus a small absolute term.
-		double floor = floorMult * (0.01 + 0.05 * lastICI);
+		double resid = ici - pred;
+		// floor proportional to the (predicted) ICI magnitude (short ICI trains
+		// tolerate proportionally less absolute jitter), plus a small absolute term.
+		double floor = floorMult * (0.01 + 0.05 * pred);
 		double scale = Math.max(floor, robustScale(iciResiduals, iciResCount));
 		double z = resid / scale;
 
 		pushICIResidual(resid);
 		pushICIWindow(ici);
-		lastICI = ici;
 		return huber2(z);
 	}
 
@@ -295,7 +303,7 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 		if (gap <= 0) {
 			return 0;
 		}
-		double predicted = predictedICI();
+		double predicted = predictNextICI();
 		if (Double.isNaN(predicted) || predicted <= 0) {
 			predicted = params.maxICI; // fall back to absolute max ICI for single units.
 		}
@@ -303,15 +311,15 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 	}
 
 	/**
-	 * Check whether the track looks like junk - either the median ICI is over the
+	 * Check whether the track looks like junk - either the central ICI is over the
 	 * absolute maximum or there is a wildly inconsistent ICI (aliasing).
 	 */
 	private boolean isJunk(AdaptiveCTParams params) {
-		double median = predictedICI();
-		if (Double.isNaN(median)) {
+		double central = centralICI();
+		if (Double.isNaN(central)) {
 			return false;
 		}
-		if (median > params.maxICI) {
+		if (central > params.maxICI) {
 			return true;
 		}
 		// any single recent ICI well over the absolute maximum suggests aliasing.
@@ -324,13 +332,46 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 	}
 
 	/**
-	 * The predicted ICI - the median of recent ICI values.
+	 * The central (typical) ICI of the track - the median of recent ICI values. Used
+	 * for the absolute rate / aliasing gate, where a robust central value is wanted
+	 * rather than a forward extrapolation.
 	 */
-	private double predictedICI() {
+	private double centralICI() {
 		if (iciWinCount == 0) {
 			return Double.NaN;
 		}
 		return median(iciWindow, iciWinCount);
+	}
+
+	/**
+	 * Predict the next ICI from the track's recent history by robust linear
+	 * extrapolation.
+	 * <p>
+	 * A Theil-Sen slope (the median of the pairwise slopes) is fitted to the recent
+	 * ICI values against their index and extrapolated one step. This tracks a smooth
+	 * trend - a lengthening or, for a buzz, a shortening ICI - while the median-based
+	 * intercept and slope keep it robust to the odd outlier. With fewer than three
+	 * ICIs there is no meaningful slope, so the most recent ICI is used (a
+	 * random-walk prediction, matching the previous behaviour). The result is clamped
+	 * to a sane band around the central ICI so a steep local trend cannot extrapolate
+	 * to an absurd (or negative) interval.
+	 *
+	 * @return the predicted next ICI in seconds, or NaN if there is no history.
+	 */
+	private double predictNextICI() {
+		if (iciWinCount == 0) {
+			return Double.NaN;
+		}
+		if (iciWinCount < 3) {
+			return iciWindow[iciWinCount - 1];
+		}
+		double slope = theilSenSlope(iciWindow, iciWinCount);
+		double intercept = robustIntercept(iciWindow, iciWinCount, slope);
+		double pred = intercept + slope * iciWinCount; // value at the next index.
+		double med = median(iciWindow, iciWinCount);
+		// keep the extrapolation sane: never below a quarter of, or above four times,
+		// the central ICI.
+		return clamp(pred, 0.25 * med, 4.0 * med);
 	}
 
 	/**
@@ -401,7 +442,6 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 		contribCount = 0;
 		totalScore = 0;
 		lastIncludedUnit = null;
-		lastICI = Double.NaN;
 		iciResCount = 0;
 		iciWinCount = 0;
 		buildFeatures();
@@ -473,6 +513,37 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 			dev[i] = Math.abs(values[i] - med);
 		}
 		return 1.4826 * median(dev, count);
+	}
+
+	/**
+	 * The Theil-Sen robust slope of the first {@code count} values against their
+	 * index (0, 1, 2, ...): the median of the slopes of every pair of points.
+	 * Returns 0 if there are fewer than two points.
+	 */
+	private static double theilSenSlope(double[] values, int count) {
+		if (count < 2) {
+			return 0;
+		}
+		double[] slopes = new double[count * (count - 1) / 2];
+		int n = 0;
+		for (int i = 0; i < count; i++) {
+			for (int j = i + 1; j < count; j++) {
+				slopes[n++] = (values[j] - values[i]) / (j - i);
+			}
+		}
+		return median(slopes, n);
+	}
+
+	/**
+	 * The robust intercept that pairs with a Theil-Sen {@code slope}: the median of
+	 * {@code value[i] - slope * i} over the first {@code count} values.
+	 */
+	private static double robustIntercept(double[] values, int count, double slope) {
+		double[] resid = new double[count];
+		for (int i = 0; i < count; i++) {
+			resid[i] = values[i] - slope * i;
+		}
+		return median(resid, count);
 	}
 
 	private static double median(double[] values, int count) {

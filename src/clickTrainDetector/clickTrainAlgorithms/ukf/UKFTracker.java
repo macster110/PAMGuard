@@ -2,6 +2,7 @@ package clickTrainDetector.clickTrainAlgorithms.ukf;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import PamguardMVC.PamDataUnit;
 
@@ -38,12 +39,19 @@ public class UKFTracker {
 	private double frameEndTime = Double.NaN;
 	private int nextTrackId = 0;
 
+	/* ---- N-scan beam state (only used when params.nScanDepth > 0) ---- */
+	private ArrayList<Hypothesis> beam = new ArrayList<>();
+	private int framesSinceCommit = 0;
+
 	public UKFTracker(UKFParams params, boolean bearingAvailable, Listener listener) {
 		this.params = params;
 		this.bearingAvailable = bearingAvailable;
 		this.model = new TrackStateModel(params, params.useAmplitude, params.useBearing && bearingAvailable);
 		this.affinity = buildAffinity(params);
 		this.listener = listener;
+		if (params.nScanDepth > 0) {
+			initBeam();
+		}
 	}
 
 	/**
@@ -69,6 +77,9 @@ public class UKFTracker {
 		frameClicks.clear();
 		frameEndTime = Double.NaN;
 		tracks.clear();
+		if (params.nScanDepth > 0) {
+			initBeam();
+		}
 	}
 
 	/** Add a click; the frame is flushed automatically when its window closes. */
@@ -94,12 +105,20 @@ public class UKFTracker {
 		for (PamDataUnit<?, ?> d : dets) {
 			now = Math.max(now, timeSeconds(d));
 		}
-		process(dets, now);
+		if (params.nScanDepth > 0) {
+			processBeam(dets, now);
+		} else {
+			process(dets, now);
+		}
 	}
 
 	/** Finalise all remaining tracks (e.g. at the end of processing). */
 	public void finaliseAll() {
 		flushFrame();
+		if (params.nScanDepth > 0) {
+			finaliseBeam();
+			return;
+		}
 		for (ClickTrack track : tracks) {
 			listener.trackFinished(track);
 		}
@@ -111,7 +130,24 @@ public class UKFTracker {
 	 * that cannot reach {@code now} within {@code maxCoast} missed clicks is closed.
 	 */
 	public void closeOverdueTracks(double now) {
-		Iterator<ClickTrack> it = tracks.iterator();
+		if (params.nScanDepth > 0) {
+			for (Hypothesis h : beam) {
+				closeOverdue(h.tracks, now, h.finished);
+			}
+			return;
+		}
+		closeOverdue(tracks, now, null);
+	}
+
+	/**
+	 * Coast the tracks in {@code trackList} forward to {@code now}, closing any that
+	 * cannot reach it within {@code maxCoast} missed clicks. A closed track is added
+	 * to {@code finishedSink} if given, otherwise reported straight to the listener
+	 * (the greedy path emits immediately; the N-scan path defers emission until the
+	 * owning hypothesis is committed).
+	 */
+	private void closeOverdue(ArrayList<ClickTrack> trackList, double now, ArrayList<ClickTrack> finishedSink) {
+		Iterator<ClickTrack> it = trackList.iterator();
 		while (it.hasNext()) {
 			ClickTrack track = it.next();
 			if (track.size() < 2) {
@@ -119,7 +155,7 @@ public class UKFTracker {
 				// that is really too far away). Close if no second click arrived within the
 				// maximum ICI, so a too-slow train never bootstraps.
 				if (now - track.getLastTimeSeconds() > params.maxICI) {
-					listener.trackFinished(track);
+					finishTrack(track, finishedSink);
 					it.remove();
 				}
 				continue;
@@ -131,9 +167,17 @@ public class UKFTracker {
 			}
 			// still overdue after the maximum number of coasts -> the track has ended.
 			if ((now - track.getLastTimeSeconds()) > 1.5 * track.expectedICI()) {
-				listener.trackFinished(track);
+				finishTrack(track, finishedSink);
 				it.remove();
 			}
+		}
+	}
+
+	private void finishTrack(ClickTrack track, ArrayList<ClickTrack> finishedSink) {
+		if (finishedSink != null) {
+			finishedSink.add(track);
+		} else {
+			listener.trackFinished(track);
 		}
 	}
 
@@ -155,16 +199,23 @@ public class UKFTracker {
 		}
 
 		boolean[] trackMatched = new boolean[tracks.size()];
+		boolean[] highMatched = new boolean[high.size()];
+		boolean[] lowMatched = new boolean[low.size()];
 
-		// stage 1: high-confidence detections against all tracks.
-		boolean[] highMatched = associate(high, trackMatched);
-
-		// stage 2: low-confidence detections against still-unmatched tracks.
+		// Association is ordered by track maturity, then by detection confidence. A
+		// confirmed (established) track gets first pick of every detection so a
+		// freshly-started tentative track cannot steal a click from it; within each
+		// maturity class the ByteTrack high/low-confidence split still applies.
+		associate(high, highMatched, trackMatched, true); // confirmed tracks, high-conf dets
 		if (params.twoStage && !low.isEmpty()) {
-			associate(low, trackMatched);
+			associate(low, lowMatched, trackMatched, true); // confirmed tracks, low-conf dets
+		}
+		associate(high, highMatched, trackMatched, false); // tentative tracks, high-conf dets
+		if (params.twoStage && !low.isEmpty()) {
+			associate(low, lowMatched, trackMatched, false); // tentative tracks, low-conf dets
 		}
 
-		// unmatched high-confidence detections start new tracks.
+		// unmatched high-confidence detections start new (tentative) tracks.
 		for (int d = 0; d < high.size(); d++) {
 			if (!highMatched[d]) {
 				PamDataUnit<?, ?> click = high.get(d);
@@ -175,65 +226,320 @@ public class UKFTracker {
 	}
 
 	/**
-	 * Associate a set of detections to the active tracks via Hungarian assignment,
-	 * updating matched tracks. Tracks already matched (in {@code trackMatched}) are
-	 * excluded.
+	 * Associate a set of detections to a maturity class of active tracks via
+	 * Hungarian assignment, updating matched tracks. Only tracks whose confirmed
+	 * state equals {@code confirmed} and that are not already matched (in
+	 * {@code trackMatched}) are considered, and only detections not already matched
+	 * (in {@code detMatched}) are offered. Both masks are updated in place so the
+	 * method can be called repeatedly for successive maturity/confidence stages over
+	 * the same detection list.
 	 *
-	 * @return a boolean array, one per detection, true if it was matched.
+	 * @param dets         - the candidate detections.
+	 * @param detMatched   - per-detection matched mask (updated in place).
+	 * @param trackMatched - per-track matched mask, indexed over all tracks (updated
+	 *                       in place).
+	 * @param confirmed    - whether to associate confirmed (true) or tentative
+	 *                       (false) tracks in this pass.
 	 */
-	private boolean[] associate(ArrayList<PamDataUnit<?, ?>> dets, boolean[] trackMatched) {
-		boolean[] detMatched = new boolean[dets.size()];
+	private void associate(ArrayList<PamDataUnit<?, ?>> dets, boolean[] detMatched, boolean[] trackMatched,
+			boolean confirmed) {
 		if (dets.isEmpty()) {
-			return detMatched;
+			return;
 		}
 
 		ArrayList<Integer> candTracks = new ArrayList<>();
 		for (int i = 0; i < tracks.size(); i++) {
-			if (!trackMatched[i]) {
+			if (!trackMatched[i] && tracks.get(i).isConfirmed() == confirmed) {
 				candTracks.add(i);
 			}
 		}
 		if (candTracks.isEmpty()) {
-			return detMatched;
+			return;
 		}
 
-		double[][] cost = new double[candTracks.size()][dets.size()];
-		double[][][] measCache = new double[candTracks.size()][dets.size()][];
+		ArrayList<Integer> candDets = new ArrayList<>();
+		for (int c = 0; c < dets.size(); c++) {
+			if (!detMatched[c]) {
+				candDets.add(c);
+			}
+		}
+		if (candDets.isEmpty()) {
+			return;
+		}
+
+		double[][] cost = new double[candTracks.size()][candDets.size()];
+		double[][][] measCache = new double[candTracks.size()][candDets.size()][];
 		for (int r = 0; r < candTracks.size(); r++) {
 			ClickTrack track = tracks.get(candTracks.get(r));
 			// the unscented measurement prediction depends only on the track, so compute
 			// it once and reuse it for every candidate detection.
 			UnscentedKalmanFilter.Prediction prediction = track.predictMeasurement();
-			for (int c = 0; c < dets.size(); c++) {
-				PamDataUnit<?, ?> det = dets.get(c);
+			for (int cc = 0; cc < candDets.size(); cc++) {
+				PamDataUnit<?, ?> det = dets.get(candDets.get(cc));
 				double t = timeSeconds(det);
 				double ici = t - track.getLastTimeSeconds();
 				if (ici <= 0 || ici > params.maxICI) {
-					cost[r][c] = FORBIDDEN_COST;
+					cost[r][cc] = FORBIDDEN_COST;
 					continue;
 				}
 				double[] z = track.measurement(t, det.getAmplitudeDB(), bearingOf(det));
-				measCache[r][c] = z;
+				measCache[r][cc] = z;
 				double aff = affinity.affinity(associationFeatures(track, z, t, params, prediction));
-				cost[r][c] = aff < params.minAffinity ? FORBIDDEN_COST : -Math.log(aff);
+				cost[r][cc] = aff < params.minAffinity ? FORBIDDEN_COST : -Math.log(aff);
 			}
 		}
 
 		int[] rowToCol = HungarianAlgorithm.solve(cost);
 		for (int r = 0; r < rowToCol.length; r++) {
-			int c = rowToCol[r];
-			if (c < 0 || cost[r][c] >= FORBIDDEN_COST) {
+			int cc = rowToCol[r];
+			if (cc < 0 || cost[r][cc] >= FORBIDDEN_COST) {
 				continue;
 			}
 			int trackIndex = candTracks.get(r);
+			int detIndex = candDets.get(cc);
 			ClickTrack track = tracks.get(trackIndex);
-			PamDataUnit<?, ?> det = dets.get(c);
+			PamDataUnit<?, ?> det = dets.get(detIndex);
 			track.predict();
-			track.update(measCache[r][c], det, timeSeconds(det));
+			track.update(measCache[r][cc], det, timeSeconds(det));
 			trackMatched[trackIndex] = true;
-			detMatched[c] = true;
+			detMatched[detIndex] = true;
 		}
-		return detMatched;
+	}
+
+	/* -------------------- N-scan multi-hypothesis pipeline -------------------- */
+
+	/** Start (or restart) the beam with a single empty hypothesis. */
+	private void initBeam() {
+		beam = new ArrayList<>();
+		beam.add(new Hypothesis(new ArrayList<>(), new ArrayList<>(), 0.0, 0));
+		framesSinceCommit = 0;
+	}
+
+	/**
+	 * Process one frame of detections through the fixed-lag multi-hypothesis beam.
+	 * Each hypothesis is expanded by the Murty k-best global assignments of its
+	 * tracks to the frame's detections (with miss and new-track options folded into
+	 * an augmented cost matrix); the resulting children are pruned to the beam width,
+	 * and the best hypothesis is committed once every {@code nScanDepth} frames.
+	 */
+	private void processBeam(ArrayList<PamDataUnit<?, ?>> dets, double now) {
+		// coast/close overdue tracks in every hypothesis (deferred emission).
+		for (Hypothesis h : beam) {
+			closeOverdue(h.tracks, now, h.finished);
+		}
+
+		boolean[] isHigh = new boolean[dets.size()];
+		for (int c = 0; c < dets.size(); c++) {
+			isHigh[c] = !params.twoStage || dets.get(c).getAmplitudeDB() >= params.confidenceAmplitude;
+		}
+
+		ArrayList<Hypothesis> children = new ArrayList<>();
+		for (Hypothesis h : beam) {
+			double[][] cost = buildAssignmentMatrix(h, dets, isHigh, now);
+			if (cost.length == 0) {
+				children.add(h); // no tracks and no detections - carry the hypothesis forward.
+				continue;
+			}
+			List<int[]> assignments = MurtyKBest.kBest(cost, params.nScanKBest);
+			if (assignments.isEmpty()) {
+				children.add(h);
+				continue;
+			}
+			for (int[] assignment : assignments) {
+				children.add(applyAssignment(h, assignment, dets, isHigh, now, cost));
+			}
+		}
+
+		// prune the beam to the lowest-scoring hypotheses.
+		children.sort((a, b) -> Double.compare(a.score, b.score));
+		int keep = Math.min(params.beamWidth, children.size());
+		beam = new ArrayList<>(children.subList(0, keep));
+
+		// commit the best hypothesis once the deferral window has elapsed.
+		framesSinceCommit++;
+		if (framesSinceCommit >= params.nScanDepth) {
+			commitBeam();
+		}
+	}
+
+	/**
+	 * Build the augmented square assignment-cost matrix for a hypothesis. Rows are
+	 * {@code [tracks | one miss-dummy per track]} and columns are
+	 * {@code [detections | one new-track dummy per detection]}, so a complete minimum
+	 * assignment chooses, at the right relative cost, whether each track takes a
+	 * detection or misses and whether each detection joins a track or starts a new
+	 * one.
+	 */
+	private double[][] buildAssignmentMatrix(Hypothesis h, ArrayList<PamDataUnit<?, ?>> dets, boolean[] isHigh,
+			double now) {
+		int t = h.tracks.size();
+		int d = dets.size();
+		int n = t + d;
+		double[][] cost = new double[n][n];
+		for (double[] row : cost) {
+			java.util.Arrays.fill(row, MurtyKBest.FORBIDDEN);
+		}
+
+		// block A: track <-> detection edge costs.
+		for (int r = 0; r < t; r++) {
+			ClickTrack track = h.tracks.get(r);
+			UnscentedKalmanFilter.Prediction prediction = track.predictMeasurement();
+			for (int c = 0; c < d; c++) {
+				PamDataUnit<?, ?> det = dets.get(c);
+				double time = timeSeconds(det);
+				double ici = time - track.getLastTimeSeconds();
+				if (ici <= 0 || ici > params.maxICI) {
+					continue;
+				}
+				double[] z = track.measurement(time, det.getAmplitudeDB(), bearingOf(det));
+				double aff = affinity.affinity(associationFeatures(track, z, time, params, prediction));
+				if (aff >= params.minAffinity) {
+					cost[r][c] = -Math.log(aff);
+				}
+			}
+		}
+		// block B: each track's own miss (coast) dummy column, charged only if due.
+		for (int r = 0; r < t; r++) {
+			cost[r][d + r] = isDue(h.tracks.get(r), now) ? params.nScanCoastCost : 0.0;
+		}
+		// block C: each detection's own new-track / drop dummy row.
+		for (int c = 0; c < d; c++) {
+			cost[t + c][c] = params.nScanNewTrackCost;
+		}
+		// block D: leftover dummies pair at zero cost.
+		for (int c = 0; c < d; c++) {
+			for (int r = 0; r < t; r++) {
+				cost[t + c][d + r] = 0.0;
+			}
+		}
+		return cost;
+	}
+
+	/**
+	 * Apply one global assignment to a copy of a parent hypothesis: matched tracks
+	 * are updated with their detection, unmatched due tracks coast (already priced
+	 * in), and unmatched high-confidence detections start new tracks. The child's
+	 * cumulative score is the parent's plus this assignment's total cost.
+	 */
+	private Hypothesis applyAssignment(Hypothesis parent, int[] assignment, ArrayList<PamDataUnit<?, ?>> dets,
+			boolean[] isHigh, double now, double[][] cost) {
+		Hypothesis child = parent.copy();
+		int t = parent.tracks.size();
+		int d = dets.size();
+
+		double inc = 0;
+		boolean[] detMatched = new boolean[d];
+		for (int r = 0; r < t; r++) {
+			int col = assignment[r];
+			inc += cost[r][col];
+			if (col < d) {
+				ClickTrack track = child.tracks.get(r);
+				PamDataUnit<?, ?> det = dets.get(col);
+				double time = timeSeconds(det);
+				double[] z = track.measurement(time, det.getAmplitudeDB(), bearingOf(det));
+				track.predict();
+				track.update(z, det, time);
+				detMatched[col] = true;
+			}
+			// col >= d is the track's miss dummy: nothing to apply (time-based coasting is
+			// handled by closeOverdue on the next frame).
+		}
+		for (int c = 0; c < d; c++) {
+			if (!detMatched[c]) {
+				inc += cost[t + c][c];
+				if (isHigh[c]) {
+					PamDataUnit<?, ?> det = dets.get(c);
+					child.tracks.add(new ClickTrack(child.nextTrackId++, model, params, det, timeSeconds(det),
+							det.getAmplitudeDB(), bearingOf(det)));
+				}
+			}
+		}
+		child.score = parent.score + inc;
+		return child;
+	}
+
+	/**
+	 * Commit the current best hypothesis: emit its finished tracks and collapse the
+	 * beam onto it, so associations older than the deferral window become final.
+	 */
+	private void commitBeam() {
+		if (beam.isEmpty()) {
+			initBeam();
+			return;
+		}
+		Hypothesis best = bestHypothesis();
+		for (ClickTrack track : best.finished) {
+			listener.trackFinished(track);
+		}
+		best.finished.clear();
+		beam = new ArrayList<>();
+		beam.add(best);
+		framesSinceCommit = 0;
+	}
+
+	/** Finalise the beam at end of processing: emit the best hypothesis in full. */
+	private void finaliseBeam() {
+		if (!beam.isEmpty()) {
+			Hypothesis best = bestHypothesis();
+			best.finished.addAll(best.tracks);
+			best.tracks.clear();
+			for (ClickTrack track : best.finished) {
+				listener.trackFinished(track);
+			}
+		}
+		initBeam();
+	}
+
+	private Hypothesis bestHypothesis() {
+		Hypothesis best = beam.get(0);
+		for (Hypothesis h : beam) {
+			if (h.score < best.score) {
+				best = h;
+			}
+		}
+		return best;
+	}
+
+	/**
+	 * Whether a track is "due" a detection at the given time - i.e. the frame has
+	 * reached (within half a frame) the time the track expects its next click. A miss
+	 * is only penalised for a due track, so the normal quiet frames between clicks of
+	 * a train are free.
+	 */
+	private boolean isDue(ClickTrack track, double now) {
+		return now >= track.predictedNextTime() - 0.5 * params.frameDuration;
+	}
+
+	/**
+	 * One global tracking hypothesis for the N-scan beam: a set of active tracks, the
+	 * tracks it has already finished (awaiting commit), a cumulative association
+	 * score (lower is better) and the next track id to allocate.
+	 */
+	private static final class Hypothesis {
+		private final ArrayList<ClickTrack> tracks;
+		private final ArrayList<ClickTrack> finished;
+		private double score;
+		private int nextTrackId;
+
+		private Hypothesis(ArrayList<ClickTrack> tracks, ArrayList<ClickTrack> finished, double score, int nextTrackId) {
+			this.tracks = tracks;
+			this.finished = finished;
+			this.score = score;
+			this.nextTrackId = nextTrackId;
+		}
+
+		/**
+		 * A deep-ish copy: active tracks are branched (UKF cloned, clicks shared
+		 * copy-on-write); the finished list is copied but its already-frozen tracks are
+		 * shared.
+		 */
+		private Hypothesis copy() {
+			ArrayList<ClickTrack> t2 = new ArrayList<>(tracks.size());
+			for (ClickTrack track : tracks) {
+				t2.add(track.copy());
+			}
+			return new Hypothesis(t2, new ArrayList<>(finished), score, nextTrackId);
+		}
 	}
 
 	/**

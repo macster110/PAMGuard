@@ -86,10 +86,13 @@ public class AdaptiveCTParams extends MHTChi2Params implements Serializable, Clo
 
 	@Override
 	public AdaptiveCTParams clone() {
-		// MHTKernelParams.clone() is not visible from this package; the kernel params
-		// are not edited via the settings pane so the shallow copy from super.clone()
-		// is sufficient.
-		return (AdaptiveCTParams) super.clone();
+		AdaptiveCTParams cloned = (AdaptiveCTParams) super.clone();
+		// deep-copy the nested kernel params so editing them via the settings pane (which
+		// works on a clone) does not mutate the live parameters.
+		if (mhtKernel != null) {
+			cloned.mhtKernel = mhtKernel.clone();
+		}
+		return cloned;
 	}
 
 	@Override

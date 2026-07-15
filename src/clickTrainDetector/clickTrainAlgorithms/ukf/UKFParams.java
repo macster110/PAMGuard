@@ -28,14 +28,30 @@ public class UKFParams implements Serializable, Cloneable, ManagedParameters {
 	/** The absolute maximum inter-click interval allowed within a train (seconds). */
 	public double maxICI = 0.4;
 
-	/** Duration of the detection batching window ("frame") in seconds. */
-	public double frameDuration = 0.05;
+	/**
+	 * Duration of the detection batching window ("frame") in seconds. Clicks inside
+	 * one frame are associated together, and each track can take at most one click
+	 * per frame - so this must be shorter than the smallest inter-click interval to
+	 * be resolved, otherwise a fast train (e.g. a porpoise buzz, ICI down to a few
+	 * tens of ms) loses every other click to a spurious new track. Kept well below a
+	 * typical minimum ICI.
+	 */
+	public double frameDuration = 0.02;
 
 	/** Maximum number of consecutive missed clicks before a track is closed. */
 	public int maxCoast = 4;
 
 	/** Minimum number of clicks for a track to be saved. */
 	public int minTrackLength = 3;
+
+	/**
+	 * Number of clicks a track must accumulate before it is "confirmed". Until then
+	 * it is tentative and is only offered detections after every confirmed track has
+	 * claimed one, so a freshly-started (possibly spurious) track cannot steal a
+	 * click from an established train. Should be &gt;= 2 and no greater than
+	 * {@link #minTrackLength}.
+	 */
+	public int confirmHits = 3;
 
 	/* ---- two-stage (ByteTrack) association ---- */
 
@@ -97,6 +113,47 @@ public class UKFParams implements Serializable, Cloneable, ManagedParameters {
 	 * below this, or beyond the ICI gate, are forbidden.
 	 */
 	public double minAffinity = 0.05;
+
+	/* ---- N-scan multi-hypothesis deferral ---- */
+
+	/**
+	 * Association deferral depth, in frames. 0 (the default) uses the single-frame
+	 * greedy nearest-neighbour association, which commits every frame's assignment
+	 * immediately. A positive value turns on a fixed-lag multi-hypothesis search: the
+	 * best few global assignments are kept for up to this many frames before the
+	 * winner is committed, so an ambiguous association (e.g. two trains crossing) can
+	 * be corrected by later evidence instead of being locked in. 4-8 is a reasonable
+	 * range; larger values defer longer (more robust, more memory/CPU).
+	 */
+	public int nScanDepth = 7;
+
+	/**
+	 * Number of global hypotheses kept in the N-scan beam. Only used when
+	 * {@link #nScanDepth} &gt; 0. Larger explores more association possibilities at
+	 * proportionally more cost.
+	 */
+	public int beamWidth = 3;
+
+	/**
+	 * Number of best assignments (Murty k-best) generated per hypothesis per frame in
+	 * the N-scan search. Only used when {@link #nScanDepth} &gt; 0.
+	 */
+	public int nScanKBest = 3;
+
+	/**
+	 * Cost (nats) charged in the N-scan search when an active, currently-due track is
+	 * left without a detection in a frame (a missed click). Only used when
+	 * {@link #nScanDepth} &gt; 0. Should be cheaper than accepting a clearly wrong
+	 * match but dear enough that a good match is preferred.
+	 */
+	public double nScanCoastCost = 1.5;
+
+	/**
+	 * Cost (nats) charged in the N-scan search when a high-confidence detection is
+	 * not associated to any existing track and instead starts a new one. Only used
+	 * when {@link #nScanDepth} &gt; 0.
+	 */
+	public double nScanNewTrackCost = 2.5;
 
 	/* ---- learned affinity network ---- */
 

@@ -15,25 +15,64 @@ public class ClickTrack {
 	private final TrackStateModel model;
 	private final UnscentedKalmanFilter ukf;
 
+	/** Number of clicks needed to promote this track from tentative to confirmed. */
+	private final int confirmHits;
+
 	/** Time (seconds) of the last click assigned to this track. */
 	private double lastTimeSeconds;
 
 	/** Number of consecutive frames with no assigned click. */
 	private int coast = 0;
 
-	/** Clicks belonging to this track, in time order. */
-	private final ArrayList<PamDataUnit> clicks = new ArrayList<>();
+	/**
+	 * Clicks belonging to this track, in time order. May be shared with a copied
+	 * track (see {@link #clicksShared}) until one of them appends, at which point it
+	 * is copied - so branching a hypothesis for N-scan search is cheap.
+	 */
+	private ArrayList<PamDataUnit> clicks = new ArrayList<>();
+
+	/**
+	 * Whether {@link #clicks} is currently shared with another (copied) track and so
+	 * must be copied before the next append.
+	 */
+	private boolean clicksShared = false;
 
 	public ClickTrack(int id, TrackStateModel model, UKFParams params, PamDataUnit firstClick, double timeSeconds,
 			double amp, double bearing) {
 		this.id = id;
 		this.model = model;
+		this.confirmHits = Math.max(2, params.confirmHits);
 		double logICI0 = Math.log(Math.max(params.maxICI * 0.5, 1e-3));
 		double[] x0 = model.initialState(logICI0, amp, bearing);
 		double[][] p0 = model.initialCovariance();
 		this.ukf = new UnscentedKalmanFilter(model, x0, p0);
 		this.lastTimeSeconds = timeSeconds;
 		this.clicks.add(firstClick);
+	}
+
+	/**
+	 * Copy constructor - clones the UKF state and shares the click list copy-on-write.
+	 */
+	private ClickTrack(ClickTrack src) {
+		this.id = src.id;
+		this.model = src.model;
+		this.confirmHits = src.confirmHits;
+		this.ukf = src.ukf.copy();
+		this.lastTimeSeconds = src.lastTimeSeconds;
+		this.coast = src.coast;
+		// share the click list; both tracks flag it shared so whichever appends first
+		// makes its own copy.
+		this.clicks = src.clicks;
+		this.clicksShared = true;
+		src.clicksShared = true;
+	}
+
+	/**
+	 * An independent copy of this track for multi-hypothesis (N-scan) branching. The
+	 * UKF state is cloned; the click list is shared copy-on-write.
+	 */
+	public ClickTrack copy() {
+		return new ClickTrack(this);
 	}
 
 	/** UKF prediction step. */
@@ -89,6 +128,11 @@ public class ClickTrack {
 		ukf.update(z);
 		lastTimeSeconds = timeSeconds;
 		coast = 0;
+		if (clicksShared) {
+			// copy-on-write: we are about to diverge from any track we were copied from.
+			clicks = new ArrayList<>(clicks);
+			clicksShared = false;
+		}
 		clicks.add(click);
 	}
 
@@ -112,6 +156,15 @@ public class ClickTrack {
 
 	public int getCoast() {
 		return coast;
+	}
+
+	/**
+	 * Whether this track is confirmed - i.e. it has accumulated at least
+	 * {@code confirmHits} clicks. Tentative (unconfirmed) tracks are only offered
+	 * detections after every confirmed track has been given the chance to claim one.
+	 */
+	public boolean isConfirmed() {
+		return clicks.size() >= confirmHits;
 	}
 
 	public double getLastTimeSeconds() {

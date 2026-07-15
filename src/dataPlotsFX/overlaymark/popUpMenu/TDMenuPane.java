@@ -233,27 +233,28 @@ public class TDMenuPane extends PamBorderPane {
 	/**
 	 * Set the summary text for the data unit in the menu. 
 	 */
-	private void setSummaryText() {		
+	private void setSummaryText() {
 		if (currentDataUnit==null || detectionSummary==null) {
 			this.infoTextLabel.setText("No data units selected");
-			return; 
+			return;
 		}
 
-		String text; 
+		String text;
 		if (detectionSummary.getDataList().size()>=1){
 //			text= currentDataUnit.getSummaryString();
-						
+
 			text=currentDataUnit.getParentDataBlock().
 					getHoverText(tdGraphFX.getGraphProjector(), currentDataUnit, 0);
-			
-			
+
+
 			if (text==null) return; //do not clear as usually this is because a super unit has been set
 		}
 		else {
-			//selected an area with no data units. 
-			text= new String("No data units selected"); 
+			//selected an area with no data units.
+			text= new String("No data units selected");
 		}
 
+		//the hover/summary text is often HTML - htmlToNormal converts basic tags to formatted plain text.
 		this.infoTextLabel.setText(PamUtilsFX.htmlToNormal(text));
 	}
 

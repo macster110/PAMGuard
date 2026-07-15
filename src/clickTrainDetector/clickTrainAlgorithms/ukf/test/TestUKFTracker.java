@@ -35,10 +35,13 @@ public class TestUKFTracker {
 		testCustomAffinity();
 
 		testSingleRegularTrain();
+		testFastTrain();
 		testTwoInterleavedTrains();
 		testBearingSeparatedTrains();
 		testCoastingGap();
 		testTwoStageRecovery();
+		testConfirmationRejectsClutter();
+		testCrossingTrainsNScan();
 		testRejectTooSlow();
 
 		System.out.println("\n==================================");
@@ -190,6 +193,22 @@ public class TestUKFTracker {
 		}
 	}
 
+	/**
+	 * A fast train whose ICI (0.03s) is below the old default frame window (0.05s)
+	 * should still be recovered as one train. With a frame longer than the ICI, two
+	 * clicks of the train land in the same frame and one is lost to a spurious new
+	 * track each time; a frame shorter than the ICI (0.02s) keeps the train intact.
+	 */
+	private static void testFastTrain() {
+		List<SimpleClick> clicks = new ArrayList<>();
+		generateTrain(clicks, 0, 1.0, 0.03, 0.001, 120, -0.05, 1.0, null, 30, new Random(15));
+		UKFParams params = defaultParams();
+		params.frameDuration = 0.02;
+		List<Integer> trains = runTracker(clicks, params, false);
+		assertTrue("Fast train recovered as one train (got " + trains.size() + " sizes " + trains + ")",
+				trains.size() == 1 && trains.get(0) >= 25);
+	}
+
 	private static void testTwoInterleavedTrains() {
 		List<SimpleClick> clicks = new ArrayList<>();
 		generateTrain(clicks, 0, 1.00, 0.10, 0.003, 122, -0.10, 1.0, null, 25, new Random(2));
@@ -243,6 +262,80 @@ public class TestUKFTracker {
 				+ ")", trains.size() == 1 && trains.get(0) >= 20);
 	}
 
+	/**
+	 * A clean train sprinkled with isolated high-amplitude clutter clicks should keep
+	 * its clicks: because confirmed tracks are associated before tentative ones, the
+	 * established train wins every contested click and stays intact, rather than
+	 * having clicks stolen by the short tentative tracks the clutter spawns. (Clutter
+	 * clicks that happen to fall a train-like interval apart may still form their own
+	 * short track - that is a false-positive/minimum-length question, not a
+	 * fragmentation of the real train, so we assert only that the real train survives
+	 * essentially whole.)
+	 */
+	private static void testConfirmationRejectsClutter() {
+		List<SimpleClick> clicks = new ArrayList<>();
+		generateTrain(clicks, 0, 1.0, 0.1, 0.003, 118, 0.0, 1.0, null, 30, new Random(16));
+		// scatter 6 loud clutter clicks across the same time span.
+		Random r = new Random(17);
+		double span = 0.1 * 30;
+		for (int i = 0; i < 6; i++) {
+			double t = 1.0 + r.nextDouble() * span;
+			clicks.add(new SimpleClick(1000 + i, t, 119 + r.nextGaussian(), SR));
+		}
+		sortByTime(clicks);
+		List<Integer> trains = runTracker(clicks, defaultParams(), false);
+		int big = 0;
+		int largest = 0;
+		for (int s : trains) {
+			if (s >= 25) {
+				big++;
+			}
+			largest = Math.max(largest, s);
+		}
+		assertTrue("Established train survives clutter intact (got " + trains.size() + " sizes " + trains + ")",
+				big == 1 && largest >= 28);
+	}
+
+	/**
+	 * Two trains that cross in bearing (ambiguous at the crossing) with distinct ICIs.
+	 * The single-frame greedy tracker swaps the two trains' identities at the crossing
+	 * (mixing their clicks); the N-scan multi-hypothesis mode defers the decision and
+	 * lets later ICI/bearing evidence pick the globally consistent assignment, making
+	 * far fewer association errors. We measure errors as UID "impurity" (clicks in a
+	 * saved train that do not belong to its majority true source) and assert N-scan
+	 * makes strictly fewer than the greedy tracker while still recovering the trains.
+	 * N-scan tends to break a track at the ambiguous crossing rather than merge across
+	 * it, so it may return more (but purer) trains - hence we do not require exactly
+	 * two.
+	 */
+	private static void testCrossingTrainsNScan() {
+		List<SimpleClick> clicks = new ArrayList<>();
+		// Two trains cleanly separated in bearing at the ends (30 vs 150 deg) that sweep
+		// through each other, coinciding at ~90 deg mid-run. Their ICIs stay distinct
+		// (0.09 vs 0.13 s) throughout, so the correct association is recoverable through
+		// the bearing crossing - but a greedy tracker can swap identities at the moment
+		// the bearings coincide.
+		generateTrainBearingSweep(clicks, 0, 1.00, 0.090, 0.002, 118, 30.0, 5.0, 1.0, 25, new Random(50));
+		generateTrainBearingSweep(clicks, 1000, 1.00, 0.130, 0.002, 118, 150.0, -5.0, 1.0, 25, new Random(51));
+		sortByTime(clicks);
+
+		UKFParams gnn = defaultParams();
+		int gnnImpurity = impurity(runTrackerTrains(clicks, gnn, true));
+
+		UKFParams nscan = defaultParams();
+		nscan.nScanDepth = 6;
+		nscan.beamWidth = 4;
+		nscan.nScanKBest = 4;
+		List<List<Long>> nscanTrains = runTrackerTrains(clicks, nscan, true);
+		int nscanImpurity = impurity(nscanTrains);
+
+		System.out.println("    [info] crossing trains: GNN impurity=" + gnnImpurity + ", N-scan impurity="
+				+ nscanImpurity + " (" + nscanTrains.size() + " N-scan trains)");
+		assertTrue("N-scan makes fewer crossing association errors than greedy (GNN=" + gnnImpurity + ", N-scan="
+				+ nscanImpurity + ")",
+				nscanImpurity < gnnImpurity && nscanImpurity <= 6 && nscanTrains.size() >= 2);
+	}
+
 	private static void testRejectTooSlow() {
 		List<SimpleClick> clicks = new ArrayList<>();
 		generateTrain(clicks, 0, 1.0, 0.6, 0.005, 120, 0.0, 1.0, null, 20, new Random(8));
@@ -262,6 +355,10 @@ public class TestUKFTracker {
 		params.useBearing = true;
 		params.twoStage = true;
 		params.confidenceAmplitude = 0.0;
+		// the scenario tests below (and the crossing test's baseline) exercise the greedy
+		// single-frame path; the N-scan path is turned on explicitly where it is tested,
+		// so pin this off regardless of the production default.
+		params.nScanDepth = 0;
 		return params;
 	}
 
@@ -281,6 +378,67 @@ public class TestUKFTracker {
 		}
 		tracker.finaliseAll();
 		return sizes;
+	}
+
+	/**
+	 * Run clicks through the tracker and return, per saved train (>= minTrackLength),
+	 * the list of click UIDs. Used to score association purity against ground truth.
+	 */
+	private static List<List<Long>> runTrackerTrains(List<SimpleClick> clicks, UKFParams params,
+			boolean bearingAvailable) {
+		List<List<Long>> trains = new ArrayList<>();
+		UKFTracker tracker = new UKFTracker(params, bearingAvailable, (ClickTrack track) -> {
+			if (track.size() >= params.minTrackLength) {
+				List<Long> uids = new ArrayList<>();
+				for (Object click : track.getClicks()) {
+					uids.add(((SimpleClick) click).getUID());
+				}
+				trains.add(uids);
+			}
+		});
+		for (SimpleClick click : clicks) {
+			tracker.addClick(click);
+		}
+		tracker.finaliseAll();
+		return trains;
+	}
+
+	/**
+	 * Total association impurity across all saved trains: for each train, the number
+	 * of clicks not belonging to that train's majority true source (UID &lt; 1000 is
+	 * train A, otherwise train B). Zero means every train is perfectly pure.
+	 */
+	private static int impurity(List<List<Long>> trains) {
+		int total = 0;
+		for (List<Long> train : trains) {
+			int a = 0;
+			int b = 0;
+			for (long uid : train) {
+				if (uid < 1000) {
+					a++;
+				} else {
+					b++;
+				}
+			}
+			total += Math.min(a, b);
+		}
+		return total;
+	}
+
+	/**
+	 * Generate a train whose bearing changes linearly (a smooth sweep) at a given
+	 * per-click rate (degrees), with bearing jitter, and append it to the list.
+	 */
+	private static void generateTrainBearingSweep(List<SimpleClick> clicks, int uidStart, double t0, double ici,
+			double iciJitter, double amp, double bearingStartDeg, double bearingRateDeg, double bearingJitterDeg, int n,
+			Random random) {
+		double t = t0;
+		for (int i = 0; i < n; i++) {
+			double a = amp + random.nextGaussian();
+			double bearing = bearingStartDeg + i * bearingRateDeg + random.nextGaussian() * bearingJitterDeg;
+			clicks.add(new SimpleClick(uidStart + i, Double.valueOf(t), Double.valueOf(a), Double.valueOf(bearing), SR));
+			t += ici + random.nextGaussian() * iciJitter;
+		}
 	}
 
 	private static void generateTrain(List<SimpleClick> clicks, int uidStart, double t0, double ici, double iciJitter,

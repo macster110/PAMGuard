@@ -17,6 +17,7 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Slider;
 import javafx.scene.control.Spinner;
+import javafx.scene.control.TitledPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Pane;
 import javafx.scene.text.Font;
@@ -59,6 +60,14 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 
 	private PamToggleSwitch useCorrelation;
 
+	private PamSpinner<Integer> maxCoastSpinner;
+
+	private PamSpinner<Integer> nHoldSpinner;
+
+	private PamSpinner<Integer> nPrunebackSpinner;
+
+	private PamSpinner<Integer> nPruneBackStartSpinner;
+
 	public AdaptiveCTSettingsPane(AdaptiveClickTrainAlgorithm adaptiveClickTrainAlgorithm) {
 		super(null);
 		this.adaptiveClickTrainAlgorithm = adaptiveClickTrainAlgorithm;
@@ -98,6 +107,20 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 	private static final String TIP_CORRELATION =
 			"Group clicks by waveform similarity (cross correlation), and refine the ICI measurement.\n"
 					+ "More accurate but more processor intensive. Available only when waveform data is present.";
+
+	private static final String TIP_MAXCOAST =
+			"Maximum number of consecutive missed clicks (coasts) bridged before a train is ended.";
+
+	private static final String TIP_NHOLD =
+			"Number of candidate track hypotheses the multi-hypothesis search keeps at each step.\n"
+					+ "Larger is more thorough but uses more memory and processing.";
+
+	private static final String TIP_NPRUNEBACK =
+			"How many clicks back the search looks before pruning (committing) the older part of a\n"
+					+ "hypothesis. Larger defers decisions longer (more robust to ambiguity, more processing).";
+
+	private static final String TIP_NPRUNEBACKSTART =
+			"Number of clicks that must accumulate before pruning of hypotheses begins.";
 
 	private Pane createPane() {
 
@@ -147,9 +170,61 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		holder.setSpacing(8);
 		holder.setPadding(new Insets(10, 0, 0, 0));
 		holder.getChildren().addAll(title, grid, new javafx.scene.control.Separator(), createFeaturePane(),
-				new javafx.scene.control.Separator(), createDefaultSpeciesPane());
+				createAdvancedPane(), new javafx.scene.control.Separator(), createDefaultSpeciesPane());
 
 		return holder;
+	}
+
+	/**
+	 * Create the collapsible "Advanced" pane exposing the underlying multi-hypothesis
+	 * (MHT) kernel search parameters. These have sensible defaults and are not usually
+	 * changed, so the pane is collapsed by default.
+	 */
+	private Node createAdvancedPane() {
+		PamGridPane grid = new PamGridPane();
+		grid.setHgap(5);
+		grid.setVgap(8);
+		int row = 0;
+
+		maxCoastSpinner = intSpinner(1, 100, 4);
+		maxCoastSpinner.setTooltip(new Tooltip(TIP_MAXCOAST));
+		grid.add(tipLabel("Max. coasts", TIP_MAXCOAST), 0, row);
+		grid.add(maxCoastSpinner, 1, row++);
+
+		nHoldSpinner = intSpinner(1, 1000, 20);
+		nHoldSpinner.setTooltip(new Tooltip(TIP_NHOLD));
+		grid.add(tipLabel("Hypotheses held", TIP_NHOLD), 0, row);
+		grid.add(nHoldSpinner, 1, row++);
+
+		nPrunebackSpinner = intSpinner(1, 100, 4);
+		nPrunebackSpinner.setTooltip(new Tooltip(TIP_NPRUNEBACK));
+		grid.add(tipLabel("Prune-back", TIP_NPRUNEBACK), 0, row);
+		grid.add(withUnit(nPrunebackSpinner, "clicks"), 1, row++);
+
+		nPruneBackStartSpinner = intSpinner(1, 100, 5);
+		nPruneBackStartSpinner.setTooltip(new Tooltip(TIP_NPRUNEBACKSTART));
+		grid.add(tipLabel("Prune-back start", TIP_NPRUNEBACKSTART), 0, row);
+		grid.add(withUnit(nPruneBackStartSpinner, "clicks"), 1, row++);
+
+		TitledPane titled = new TitledPane("Advanced (multi-hypothesis search)", grid);
+		titled.setExpanded(false);
+		return titled;
+	}
+
+	private PamSpinner<Integer> intSpinner(int min, int max, int init) {
+		PamSpinner<Integer> spinner = new PamSpinner<>(min, max, init, 1);
+		spinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+		spinner.setEditable(true);
+		spinner.setPrefWidth(90);
+		return spinner;
+	}
+
+	private Pane withUnit(Node control, String unit) {
+		PamHBox box = new PamHBox();
+		box.setAlignment(Pos.CENTER_LEFT);
+		box.setSpacing(5);
+		box.getChildren().addAll(control, new Label(unit));
+		return box;
 	}
 
 	/**
@@ -279,6 +354,12 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		params.useBearing = useBearing.isSelected();
 		params.bearingFloorDeg = bearingFloorSpinner.getValue();
 		params.useCorrelation = useCorrelation.isSelected();
+		if (params.mhtKernel != null) {
+			params.mhtKernel.maxCoast = maxCoastSpinner.getValue();
+			params.mhtKernel.nHold = nHoldSpinner.getValue();
+			params.mhtKernel.nPruneback = nPrunebackSpinner.getValue();
+			params.mhtKernel.nPruneBackStart = nPruneBackStartSpinner.getValue();
+		}
 		return params;
 	}
 
@@ -292,6 +373,12 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		useBearing.setSelected(input.useBearing);
 		bearingFloorSpinner.getValueFactory().setValue(input.bearingFloorDeg);
 		useCorrelation.setSelected(input.useCorrelation);
+		if (input.mhtKernel != null) {
+			maxCoastSpinner.getValueFactory().setValue(input.mhtKernel.maxCoast);
+			nHoldSpinner.getValueFactory().setValue(input.mhtKernel.nHold);
+			nPrunebackSpinner.getValueFactory().setValue(input.mhtKernel.nPruneback);
+			nPruneBackStartSpinner.getValueFactory().setValue(input.mhtKernel.nPruneBackStart);
+		}
 		updateFeatureAvailability(null);
 	}
 
