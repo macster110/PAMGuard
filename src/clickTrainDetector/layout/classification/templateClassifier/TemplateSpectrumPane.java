@@ -356,19 +356,24 @@ public class TemplateSpectrumPane  extends PamBorderPane {
 	
 	private String getTooltipText() {
 		String tooltipText= "";
-		tooltipText+="<b>Import a Spectrum Template</b>"; 
+		tooltipText+="<b>Load a Spectrum Template</b>";
 		tooltipText+="<p>";
-		tooltipText+="Import a custom spectrum from file. Ideally the spectrum should be the same as the sample rate as the DAQ"
-				+ "input into PAMGuard, however PAMGuard will attempt to interpolate if sample rates are different. There are "
-				+ "two methods of importing, MATLAB and CSV";
+		tooltipText+="Press the button to import a custom spectrum template from a file, or use the drop-down menu to "
+				+ "select one of the default templates. Ideally the template should have the same sample rate as the DAQ "
+				+ "input into PAMGuard; if the sample rates are different PAMGuard will interpolate the template. Two "
+				+ "file formats can be imported, MATLAB (.mat) and CSV (.csv).";
 		tooltipText+="<p><p>";
-		tooltipText+="<b>MATLAB</b>";
-		tooltipText+="A struct containing the fields <i>spectrum</i> with a 1D array of amplitude values between -1 and 1 and a field <i>sR</i> with "
-				+ "a single number representing the sample rate in samples per second saved as a .mat file";
+		tooltipText+="<b>MATLAB (.mat)</b>";
+		tooltipText+="A .mat file containing a variable <i>spectrum</i>, a 1D array of linear spectrum amplitude values "
+				+ "(usually normalised between 0 and 1), and a variable <i>sR</i>, a single number, the sample rate in "
+				+ "samples per second.";
 		tooltipText+="<p><p>";
-		tooltipText+="<b>CSV</b>";
-		tooltipText+="A comma delimitted CSV file were the first row is the amplitude values of the spectrum between 0 and 1 and the "
-				+ "second column is a single value represenitng the sample rate in samples per second";
+		tooltipText+="<b>CSV (.csv)</b>";
+		tooltipText+="A comma-delimited CSV file where the first row is the amplitude values of the spectrum (usually "
+				+ "normalised between 0 and 1) and the first value of the second row is the sample rate in samples per second.";
+		tooltipText+="<p><p>";
+		tooltipText+="Templates generated from click events (the <i>Generate template from click events</i> button) are "
+				+ "saved in these same formats and so can be re-imported here.";
 		return 	PamUtilsFX.htmlToNormal(tooltipText);
 	}
 
