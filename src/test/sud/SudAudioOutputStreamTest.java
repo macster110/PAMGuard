@@ -15,9 +15,8 @@ import javax.sound.sampled.AudioInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.pamguard.x3.sud.SudAudioInputStream;
+import org.pamguard.x3.sud.SudAudioOutputStream;
 import org.pamguard.x3.sud.SudParams;
-
-import Acquisition.sud.SudAudioOutputStream;
 
 /**
  * Round-trip tests for {@link SudAudioOutputStream} / {@link SudAudioInputStream}.

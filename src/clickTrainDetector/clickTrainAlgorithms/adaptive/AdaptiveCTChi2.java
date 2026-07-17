@@ -7,6 +7,7 @@ import PamguardMVC.PamDataUnit;
 import clickTrainDetector.clickTrainAlgorithms.CTAlgorithmInfo;
 import clickTrainDetector.clickTrainAlgorithms.mht.MHTChi2;
 import clickTrainDetector.clickTrainAlgorithms.mht.TrackBitSet;
+import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.BearingChi2VarParams;
 import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.IDIManager;
 
 /**
@@ -47,6 +48,12 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 	 * Minimum residual scale ("floor") for amplitude, in dB, at sensitivity 0.5.
 	 */
 	private static final double AMP_FLOOR_DB = 2.5;
+
+	/**
+	 * Smallest bearing tolerance (degrees) allowed for the bearing residual-scale
+	 * floor, so a zero maximum bearing jump cannot collapse the scale to nothing.
+	 */
+	private static final double MIN_BEARING_TOLERANCE_DEG = 0.5;
 
 	/**
 	 * Scale (at sensitivity 0.5) for the waveform-correlation penalty. Correlation is
@@ -90,6 +97,14 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 
 	/** Number of coasts (missed clicks) at the end of the track. */
 	private int nCoasts = 0;
+
+	/**
+	 * Set once a click has been added whose bearing jumped beyond the configured
+	 * maximum (in the policed direction). Once violated the track is treated as junk
+	 * so the kernel discards it, mirroring the standard MHT "stop the train"
+	 * behaviour.
+	 */
+	private boolean bearingJumpViolated = false;
 
 	/** The last detection actually included in this hypothesis. */
 	private PamDataUnit lastIncludedUnit = null;
@@ -152,6 +167,9 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 		IDIManager idiManager = provider.getIDIManager();
 		AdaptiveCTParams params = provider.getParams();
 		double floorMult = floorMultiplier(params.sensitivity);
+		// the maximum bearing jump doubles as the bearing residual-scale floor (radians).
+		double bearingFloor = floorMult
+				* Math.toRadians(Math.max(params.maxBearingJumpDeg, MIN_BEARING_TOLERANCE_DEG));
 		double coastCost = -Math.log(1.0 - clamp(params.detectionProb, 0.01, 0.999));
 
 		if (included) {
@@ -192,10 +210,19 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 				if (bearing != null) {
 					Double b = getBearing(newDataUnit);
 					if (b != null) {
-						double c = bearing.score(b, floorMult * Math.toRadians(params.bearingFloorDeg));
+						// capture the previous bearing before scoring updates it, so the jump
+						// cutoff can compare consecutive absolute bearings.
+						double prevBearing = bearing.lastValue();
+						double c = bearing.score(b, bearingFloor);
 						if (!Double.isNaN(c)) {
 							clickHuber += c;
 							clickFeatures++;
+						}
+						if (params.bearingJumpEnable && !Double.isNaN(prevBearing)
+								&& BearingChi2VarParams.exceedsMaxJump(
+										BearingChi2VarParams.signedBearingDiff(b, prevBearing),
+										Math.toRadians(params.maxBearingJumpDeg), params.bearingJumpDrctn)) {
+							bearingJumpViolated = true;
 						}
 					}
 				}
@@ -229,7 +256,7 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 				if (bearing != null) {
 					Double b = getBearing(newDataUnit);
 					if (b != null) {
-						bearing.score(b, floorMult * Math.toRadians(params.bearingFloorDeg));
+						bearing.score(b, bearingFloor);
 					}
 				}
 				// ICI and correlation both need a previous included click - nothing to seed.
@@ -248,8 +275,8 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 			return;
 		}
 
-		// junk / aliased track gate.
-		if (isJunk(params)) {
+		// junk / aliased track gate (also stops a train whose bearing jumped too far).
+		if (isJunk(params) || bearingJumpViolated) {
 			this.chi2 = JUNK_CHI2 + totalScore;
 			return;
 		}
@@ -437,6 +464,7 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 	public void clear() {
 		chi2 = MAX_CHI2;
 		nCoasts = 0;
+		bearingJumpViolated = false;
 		includedCount = 0;
 		chi2Sum = 0;
 		contribCount = 0;
@@ -644,6 +672,15 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 
 			double z = resid / scale;
 			return huber2(z);
+		}
+
+		/**
+		 * The most recent value scored (radians for bearing), or {@code NaN} if no
+		 * value has been seen yet. Read before {@link #score(double, double)} to obtain
+		 * the previous value for a consecutive-difference test.
+		 */
+		double lastValue() {
+			return lastValue;
 		}
 
 		FeatureState copy() {

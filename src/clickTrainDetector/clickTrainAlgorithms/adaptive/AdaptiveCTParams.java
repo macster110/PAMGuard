@@ -7,6 +7,7 @@ import PamModel.parametermanager.PamParameterSet;
 import PamModel.parametermanager.PamParameterSet.ParameterSetType;
 import clickTrainDetector.clickTrainAlgorithms.mht.MHTChi2Params;
 import clickTrainDetector.clickTrainAlgorithms.mht.MHTKernelParams;
+import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.BearingChi2VarParams.BearingJumpDrctn;
 
 /**
  * Parameters for the adaptive click train algorithm.
@@ -62,14 +63,36 @@ public class AdaptiveCTParams extends MHTChi2Params implements Serializable, Clo
 	 */
 	public boolean useBearing = true;
 
+	/* ---- maximum bearing jump ---- */
+
 	/**
-	 * The bearing "jump floor" in degrees - the minimum scale used to standardise
-	 * bearing residuals. Bearings are normally smooth and do not jump around, so a
-	 * small value keeps bearing a strong separation cue. Raise it for species whose
-	 * bearings are inherently noisy (e.g. harbour porpoise, whose narrowband clicks
-	 * give poor bearing measurements) so that genuine trains are not broken up.
+	 * The maximum bearing jump between consecutive clicks, in DEGREES. This is the
+	 * single bearing tolerance control: it always sets the minimum residual scale
+	 * ("floor") used to standardise bearing residuals (how much bearing change the
+	 * detector tolerates), and when {@link #bearingJumpEnable} is set it is
+	 * additionally applied as a hard cutoff (in the {@link #bearingJumpDrctn}
+	 * direction).
 	 */
-	public double bearingFloorDeg = 3.0;
+	public double maxBearingJumpDeg = 3;
+
+	/**
+	 * Whether the maximum bearing jump is additionally applied as a hard cutoff. When
+	 * enabled, a click whose bearing jumps more than {@link #maxBearingJumpDeg} (in
+	 * the {@link #bearingJumpDrctn} direction) from the previous click in a train
+	 * marks the train as junk, stopping it. Useful for high-SNR, sparse clicks (e.g.
+	 * sperm whales) or towed arrays where a sudden bearing jump almost certainly
+	 * belongs to a different animal. Ignored when no bearing is available.
+	 */
+	public boolean bearingJumpEnable = false;
+
+	/**
+	 * The direction of the bearing jump that is policed. For a towed hydrophone
+	 * array {@link BearingJumpDrctn#POSITIVE} is often a good choice as animals
+	 * usually pass the vessel from positive to negative bearings, so a large
+	 * positive jump is unlikely to belong to the same animal. Only used when
+	 * {@link #bearingJumpEnable} is set.
+	 */
+	public BearingJumpDrctn bearingJumpDrctn = BearingJumpDrctn.POSITIVE;
 
 	/**
 	 * Use waveform cross-correlation (similarity) to group clicks - and to refine

@@ -10,6 +10,7 @@ import clickTrainDetector.clickTrainAlgorithms.adaptive.AdaptiveCTChi2Provider;
 import clickTrainDetector.clickTrainAlgorithms.adaptive.AdaptiveCTParams;
 import clickTrainDetector.clickTrainAlgorithms.mht.MHTKernel;
 import clickTrainDetector.clickTrainAlgorithms.mht.TrackBitSet;
+import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.BearingChi2VarParams.BearingJumpDrctn;
 import clickTrainDetector.clickTrainAlgorithms.mht.mhtMAT.SimpleClick;
 import clickTrainDetector.clickTrainAlgorithms.mht.test.SimpleClickDataBlock;
 
@@ -40,6 +41,7 @@ public class TestAdaptiveCTChi2 {
 		testCoastingGap();
 		testBearingSeparatedTrains();
 		testBearingRapidSweep();
+		testBearingJumpCutoff();
 		testBearingRotatingTrains();
 		testNoisyBearingTrain();
 		testCorrelationSeparatedTrains();
@@ -172,6 +174,48 @@ public class TestAdaptiveCTChi2 {
 		List<Integer> trains = runKernel(clicks, defaultParams(), true, false);
 		assertTrue("Rapid smooth bearing sweep stays one train (got " + trains.size() + " sizes " + trains + ")",
 				trains.size() == 1 && trains.get(0) >= 25);
+	}
+
+	/**
+	 * A single train that steps sharply in bearing part-way through. With a
+	 * permissive bearing floor the step alone does not fragment the train, which
+	 * isolates the hard maximum-bearing-jump cutoff: enabling it in the POSITIVE
+	 * direction marks the train junk at the +50&deg; step and splits it in two, while
+	 * the NEGATIVE direction ignores a positive jump and keeps the train whole
+	 * (proving the direction control works).
+	 */
+	private static void testBearingJumpCutoff() {
+		// a train that steps in bearing part-way through by an amount the adaptive
+		// scorer's default bearing tolerance still accepts as one train - so any split
+		// is driven by the maximum-bearing-jump cutoff, not the self-calibrated scale.
+		double stepDeg = 15.0;
+		List<SimpleClick> clicks = new ArrayList<>();
+		generateTrain(clicks, 0, 1.0, 0.1, 0.003, 118, 0.0, 1.0, 30.0, 15, new Random(60));
+		generateTrain(clicks, 100, 1.0 + 15 * 0.1, 0.1, 0.003, 118, 0.0, 1.0, 30.0 + stepDeg, 15, new Random(61));
+		sortByTime(clicks);
+
+		// no cutoff -> the modest step is tolerated, one train.
+		List<Integer> noneTrains = runKernel(clicks, defaultParams(), true, false);
+		assertTrue("Adaptive bearing jump cutoff off: one train through the step (got " + noneTrains.size() + " sizes "
+				+ noneTrains + ")", noneTrains.size() == 1 && noneTrains.get(0) >= 28);
+
+		// POSITIVE cutoff below the step -> the +step is rejected, splitting the train.
+		AdaptiveCTParams pos = defaultParams();
+		pos.bearingJumpEnable = true;
+		pos.maxBearingJumpDeg = 8.0;
+		pos.bearingJumpDrctn = BearingJumpDrctn.POSITIVE;
+		List<Integer> posTrains = runKernel(clicks, pos, true, false);
+		assertTrue("Adaptive bearing jump cutoff (POSITIVE 8 deg) splits at the +" + (int) stepDeg + " deg step (got "
+				+ posTrains.size() + " sizes " + posTrains + ")", posTrains.size() == 2);
+
+		// NEGATIVE direction does not police a positive jump -> the train stays whole.
+		AdaptiveCTParams neg = defaultParams();
+		neg.bearingJumpEnable = true;
+		neg.maxBearingJumpDeg = 8.0;
+		neg.bearingJumpDrctn = BearingJumpDrctn.NEGATIVE;
+		List<Integer> negTrains = runKernel(clicks, neg, true, false);
+		assertTrue("Adaptive bearing jump cutoff (NEGATIVE) ignores a positive jump: one train (got " + negTrains.size()
+				+ " sizes " + negTrains + ")", negTrains.size() == 1 && negTrains.get(0) >= 28);
 	}
 
 	/**

@@ -300,6 +300,7 @@ public class ClickTrainAlgorithmPaneFX extends SettingsPane<ClickTrainParams> {
 			enableControls(); 
 		});
 		dataSelectorButton = new PamButton();
+		dataSelectorButton.getStyleClass().add("icon-button");
 //		dataSelectorButton.setGraphic(PamGlyphDude.createPamGlyph(MaterialIcon.SETTINGS, PamGuiManagerFX.iconSize));
 		dataSelectorButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
 		dataSelectorButton.setOnAction((action)->{

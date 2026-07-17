@@ -444,6 +444,7 @@ public class RecorderSettingsDialog extends PamDialog {
 			fileInitials.setText(recorderSettings.fileInitials);
 			bitDepth.setSelectedItem(recorderSettings.bitDepth);
 		}
+		
 		boolean getParams() {
 			recorderSettings.setFileType((AudioFileFormat.Type) fileType.getSelectedItem());
 			if (recorderSettings.getFileType() == null) return false;

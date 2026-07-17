@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import PamguardMVC.PamDataUnit;
+import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.BearingChi2VarParams;
 
 /**
  * The core UKF tracking pipeline, independent of the PAMGuard plumbing so it can
@@ -39,7 +40,7 @@ public class UKFTracker {
 	private double frameEndTime = Double.NaN;
 	private int nextTrackId = 0;
 
-	/* ---- N-scan beam state (only used when params.nScanDepth > 0) ---- */
+	/* ---- N-scan beam state (only used when useNScan() is true) ---- */
 	private ArrayList<Hypothesis> beam = new ArrayList<>();
 	private int framesSinceCommit = 0;
 
@@ -49,9 +50,19 @@ public class UKFTracker {
 		this.model = new TrackStateModel(params, params.useAmplitude, params.useBearing && bearingAvailable);
 		this.affinity = buildAffinity(params);
 		this.listener = listener;
-		if (params.nScanDepth > 0) {
+		if (useNScan()) {
 			initBeam();
 		}
+	}
+
+	/**
+	 * Whether the fixed-lag multi-hypothesis (N-scan) association search should be
+	 * used, as opposed to the single-frame greedy nearest-neighbour association.
+	 * True only when the user has enabled it ({@link UKFParams#useMultiHypothesis})
+	 * and the deferral depth ({@link UKFParams#nScanDepth}) is positive.
+	 */
+	private boolean useNScan() {
+		return params.useMultiHypothesis && params.nScanDepth > 0;
 	}
 
 	/**
@@ -77,7 +88,7 @@ public class UKFTracker {
 		frameClicks.clear();
 		frameEndTime = Double.NaN;
 		tracks.clear();
-		if (params.nScanDepth > 0) {
+		if (useNScan()) {
 			initBeam();
 		}
 	}
@@ -105,7 +116,7 @@ public class UKFTracker {
 		for (PamDataUnit<?, ?> d : dets) {
 			now = Math.max(now, timeSeconds(d));
 		}
-		if (params.nScanDepth > 0) {
+		if (useNScan()) {
 			processBeam(dets, now);
 		} else {
 			process(dets, now);
@@ -115,7 +126,7 @@ public class UKFTracker {
 	/** Finalise all remaining tracks (e.g. at the end of processing). */
 	public void finaliseAll() {
 		flushFrame();
-		if (params.nScanDepth > 0) {
+		if (useNScan()) {
 			finaliseBeam();
 			return;
 		}
@@ -130,7 +141,7 @@ public class UKFTracker {
 	 * that cannot reach {@code now} within {@code maxCoast} missed clicks is closed.
 	 */
 	public void closeOverdueTracks(double now) {
-		if (params.nScanDepth > 0) {
+		if (useNScan()) {
 			for (Hypothesis h : beam) {
 				closeOverdue(h.tracks, now, h.finished);
 			}
@@ -187,11 +198,13 @@ public class UKFTracker {
 		// associates at a normal ICI (and tracks that have ended are closed).
 		closeOverdueTracks(now);
 
-		// split detections into high / low confidence (ByteTrack two-stage).
+		// split detections into high / low confidence (ByteTrack two-stage). With the
+		// threshold at its default of 0 every click is high-confidence and the split
+		// is effectively off.
 		ArrayList<PamDataUnit<?, ?>> high = new ArrayList<>();
 		ArrayList<PamDataUnit<?, ?>> low = new ArrayList<>();
 		for (PamDataUnit<?, ?> d : dets) {
-			if (!params.twoStage || d.getAmplitudeDB() >= params.confidenceAmplitude) {
+			if (d.getAmplitudeDB() >= params.confidenceAmplitude) {
 				high.add(d);
 			} else {
 				low.add(d);
@@ -207,11 +220,11 @@ public class UKFTracker {
 		// freshly-started tentative track cannot steal a click from it; within each
 		// maturity class the ByteTrack high/low-confidence split still applies.
 		associate(high, highMatched, trackMatched, true); // confirmed tracks, high-conf dets
-		if (params.twoStage && !low.isEmpty()) {
+		if (!low.isEmpty()) {
 			associate(low, lowMatched, trackMatched, true); // confirmed tracks, low-conf dets
 		}
 		associate(high, highMatched, trackMatched, false); // tentative tracks, high-conf dets
-		if (params.twoStage && !low.isEmpty()) {
+		if (!low.isEmpty()) {
 			associate(low, lowMatched, trackMatched, false); // tentative tracks, low-conf dets
 		}
 
@@ -284,6 +297,11 @@ public class UKFTracker {
 				}
 				double[] z = track.measurement(t, det.getAmplitudeDB(), bearingOf(det));
 				measCache[r][cc] = z;
+				if (bearingJumpExceeded(track, z, prediction)) {
+					// bearing jumps too far (in the policed direction) to be the same animal.
+					cost[r][cc] = FORBIDDEN_COST;
+					continue;
+				}
 				double aff = affinity.affinity(associationFeatures(track, z, t, params, prediction));
 				cost[r][cc] = aff < params.minAffinity ? FORBIDDEN_COST : -Math.log(aff);
 			}
@@ -330,7 +348,7 @@ public class UKFTracker {
 
 		boolean[] isHigh = new boolean[dets.size()];
 		for (int c = 0; c < dets.size(); c++) {
-			isHigh[c] = !params.twoStage || dets.get(c).getAmplitudeDB() >= params.confidenceAmplitude;
+			isHigh[c] = dets.get(c).getAmplitudeDB() >= params.confidenceAmplitude;
 		}
 
 		ArrayList<Hypothesis> children = new ArrayList<>();
@@ -392,6 +410,10 @@ public class UKFTracker {
 					continue;
 				}
 				double[] z = track.measurement(time, det.getAmplitudeDB(), bearingOf(det));
+				if (bearingJumpExceeded(track, z, prediction)) {
+					// bearing jumps too far (in the policed direction): leave this pairing forbidden.
+					continue;
+				}
 				double aff = affinity.affinity(associationFeatures(track, z, time, params, prediction));
 				if (aff >= params.minAffinity) {
 					cost[r][c] = -Math.log(aff);
@@ -574,10 +596,31 @@ public class UKFTracker {
 			f[2] = Math.abs(innov[track.getModel().ampMeasIndex()]) / Math.sqrt(params.ampMeasNoise);
 		}
 		if (track.getModel().usesBearing()) {
-			f[3] = Math.abs(innov[track.getModel().bearingMeasIndex()]) / Math.toRadians(params.bearingFloorDeg);
+			f[3] = Math.abs(innov[track.getModel().bearingMeasIndex()]) / params.bearingToleranceRad();
 		}
 		f[4] = (t - track.getLastTimeSeconds()) / Math.max(track.expectedICI(), 1e-3);
 		return f;
+	}
+
+	/**
+	 * Whether associating the candidate measurement {@code z} to {@code track} would
+	 * require a bearing jump beyond the configured maximum (in the policed
+	 * direction). The jump is the signed bearing innovation - the wrapped difference
+	 * between the candidate bearing and the track's predicted bearing. Returns false
+	 * when the cutoff is disabled or the model does not track bearing.
+	 *
+	 * @param track      - the candidate track.
+	 * @param z          - the candidate measurement (from {@link ClickTrack#measurement}).
+	 * @param prediction - the track's precomputed measurement prediction.
+	 * @return true if the pairing should be forbidden on bearing-jump grounds.
+	 */
+	private boolean bearingJumpExceeded(ClickTrack track, double[] z, UnscentedKalmanFilter.Prediction prediction) {
+		if (!params.bearingJumpEnable || !track.getModel().usesBearing()) {
+			return false;
+		}
+		double signedJump = track.getModel().measResidual(z, prediction.zPred())[track.getModel().bearingMeasIndex()];
+		return BearingChi2VarParams.exceedsMaxJump(signedJump, Math.toRadians(params.maxBearingJumpDeg),
+				params.bearingJumpDrctn);
 	}
 
 	/** Number of currently active tracks (for diagnostics/tests). */

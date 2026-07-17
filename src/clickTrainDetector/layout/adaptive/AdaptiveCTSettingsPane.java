@@ -9,6 +9,7 @@ import clickTrainDetector.clickTrainAlgorithms.adaptive.AdaptiveCTParams;
 import clickTrainDetector.clickTrainAlgorithms.adaptive.AdaptiveClickTrainAlgorithm;
 import clickTrainDetector.clickTrainAlgorithms.adaptive.DefaultAdaptiveParams;
 import clickTrainDetector.clickTrainAlgorithms.adaptive.DefaultAdaptiveParams.DefaultAdaptiveSpecies;
+import clickTrainDetector.layout.mht.BearingJumpPane;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -56,7 +57,8 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 
 	private PamToggleSwitch useBearing;
 
-	private PamSpinner<Double> bearingFloorSpinner;
+	/** Reusable controls for the maximum bearing jump cutoff and its direction. */
+	private BearingJumpPane bearingJumpPane;
 
 	private PamToggleSwitch useCorrelation;
 
@@ -98,11 +100,6 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 	private static final String TIP_BEARING =
 			"Group clicks by the consistency of their bearing. Available only for multi-channel data\n"
 					+ "that provides a bearing.";
-
-	private static final String TIP_BEARING_FLOOR =
-			"The minimum bearing jump (degrees) tolerated between clicks. Bearings are normally smooth,\n"
-					+ "so keep this small. Raise it for species with noisy bearings (e.g. harbour porpoise,\n"
-					+ "whose narrowband clicks give poor bearing measurements).";
 
 	private static final String TIP_CORRELATION =
 			"Group clicks by waveform similarity (cross correlation), and refine the ICI measurement.\n"
@@ -266,19 +263,11 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		useBearing = new PamToggleSwitch("Bearing");
 		useBearing.setTooltip(new Tooltip(TIP_BEARING));
 
-		bearingFloorSpinner = new PamSpinner<>(0.0, 180.0, 3.0, 0.5);
-		bearingFloorSpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
-		bearingFloorSpinner.setEditable(true);
-		bearingFloorSpinner.setPrefWidth(90);
-		bearingFloorSpinner.setTooltip(new Tooltip(TIP_BEARING_FLOOR));
-		PamHBox bearingFloorBox = new PamHBox();
-		bearingFloorBox.setAlignment(Pos.CENTER_LEFT);
-		bearingFloorBox.setSpacing(5);
-		bearingFloorBox.setPadding(new Insets(0, 0, 0, 20));
-		bearingFloorBox.getChildren().addAll(tipLabel("Bearing jump floor", TIP_BEARING_FLOOR), bearingFloorSpinner,
-				new Label("°"));
-		// the floor only applies when bearing grouping is on.
-		useBearing.selectedProperty().addListener((o, ov, nv) -> bearingFloorSpinner.setDisable(!nv));
+		// the maximum bearing jump cutoff, indented to sit under the bearing toggle.
+		bearingJumpPane = new BearingJumpPane();
+		bearingJumpPane.setPadding(new Insets(0, 0, 0, 20));
+		// the jump cutoff only applies when bearing grouping is on.
+		useBearing.selectedProperty().addListener((o, ov, nv) -> bearingJumpPane.setAvailable(nv));
 
 		useCorrelation = new PamToggleSwitch("Waveform correlation");
 		useCorrelation.setTooltip(new Tooltip(TIP_CORRELATION));
@@ -286,7 +275,8 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		PamVBox box = new PamVBox();
 		box.setSpacing(5);
 		box.setPadding(new Insets(5, 0, 0, 0));
-		box.getChildren().addAll(label, useICI, useAmplitude, useBearing, bearingFloorBox, useCorrelation);
+		box.getChildren().addAll(label, useICI, useAmplitude, useBearing, bearingJumpPane,
+				useCorrelation);
 		return box;
 	}
 
@@ -339,7 +329,9 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		boolean waveformAvailable = block != null && RawDataHolder.class.isAssignableFrom(block.getUnitClass());
 
 		useBearing.setDisable(!bearingAvailable);
-		bearingFloorSpinner.setDisable(!bearingAvailable || !useBearing.isSelected());
+		if (bearingJumpPane != null) {
+			bearingJumpPane.setAvailable(bearingAvailable && useBearing.isSelected());
+		}
 		useCorrelation.setDisable(!waveformAvailable);
 	}
 
@@ -352,7 +344,9 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		params.useICI = useICI.isSelected();
 		params.useAmplitude = useAmplitude.isSelected();
 		params.useBearing = useBearing.isSelected();
-		params.bearingFloorDeg = bearingFloorSpinner.getValue();
+		params.bearingJumpEnable = bearingJumpPane.isJumpEnabled();
+		params.maxBearingJumpDeg = bearingJumpPane.getMaxJumpDeg();
+		params.bearingJumpDrctn = bearingJumpPane.getJumpDirection();
 		params.useCorrelation = useCorrelation.isSelected();
 		if (params.mhtKernel != null) {
 			params.mhtKernel.maxCoast = maxCoastSpinner.getValue();
@@ -371,7 +365,7 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		useICI.setSelected(input.useICI);
 		useAmplitude.setSelected(input.useAmplitude);
 		useBearing.setSelected(input.useBearing);
-		bearingFloorSpinner.getValueFactory().setValue(input.bearingFloorDeg);
+		bearingJumpPane.setParams(input.bearingJumpEnable, input.maxBearingJumpDeg, input.bearingJumpDrctn);
 		useCorrelation.setSelected(input.useCorrelation);
 		if (input.mhtKernel != null) {
 			maxCoastSpinner.getValueFactory().setValue(input.mhtKernel.maxCoast);

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Random;
 
 import clickTrainDetector.clickTrainAlgorithms.mht.mhtMAT.SimpleClick;
+import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.BearingChi2VarParams.BearingJumpDrctn;
 import clickTrainDetector.clickTrainAlgorithms.ukf.AffinityNN;
 import clickTrainDetector.clickTrainAlgorithms.ukf.ClickTrack;
 import clickTrainDetector.clickTrainAlgorithms.ukf.HungarianAlgorithm;
@@ -38,6 +39,7 @@ public class TestUKFTracker {
 		testFastTrain();
 		testTwoInterleavedTrains();
 		testBearingSeparatedTrains();
+		testBearingJumpCutoff();
 		testCoastingGap();
 		testTwoStageRecovery();
 		testConfirmationRejectsClutter();
@@ -229,6 +231,71 @@ public class TestUKFTracker {
 				trains.size() == 2);
 	}
 
+	/**
+	 * A train that steps sharply in bearing part-way through. With a permissive
+	 * bearing gate (large floor) the step alone does not break the train, which
+	 * isolates the hard maximum-bearing-jump cutoff: enabling it in the POSITIVE
+	 * direction rejects the +40&deg; step and splits the train, while the NEGATIVE
+	 * direction ignores a positive jump and keeps the train whole (proving the
+	 * direction control works). The cutoff is exercised in both the greedy and the
+	 * N-scan association paths.
+	 */
+	private static void testBearingJumpCutoff() {
+		// a train that steps in bearing part-way through by an amount the tracker's
+		// default bearing tolerance still accepts as one train - so any split is driven
+		// by the maximum-bearing-jump cutoff, not the underlying association gate.
+		double stepDeg = 12.0;
+		List<SimpleClick> clicks = new ArrayList<>();
+		double t = 1.0;
+		double ici = 0.1;
+		int uid = 0;
+		for (int i = 0; i < 15; i++) {
+			clicks.add(new SimpleClick(uid++, Double.valueOf(t), Double.valueOf(118.0), Double.valueOf(30.0), SR));
+			t += ici;
+		}
+		for (int i = 0; i < 15; i++) {
+			clicks.add(new SimpleClick(uid++, Double.valueOf(t), Double.valueOf(118.0), Double.valueOf(30.0 + stepDeg),
+					SR));
+			t += ici;
+		}
+
+		// no cutoff -> the modest step is tolerated, one train.
+		List<Integer> noneTrains = runTracker(clicks, defaultParams(), true);
+		assertTrue("Bearing jump cutoff off: one train through the step (got " + noneTrains.size() + " sizes "
+				+ noneTrains + ")", noneTrains.size() == 1 && noneTrains.get(0) >= 28);
+
+		// POSITIVE cutoff below the step -> the +step is rejected, splitting the train.
+		UKFParams pos = defaultParams();
+		pos.bearingJumpEnable = true;
+		pos.maxBearingJumpDeg = 6.0;
+		pos.bearingJumpDrctn = BearingJumpDrctn.POSITIVE;
+		List<Integer> posTrains = runTracker(clicks, pos, true);
+		assertTrue("Bearing jump cutoff (POSITIVE 6 deg) splits the train at the +" + (int) stepDeg + " deg step (got "
+				+ posTrains.size() + " sizes " + posTrains + ")", posTrains.size() == 2);
+
+		// same cutoff in the N-scan association path.
+		UKFParams posN = defaultParams();
+		posN.bearingJumpEnable = true;
+		posN.maxBearingJumpDeg = 6.0;
+		posN.bearingJumpDrctn = BearingJumpDrctn.POSITIVE;
+		posN.useMultiHypothesis = true;
+		posN.nScanDepth = 6;
+		posN.beamWidth = 4;
+		posN.nScanKBest = 4;
+		List<Integer> posNTrains = runTracker(clicks, posN, true);
+		assertTrue("Bearing jump cutoff applies in N-scan mode too (got " + posNTrains.size() + " sizes " + posNTrains
+				+ ")", posNTrains.size() >= 2);
+
+		// NEGATIVE direction does not police a positive jump -> the train stays whole.
+		UKFParams neg = defaultParams();
+		neg.bearingJumpEnable = true;
+		neg.maxBearingJumpDeg = 6.0;
+		neg.bearingJumpDrctn = BearingJumpDrctn.NEGATIVE;
+		List<Integer> negTrains = runTracker(clicks, neg, true);
+		assertTrue("Bearing jump cutoff (NEGATIVE) ignores a positive jump: one train (got " + negTrains.size()
+				+ " sizes " + negTrains + ")", negTrains.size() == 1 && negTrains.get(0) >= 28);
+	}
+
 	private static void testCoastingGap() {
 		List<SimpleClick> clicks = new ArrayList<>();
 		generateTrain(clicks, 0, 1.0, 0.1, 0.003, 120, -0.1, 1.0, null, 15, new Random(4));
@@ -252,7 +319,6 @@ public class TestUKFTracker {
 			t += 0.1 + r.nextGaussian() * 0.003;
 		}
 		UKFParams params = defaultParams();
-		params.twoStage = true;
 		params.confidenceAmplitude = 100; // quiet (90) clicks are low-confidence
 		// track on ICI only: amplitude is the confidence signal here, so using it as a
 		// tracking gate would itself reject the quiet clicks the second stage recovers.
@@ -323,6 +389,7 @@ public class TestUKFTracker {
 		int gnnImpurity = impurity(runTrackerTrains(clicks, gnn, true));
 
 		UKFParams nscan = defaultParams();
+		nscan.useMultiHypothesis = true;
 		nscan.nScanDepth = 6;
 		nscan.beamWidth = 4;
 		nscan.nScanKBest = 4;
@@ -353,8 +420,7 @@ public class TestUKFTracker {
 		params.minTrackLength = 3;
 		params.useAmplitude = true;
 		params.useBearing = true;
-		params.twoStage = true;
-		params.confidenceAmplitude = 0.0;
+		params.confidenceAmplitude = 0.0; // 0 = two-stage split off
 		// the scenario tests below (and the crossing test's baseline) exercise the greedy
 		// single-frame path; the N-scan path is turned on explicitly where it is tested,
 		// so pin this off regardless of the production default.

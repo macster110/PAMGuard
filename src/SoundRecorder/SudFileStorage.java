@@ -9,7 +9,8 @@ import java.io.OutputStream;
 
 import javax.sound.sampled.AudioFileFormat.Type;
 
-import Acquisition.sud.SudAudioOutputStream;
+import org.pamguard.x3.sud.SudAudioOutputStream;
+
 import PamUtils.FileFunctions;
 import PamUtils.PamCalendar;
 import warnings.PamWarning;
