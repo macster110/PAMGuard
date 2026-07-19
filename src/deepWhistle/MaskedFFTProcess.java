@@ -34,6 +34,12 @@ public abstract class MaskedFFTProcess extends PamProcess {
 
     private int unitsToBuffer = 0;
 
+    // the FFT length and hop the process (and mask) was last prepared for. Used to
+    // detect when the source FFT settings change underneath us (e.g. the user changes
+    // the parent FFT module) so we can clear stale buffered units and re-initialise.
+    private int preparedFftLength = -1;
+    private int preparedFftHop = -1;
+
     // single-thread executor reused for processing batches
     private ExecutorService executor;
 
@@ -47,6 +53,13 @@ public abstract class MaskedFFTProcess extends PamProcess {
      * a different maks or set a new mask via setMask().
      */
     private PamFFTMask mask = new DummyFFTMask();
+
+    /**
+     * The mask type the current mask was created from. Used to detect when the
+     * user has selected a different mask so the mask is only recreated when
+     * necessary.
+     */
+    private FFTMaskType currentMaskType = null;
 
 
     public MaskedFFTProcess(DeepWhistleControl control) {
@@ -90,6 +103,20 @@ public abstract class MaskedFFTProcess extends PamProcess {
         if (!(arg instanceof FFTDataUnit)) return;
 
         FFTDataUnit inUnit = (FFTDataUnit) arg;
+
+        // If the source FFT length or hop has changed since we were prepared (e.g. the
+        // user changed the parent FFT module's settings while running), the buffered
+        // units and the mask/model are now the wrong size. Drop everything and re-prepare
+        // so we don't mix FFT lengths in a batch (which crashes the spectrogram maths).
+        if (inputFFTData != null
+                && (inputFFTData.getFftLength() != preparedFftLength || inputFFTData.getFftHop() != preparedFftHop)) {
+            System.out.println("MaskedFFTProcess: FFT settings changed (length " + preparedFftLength
+                    + " -> " + inputFFTData.getFftLength() + ", hop " + preparedFftHop
+                    + " -> " + inputFFTData.getFftHop() + ") - clearing buffers and re-preparing");
+            clearBuffers();
+            prepareProcess();
+            if (!prepOk) return;
+        }
 
         // channel check
         if ((inUnit.getChannelBitmap() & maskedFFTDataBlock.getChannelMap()) == 0) {
@@ -202,7 +229,10 @@ public abstract class MaskedFFTProcess extends PamProcess {
             prepOk = false;
             return;
         }
-        
+
+        // drop any stale buffered units (may be from a previous FFT length)
+        clearBuffers();
+
         System.out.println("MaskedFFTProcess: input params channels: " + (params.channelMap & inputFFTData.getChannelMap()) + params.channelMap);
 
         // copy information from input block
@@ -225,7 +255,18 @@ public abstract class MaskedFFTProcess extends PamProcess {
                 return t;
             });
         }
-        
+
+        // create the mask based on the selected mask type. Only recreate the mask
+        // if the user has selected a different mask type so we don't needlessly
+        // reload the model.
+        if (params.maskType != null && (this.mask == null || currentMaskType != params.maskType)) {
+            PamFFTMask newMask = params.maskType.createMask(this);
+            if (newMask != null) {
+                setMask(newMask);
+                currentMaskType = params.maskType;
+            }
+        }
+
         //init the mask - this may contain complex model
         boolean mask = this.mask.initMask();
         if (!mask) {
@@ -234,7 +275,25 @@ public abstract class MaskedFFTProcess extends PamProcess {
             return;
         }
 
+        // record the FFT settings we are now prepared for so newData can detect changes.
+        preparedFftLength = inputFFTData.getFftLength();
+        preparedFftHop = inputFFTData.getFftHop();
+
         prepOk = true;
+    }
+
+    /**
+     * Clear all the per-channel FFT buffers. Called on prepare and whenever the
+     * source FFT length changes so units of different lengths are never mixed.
+     */
+    private void clearBuffers() {
+        synchronized (buffer) {
+            for (int i = 0; i < buffer.length; i++) {
+                if (buffer[i] != null) {
+                    buffer[i].clear();
+                }
+            }
+        }
     }
     
     @Override

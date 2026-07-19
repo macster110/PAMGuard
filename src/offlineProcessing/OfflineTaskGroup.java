@@ -577,7 +577,8 @@ public class OfflineTaskGroup implements PamSettings {
 				taskGroupWorker.publish(new TaskMonitorData(TaskStatus.RUNNING , TaskActivity.LOADING, nMapPoints, iPoint++, mapPoint.getName(),
 						lastTime));
 
-				primaryDataBlock.loadViewerData(new OfflineDataLoadInfo(mapPoint.getStartTime(), mapPoint.getEndTime()), null);
+//				primaryDataBlock.loadViewerData(new OfflineDataLoadInfo(mapPoint.getStartTime(), mapPoint.getEndTime()), null);
+				primaryDataBlock.loadMapPointData(mapPoint, null);
 				
 				System.out.println("No. viewer units: " + primaryDataBlock.getUnitsCount());
 
@@ -717,7 +718,10 @@ public class OfflineTaskGroup implements PamSettings {
 				continue;
 			}
 			if (aTask.isDoRun()) {
+				System.out.println("CLICK TRAIN DETECTOR: SHOULD DELETE? " + taskGroupParams.deleteOld);
+
 				if (taskGroupParams.deleteOld) {
+					System.out.println("CLICK TRAIN DETECTOR: DELETING TASK " + aTask.getLongName());
 					aTask.deleteOldData(taskGroupParams);
 				}
 				//added this here so that tasks with different

@@ -41,7 +41,12 @@ public abstract class RDataUnitExport<T extends PamDataUnit<?, ?>> {
 		}
 		rData.add("UID", dataUnit.getUID());
 		rData.add("startSample", dataUnit.getStartSample());
-		rData.add("sampleDuration", dataUnit.getSampleDuration());
+		if (dataUnit.getSampleDuration()!=null) {
+			rData.add("sampleDuration", dataUnit.getSampleDuration());
+		}
+		else {
+			rData.add("sampleDuration", 1);
+		}
 //		rData.add("freqLimits", new DoubleArrayVector(dataUnit.getBasicData().getFrequency()));
 		rData.add("minFreq", dataUnit.getBasicData().getFrequency()[0]);
 		rData.add("maxFreq", dataUnit.getBasicData().getFrequency()[1]);

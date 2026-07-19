@@ -360,6 +360,11 @@ public class FFTPaneFX extends SettingsPane<FFTParameters>{
 	}
 
 	@Override
+	public helpFX.HelpPoint getHelpPointFX() {
+		return new helpFX.HelpPoint("fft_engine.md");
+	}
+
+	@Override
 	public Node getContentNode() {
 		return mainPane;
 	}

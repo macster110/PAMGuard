@@ -2,10 +2,8 @@ package rawDeepLearningClassifier.dlClassification;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import PamDetection.RawDataUnit;
 import PamUtils.PamArrayUtils;
-import PamUtils.PamCalendar;
 import PamUtils.PamUtils;
 import PamView.GroupedSourceParameters;
 import PamguardMVC.DataUnitBaseData;
@@ -331,6 +329,12 @@ public class DLClassifyProcess extends PamProcess {
 		}
 	}
 	
+	/**
+	 * Check whether the new detection group is contiguous with the last one in the buffer. This is important because we only want to merge data units which are contiguous. 
+	 * @param detectionGroup - the new detection group. 
+	 * @param i - the channel group index. 
+	 * @return true if the new detection group is contiguous with the last one in the buffer. 
+	 */
 	private boolean isGroupContiguous(SegmenterDetectionGroup detectionGroup, int i) {
 		if (groupDetectionBuffer[i] == null || groupDetectionBuffer[i].size() == 0) {
 			//no buffer so always contiguous
@@ -339,7 +343,7 @@ public class DLClassifyProcess extends PamProcess {
 		
 		//so we have at least one segment in the buffer. Check whether the new segment is contiguous with the last one.
 		
-		long timeMillis1 = groupDetectionBuffer[i].getLast().getSegmentStartMillis();
+		long timeMillis1 = groupDetectionBuffer[i].get(groupDetectionBuffer[i].size() - 1).getSegmentStartMillis();
 		long timeMillis2 = detectionGroup.getSegmentStartMillis();
 		
 		//now, does this fall within the max gap time?
@@ -574,9 +578,6 @@ public class DLClassifyProcess extends PamProcess {
 	public void newRawModelResult(List<? extends PredictionResult> modelResult, GroupedRawData pamRawData) {
 
 		//the model result may be null if the classifier uses a new thread. 
-
-//		System.out.println("DLClassifyProcess: New newRawModelResult: startSample " + pamRawData.getStartSample() + " No. prediction results: " + modelResult.size()+ "  " + getSourceParams().countChannelGroups());
-
 		//create a new data unit - always add to the model result section. 
 		DLDataUnit dlDataUnit;
 		List<DLDataUnit> dlDataUnits = new ArrayList<DLDataUnit>();
@@ -811,9 +812,12 @@ public class DLClassifyProcess extends PamProcess {
 //				+ rawdata[0].length + " sampleDuration " + groupDataBuffer.get(0).getSampleDuration());
 
 		//Now we have the time limits of the predictions, check whether the raw data is within these limits.
-		if (rawdata[0].length!=(endSample-startSample)) { //only trim if we need to
+		if (rawdata[0].length>(endSample-startSample)) { //only trim if we need to
 						//need to trim the raw data to the time limits of the data unit.
 			rawdata = trimRawData(rawdata, groupDataBuffer.get(0).getStartSample(),  startSample, endSample);
+		}
+		else if (rawdata[0].length!=(endSample-startSample)) {
+			System.err.println("DLClassifyProcess: Warning: the raw data is shorter than the time limits of the model results. This should never happen. Raw data length: " + rawdata[0].length + " time limits in samples: " + (endSample-startSample));
 		}
 
 		DataUnitBaseData basicData  = groupDataBuffer.get(0).getBasicData().clone(); 

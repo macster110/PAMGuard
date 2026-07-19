@@ -101,6 +101,21 @@ public class DLDownloadManager {
 	}
 
 	/**
+	 * Get the path to a model, searching a downloaded archive for one of the supplied
+	 * model file names instead of the default ({@link #defaultModels}). Use this when
+	 * the model inside a zip is not a TensorFlow <code>saved_model.pb</code> (e.g. a
+	 * PyTorch <code>.pt</code> file).
+	 * @param modelURI - the URI to the model.
+	 * @param modelFileNames - the candidate model file names to search for within a
+	 *        decompressed archive.
+	 * @return the path to the model, or null if it could not be found / downloaded.
+	 */
+	public URI downloadModel(URI modelURI, String[] modelFileNames) {
+		String modelName = getModelName(modelURI);
+		return downloadModel( modelURI,  modelName, modelFileNames);
+	}
+
+	/**
 	 * Get a model name based on it's filename
 	 * @param modelURI - URI to the model
 	 * @return the model name. 
@@ -127,6 +142,18 @@ public class DLDownloadManager {
 	 * @return the path to the model The model might be a zip file, py file, .kgu file. 
 	 */
 	public URI downloadModel(URI modelURI, String modelName) {
+		return downloadModel(modelURI, modelName, defaultModels);
+	}
+
+	/**
+	 * Get the path to a model. If the URI is a URL then the model is download to a local folder and the path to
+	 * the local folder is returned.
+	 * @param modelURI - the model to load.
+	 * @param modelName - the name of the model - this is used to create the local folder name if the model is downloaded.
+	 * @param modelFileNames - the candidate model file names to search for within a decompressed archive.
+	 * @return the path to the model The model might be a zip file, py file, .kgu file.
+	 */
+	public URI downloadModel(URI modelURI, String modelName, String[] modelFileNames) {
 
 		if ("file".equalsIgnoreCase(modelURI.getScheme())) {
 			// It's a file path
@@ -158,7 +185,7 @@ public class DLDownloadManager {
 
 						if (file.isDirectory()) {
 							//the file has been decompressed and need to search for model path within this...
-							file =  findModelFile(file, defaultModels);
+							file =  findModelFile(file, modelFileNames);
 							
 							System.out.println("DECOMPRESSED MODEL: " + file );
 

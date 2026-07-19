@@ -463,7 +463,7 @@ of all loaded plugin modules is written to the database table
 Version_Information every time PAMGuard starts. </p>
 
 <p class=MsoNormal>Automatic NMEA serial port selection. New option, which will
-try available serial ports in turn until one is found that�s returning NMEA
+try available serial ports in turn until one is found thats returning NMEA
 data. </p>
 
 <p class=MsoNormal><b>Bug Fixes</b></p>
@@ -475,6 +475,15 @@ harm. </p>
 <p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/300">Issue
 300</a>: Null pointer returned by the Ishmael Spectrogram Correlation detector.
 Fixed.</p>
+
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/306">Issue
+306</a>: Tethys export. Options to limit number of items per Detections
+document to about 100k.</p>
+
+<p class=MsoNormal><a href="https://github.com/PAMGuard/PAMGuard/issues/307">Issue
+307</a>: Tethys not exporting correct count of data points in Detections
+documents. </p>
 
 <h1>Version 2.02.18 February 2026</h1>
 
@@ -674,7 +683,7 @@ annotations, species codes can be taken from the logger form. </p>
 <p class=MsoNormal>Made export of data (Calibrations, Deployments, Detections,
 and Localisations) available as Offline tasks. This is not useful when running
 Tethys on a single dataset, since all tasks can be easily performed using
-Export buttons on the main Tethys interface. However, this change means
+ÂExportÂ buttons on the main Tethys interface. However, this change means
 that these export tasks become available to the <a
 href="https://www.pamguard.org/plugins/batchprocessor.html">batch processor</a>
 (Version 2.0 or above) which can be used to export data from multiple similar
@@ -824,8 +833,8 @@ continually reset them. </p>
 project information to store with your data. See menu item Settings/Project
 information.</p>
 
-<p class=MsoNormal>ÂEffort' management system. New map options allow
-colouring of track line by Âeffort' from various other modules. This is
+<p class=MsoNormal>ÃÂEffort' management system. New map options allow
+colouring of track line by ÃÂeffort' from various other modules. This is
 currently the acquisition system (so the track will change colour when PAMGuard
 is running), the binary store system (likely the same as the acquisition) or
 data from Logger forms. This system will be extended to other modules in the
@@ -892,9 +901,9 @@ exact times, rather than a couple of seconds after the hour. </p>
 <h2><span lang=EN-US>New Features</span></h2>
 
 <p class=MsoNormal><b><span lang=EN-US>Importing modules</span></b><span
-lang=EN-US> from other configurations: New options from file menu allowing
-import of specific modules, or module settings from other configurations. E.g.
-if you had three similar configurations and had set one of them up with a new
+lang=EN-US> from other configurations: New options from file menu allowing import
+of specific modules, or module settings from other configurations. E.g. if you
+had three similar configurations and had set one of them up with a new
 detector, or got the click classifier settings set up just right in one of
 those configurations, you can import the additional modules or the click
 detector settings easily into the other configurations. </span></p>
@@ -996,10 +1005,10 @@ handlers to handle corrupt map files. </span></p>
 
 <h2><span lang=EN-US>New Features</span></h2>
 
-<p class=MsoNormal><span lang=EN-US>Restart Options: When you restart
-processing of offline files, if output data already exist (binary data of
-within database tables) you will be asked if you want to overwrite the data,
-cancel, or try to continue from where to left off. </span></p>
+<p class=MsoNormal><span lang=EN-US>Restart Options: When you restart processing
+of offline files, if output data already exist (binary data of within database
+tables) you will be asked if you want to overwrite the data, cancel, or try to
+continue from where to left off. </span></p>
 
 <p class=MsoNormal><span lang=EN-US>Updated SoundTrap sud file interface so
 that PAMGuard now extracts and stores the Click Detector settings from the sud
@@ -1016,14 +1025,14 @@ the first two characters of the string name may be. </span></p>
 <h2><span lang=EN-US>Bug Fixes</span></h2>
 
 <p class=MsoNormal><span lang=EN-US>Use of localization sensor and orientation
-data for static hydrophones had a bug whereby it would continually Âforget'
+data for static hydrophones had a bug whereby it would continually ÃÂforget'
 angle offsets applied to static hydrophones in viewer mode. This is now fixed. </span></p>
 
 <p class=MsoNormal><span lang=EN-US>Click tool bar: Correctly shows event
 selection options even if no species classification options are in place. </span></p>
 
 <p class=MsoNormal><span lang=EN-US>Fixed Landmarks: Earlier versions were
-Âlosing' these every time PAMGuard started or new data were loaded in viewer
+ÃÂlosing' these every time PAMGuard started or new data were loaded in viewer
 mode. Now fixed. </span></p>
 
 <p class=MsoNormal><span lang=EN-US>ROCCA: Fixed (another) memory leak which
@@ -1046,7 +1055,7 @@ you'd expect sound from higher frequency baleen whales, such as humpbacks, to
 vocalise at. &nbsp;&nbsp;</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Hiding tool tips. A menu item to
-permanently turn off all tool tips, or tap the ÂEsc' key to turn them off
+permanently turn off all tool tips, or tap the ÃÂEsc' key to turn them off
 for 6 seconds if they are getting in the way, particularly when trying to
 interact with displays using the mouse. </span></p>
 
@@ -1062,8 +1071,8 @@ being cleared from memory, so memory will eventually run out. This could happen
 after browsing a lot of data, but was most likely when reprocessing files
 offline, for example running click classifiers. This is now fixed. </span></p>
 
-<p class=MsoNormal><span lang=EN-US>Also fixed a memory leak in the ROCCA
-whistle classification module.</span></p>
+<p class=MsoNormal><span lang=EN-US>Also fixed a memory leak in the ROCCA whistle
+classification module.</span></p>
 
 <h2><span lang=EN-US>New Features</span></h2>
 
@@ -1091,9 +1100,9 @@ system to have nested classifiers which can be enabled or disabled. </span></p>
 accommodate the new classification system.</span></p>
 
 <p class=MsoNormal><span lang=EN-US>Addition of data selectors to the minimum
-number of clicks accepted by the classifier. This allows the click-by-click
-classifier and the click train detector to be used to together to improve
-classification accuracy. </span></p>
+number of clicks accepted by the classifier. This allows the click-by-click classifier
+and the click train detector to be used to together to improve classification
+accuracy. </span></p>
 
 <p class=MsoNormal><b><span lang=EN-US>Bug fixes</span></b></p>
 
@@ -1131,7 +1140,7 @@ audio files. </span></p>
 <h2><span lang=EN-US>Bug Fixes</span></h2>
 
 <p class=MsoNormal><span lang=EN-US>Soundtrap DWV import. Will now generate
-binary files even if DWV file doesnÂ't exist (which is correct behavior in
+binary files even if DWV file doesnÃÂ't exist (which is correct behavior in
 quiet conditions when no clicks were detected). </span></p>
 
 <p class=MsoNormal><span lang=EN-US>Spectrogram. Changes to stop occasional
@@ -1166,7 +1175,7 @@ running in real time. Added template names based on file names. </p>
 <p class=MsoNormal>#13 Merging files when offline processing file folders: Had
 an error introduced in last release which caused it to fail to recognise gaps
 between files, meaning that some output data (i.e. after a gap) would have an
-incorrect time stamp. This did not affect data if the Âmerge contiguous
+incorrect time stamp. This did not affect data if the ÃÂmerge contiguous
 files' option was not selected. </p>
 
 <p class=MsoNormal>#14 Logger forms data were not plotting correctly. This was
@@ -1363,7 +1372,7 @@ included in a future release. </p>
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span lang=EN-US>17. </span><span
 lang=EN-US style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span
 lang=EN-US> </span>An implementation of the Generalized Power Law Detector,
-developed by Tyler Helble ([Helble et al., ÂA generalized power-law
+developed by Tyler Helble ([Helble et al., ÃÂA generalized power-law
 detection algorithm for humpback whale vocalizations', The Journal of the
 Acoustical Society of America, vol. 131, no. 4, pp. 2682-2699, 2012) is now
 available. For details, see the online help </p>
@@ -2661,7 +2670,7 @@ UID's are also added to PAMGuard database tables. </span></p>
 viewer they will automatically be converted. For safety, the original binary
 files will not be overwritten and the new data will be placed in a new folder
 on your computer with the same path as the old data, but suffixed with
-Â_WithUID', e.g. if your binary data were previously stored in the folder
+ÃÂ_WithUID', e.g. if your binary data were previously stored in the folder
 C:\MySurvey\binarydata the new data will be written to
 C:\MySurvey\binarydata_WithUID. </span></p>
 
@@ -3788,9 +3797,9 @@ module. </p>
 
 <p class=MsoNormal><i>Sound Recorder Module</i></p>
 
-<p class=MsoNormal>Now supports writing 8 and 24 bit as well as 16 bit files.
-Also writes data to dated sub folders, starting a new folder each day (UTC).
-Also provides additional information on disk space on the main display panel.
+<p class=MsoNormal>Now supports writing 8 and 24 bit as well as 16 bit files. Also
+writes data to dated sub folders, starting a new folder each day (UTC). Also
+provides additional information on disk space on the main display panel.
 Millisecond time is also now included in the output file names. </p>
 
 <p class=MsoNormal><i>Datagram Options</i></p>
@@ -4498,13 +4507,13 @@ channels are assigned to a hydrophone. </p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span style='font-family:
 Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-</span>Play back of high frequency wav files through National Instruments (NI)
-cards: When analysing wav files, sound can be output at high frequency
-(depending on the specification of the NI card). The primary motivation for
-this has been to develop a test bed for high frequency sound acquisition
-whereby we can play 500kHz recordings of harbour porpoise out of an NI card on
-one machine, into NI cards on a different machine which are testing high
-frequency versions of the click detector.</p>
+</span>Play back of high frequency wav files through National Instruments (NI) cards:
+When analysing wav files, sound can be output at high frequency (depending on
+the specification of the NI card). The primary motivation for this has been to
+develop a test bed for high frequency sound acquisition whereby we can play
+500kHz recordings of harbour porpoise out of an NI card on one machine, into NI
+cards on a different machine which are testing high frequency versions of the
+click detector.</p>
 
 <p class=MsoListParagraph style='text-indent:-18.0pt'><span style='font-family:
 Symbol'>'</span><span style='font-size:7.0pt;font-family:"Times New Roman",serif'>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
@@ -4812,9 +4821,9 @@ now been fixed. </p>
 
 <p class=MsoNormal><b>Sound Recorder</b></p>
 
-<p class=MsoNormal>Level meters are shown for the correct channels (after
-channel numbering has been changed). Occasional crash due to synchronisation
-problems when &nbsp;multi-threading now fixed.</p>
+<p class=MsoNormal>Level meters are shown for the correct channels (after channel
+numbering has been changed). Occasional crash due to synchronisation problems
+when &nbsp;multi-threading now fixed.</p>
 
 <p class=MsoNormal><b>Whistle Detector</b></p>
 

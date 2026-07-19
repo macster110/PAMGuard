@@ -2,130 +2,225 @@ package PamController.pamWizard;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.SwingUtilities;
 
+import PamController.PamControlledUnit;
 import PamController.PamController;
-import PamController.soundMedium.GlobalMedium.SoundMedium;
-import PamUtils.worker.filelist.FileListData;
-import PamUtils.worker.filelist.WavFileType;
-import PamUtils.worker.filelist.WavListUser;
-import PamUtils.worker.filelist.WavListWorker;
+import PamController.PamGUIManager;
+import PamModel.PamModuleInfo;
+import javafx.application.Platform;
 
 /**
- * Manages the creation of automatic PAMGaurcd configurations. 
- * 
+ * Manages the automatic creation of PAMGuard configurations when files are
+ * dragged onto a <b>blank</b> configuration. Dropped files are scanned by a set
+ * of {@link PamFileTypeScanner}s (only sound files are currently scanned for) and
+ * the user is offered a list of {@link PamAutoConfig} options appropriate to the
+ * file types present and the run mode.
+ *
  * @author Jamie Macaulay
  */
 public class PamWizardManager {
-	
-	public List<PamAutoConfig> autoConfigs;
-	
-	public FileListData<WavFileType> currentFiles; 
-	
+
 	/**
-	 * Creates a list of wav files.
+	 * Scanners which recognise file types within the dropped files. The sound-file
+	 * scanner is the only one implemented; FPOD/CPOD/binary scanners can be added
+	 * here to enable configurations that view those data alongside the sound.
 	 */
-	WavListWorker wavListWorker = new WavListWorker(new WavListReceiver());
+	private final List<PamFileTypeScanner> scanners = new ArrayList<>();
 
-	private class WavListReceiver implements WavListUser {
+	/**
+	 * Available automatic configurations. Each decides for itself whether it applies
+	 * to a given set of dropped files and run mode.
+	 */
+	private final List<PamAutoConfig> autoConfigs = new ArrayList<>();
 
-		@Override
-		public void newFileList(FileListData<WavFileType> fileListData) {
-			newSoundFileList(fileListData);
-		}
-	}
-	
-	
-	private void newSoundFileList(FileListData<WavFileType> fileListData) {
-		currentFiles = fileListData; 
-		
-		System.out.println("PamWizardManager Found "+currentFiles.getFileCount()+" audio files.");
-		
-        // Create a few dummy PamAutoConfig implementations for demo
-        List<PamAutoConfig> demo = new ArrayList<>();
-        demo.add(new PamAutoConfig() {
-            public boolean isConfigValid(PamFileImport importHandler) { return true; }
-            public String getConfigDescription() { return "Air config for species A"; }
-            public String[] getSpeciesList() { return new String[]{"Species A", "Species B"}; }
-            public String getConfigName() { return "Air Config 1"; }
-            public SoundMedium getGlobalMediumSettings() { return SoundMedium.Air; }
-        });
-        demo.add(new PamAutoConfig() {
-            public boolean isConfigValid(PamFileImport importHandler) { return true; }
-            public String getConfigDescription() { return "Water config only"; }
-            public String[] getSpeciesList() { return new String[]{"Species C"}; }
-            public String getConfigName() { return "Water Config"; }
-            public SoundMedium getGlobalMediumSettings() { return SoundMedium.Water; }
-        });
-        demo.add(new PamAutoConfig() {
-            public boolean isConfigValid(PamFileImport importHandler) { return true; }
-            public String getConfigDescription() { return "Both media, many species"; }
-            public String[] getSpeciesList() { return new String[]{"Species A", "Species C"}; }
-            public String getConfigName() { return "Both Config"; }
-            public SoundMedium getGlobalMediumSettings() { return null; }
-        });
+	/**
+	 * Always-present default modules that are added automatically to every
+	 * configuration (not via the data model) and so do not count towards a
+	 * configuration being "non-blank". Core / hidden / essential ({@code minNumber > 0})
+	 * modules are detected generically; this set covers the remaining auto-added
+	 * singletons that are none of those.
+	 */
+	private static final Set<String> DEFAULT_MODULE_CLASSES = new HashSet<>(Arrays.asList(
+			"Array.ArrayManager",
+			"metadata.MetaDataContol"));
 
-        SwingUtilities.invokeLater(() -> {
-            PamAutoConfigDialog dlg = new PamAutoConfigDialog(null, demo);
-            PamAutoConfig sel = dlg.showDialog();
-            System.out.println("Selected: " + (sel == null ? "<none>" : sel.getConfigName()));
-            System.exit(0);
-        });
-	}
-
-
-	
 	public PamWizardManager(PamController pamController) {
-		createAutoConfigs(); 
+		createScanners();
+		createAutoConfigs();
 	}
-	
-	
-	
+
+	private void createScanners() {
+		scanners.add(new SoundFileScanner());
+		/* Future: register FPOD / CPOD / binary file scanners here. */
+	}
+
 	private void createAutoConfigs() {
-		/***Add automated configuration here***/
-		
+		autoConfigs.add(new SpectrogramViewerAutoConfig());
+		autoConfigs.add(new SpectrogramRealTimeAutoConfig());
+		/* Future: register combined configurations here, e.g. a config that is valid
+		 * when both FPOD detection files and sound files are present and shows the
+		 * detections alongside the spectrogram. */
 	}
 
 	/**
-	 * Called whenever new files are imported into PamGuard via drag and drop or other methods. 
-	 * @param files - a folder or file. These should be checked to see if they are audio files 
-	 * that can be used to create a PAMGuard configuration.
+	 * Called whenever files are dropped into PAMGuard. Scans the files and, if the
+	 * configuration is blank, offers the user a list of matching auto-configurations.
+	 *
+	 * @param files dropped files or folders.
 	 */
 	public void newImportedFiles(List<File> files) {
-		currentFiles = null;
-		String[] rootList = filesToPathArray(files);
-		
-		//Swing way
-		wavListWorker.startFileListProcess(PamController.getMainFrame(), rootList,
-				true, true);
-	
-//		/**Now check each auto config to see if it can handle the imported files**/
-//		ArrayList<PamAutoConfig> validConfigs = new ArrayList<PamAutoConfig>();
-//		for (PamAutoConfig config : autoConfigs) {
-//			if (config.isConfigValid(importHandler)) {
-//				validConfigs.add(config);
-//			}
-//			
-//		}
+		// Importing is only allowed into a blank configuration; once any module has
+		// been added the user should use the normal module-setup tools.
+		if (!isBlankConfiguration()) {
+			return;
+		}
+		if (files == null || files.isEmpty()) {
+			return;
+		}
+
+		final PamFileImport fileImport = new PamFileImport(files);
+
+		if (scanners.isEmpty()) {
+			presentOptions(fileImport);
+			return;
+		}
+
+		// run all scanners (scanning may be asynchronous) and present options once
+		// every scanner has reported back.
+		final AtomicInteger remaining = new AtomicInteger(scanners.size());
+		for (PamFileTypeScanner scanner : scanners) {
+			scanner.scan(files, result -> {
+				synchronized (fileImport) {
+					fileImport.addResult(result);
+				}
+				if (remaining.decrementAndGet() == 0) {
+					presentOptions(fileImport);
+				}
+			});
+		}
 	}
 
 	/**
-	 * Convert a list of File objects to a String array of absolute paths.
-	 * Null entries are skipped. If the input list is null or contains no valid
-	 * files this returns an empty array.
+	 * Work out which configurations apply and present them to the user.
+	 */
+	private void presentOptions(PamFileImport fileImport) {
+		// the scan may have been asynchronous - re-check the config is still blank.
+		if (!isBlankConfiguration()) {
+			return;
+		}
+
+		int runMode = PamController.getInstance().getRunMode();
+		List<PamAutoConfig> validConfigs = new ArrayList<>();
+		for (PamAutoConfig config : autoConfigs) {
+			if (config.isValid(fileImport, runMode)) {
+				validConfigs.add(config);
+			}
+		}
+		if (validConfigs.isEmpty()) {
+			return;
+		}
+
+		showOptionsDialog(validConfigs, fileImport);
+	}
+
+	/**
+	 * Show the options dialog (FX or Swing depending on the active GUI) and build the
+	 * selected configuration.
+	 */
+	private void showOptionsDialog(List<PamAutoConfig> configs, PamFileImport fileImport) {
+		if (PamGUIManager.isFX()) {
+			Platform.runLater(() -> {
+				PamAutoConfig selected = PamAutoConfigDialogFX.showDialog(configs);
+				buildConfiguration(selected, fileImport);
+			});
+		}
+		else {
+			SwingUtilities.invokeLater(() -> {
+				PamAutoConfigDialog dlg = new PamAutoConfigDialog(PamController.getMainFrame(), configs);
+				PamAutoConfig selected = dlg.showDialog();
+				buildConfiguration(selected, fileImport);
+			});
+		}
+	}
+
+	/**
+	 * Build the selected configuration on the Swing event thread (module management
+	 * runs through the Swing-based {@link PamController}).
+	 */
+	private void buildConfiguration(PamAutoConfig selected, PamFileImport fileImport) {
+		if (selected == null) {
+			return;
+		}
+		SwingUtilities.invokeLater(() -> {
+			if (isBlankConfiguration()) {
+				selected.createConfiguration(fileImport);
+			}
+		});
+	}
+
+	/**
+	 * Whether the current configuration is blank, i.e. has no user-added modules.
+	 * Essential / always-present modules (those with a minimum count greater than
+	 * zero) are ignored - this matches the logic that shows/removes the import tab,
+	 * which only removes it when a user module ({@code minNumber <= 0}) is added.
+	 *
+	 * @return true if no user modules have been added.
+	 */
+	public boolean isBlankConfiguration() {
+		PamController pamController = PamController.getInstance();
+		int n = pamController.getNumControlledUnits();
+		for (int i = 0; i < n; i++) {
+			if (isUserModule(pamController.getControlledUnit(i))) {
+				return false; // a user-added module is present
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Whether a controlled unit is a user-added module (as opposed to always-present
+	 * infrastructure: core, hidden, essential, or a default singleton).
+	 */
+	private boolean isUserModule(PamControlledUnit unit) {
+		if (unit == null) {
+			return false;
+		}
+		PamModuleInfo moduleInfo = unit.getPamModuleInfo();
+		if (moduleInfo == null) {
+			return false;
+		}
+		if (moduleInfo.isCoreModule() || moduleInfo.isHidden() || moduleInfo.getMinNumber() > 0) {
+			return false;
+		}
+		return !DEFAULT_MODULE_CLASSES.contains(unit.getClass().getName());
+	}
+
+	/**
+	 * Convert a list of File objects to a String array of absolute paths. Null
+	 * entries are skipped. If the input list is null or contains no valid files this
+	 * returns an empty array.
+	 *
 	 * @param files list of File objects
 	 * @return array of absolute path strings
 	 */
 	public static String[] filesToPathArray(List<File> files) {
-		if (files == null || files.isEmpty()) return new String[0];
+		if (files == null || files.isEmpty()) {
+			return new String[0];
+		}
 		List<String> paths = new ArrayList<>();
 		for (File f : files) {
-			if (f == null) continue;
+			if (f == null) {
+				continue;
+			}
 			paths.add(f.getAbsolutePath());
 		}
 		return paths.toArray(new String[0]);
 	}
-
 }

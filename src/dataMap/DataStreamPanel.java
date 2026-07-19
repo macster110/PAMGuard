@@ -277,9 +277,23 @@ public class DataStreamPanel extends JPanel implements DataMapObserver {
 		}
 
 		/**
-		 * Draws lines
-		 * 
-		 * @param g
+		 * Draws lines for a 2D datagram (one coloured line per amplitude/frequency band).
+		 * <p>
+		 * Two kinds of "no data" bins can appear in the image array:
+		 * <ol>
+		 *   <li><b>-1</b> – set by {@link DatagramManager#getImageData} when
+		 *       {@code scaleCount == 0} for a pixel bin (no {@link DatagramDataPoint}
+		 *       objects mapped to it at all).  Already handled by the {@code < 0}
+		 *       guard below.</li>
+		 *   <li><b>all-zero</b> – arises when a {@link DatagramDataPoint} was created
+		 *       but contained no data units (e.g. a gap between SUD files).  The
+		 *       datagram builder always stores a point for every time slice, so empty
+		 *       slices have data = 0 for every band.  These produce {@code 0/n = 0.0}
+		 *       after normalisation and therefore escape the {@code < 0} check.
+		 *       Drawing a line to y = 0 creates a downward spike at every such gap.</li>
+		 * </ol>
+		 * Both cases are treated as gaps: {@code lastX} is reset to the sentinel
+		 * so no line segment is drawn across the empty bin.
 		 */
 		private void datagramPaint2D(Graphics g) {
 			long startMillis = scrollingDataPanel.getScreenStartMillis();
@@ -319,6 +333,22 @@ public class DataStreamPanel extends JPanel implements DataMapObserver {
 			lastPlotted2DminVal = minMaxValue[0];
 			lastPlotted2DmaxVal = minMaxValue[1];
 
+			// Pre-compute which time bins should be treated as gaps.
+			// A bin is a gap if:
+			//   (a) any value is < 0  (the -1 "no DatagramDataPoint" sentinel), OR
+			//   (b) all values are exactly 0 (empty DatagramDataPoint – no data units
+			//       recorded in that interval, e.g. between SUD files).
+			boolean[] skipBin = new boolean[nTimePoints];
+			for (int ix = 0; ix < nTimePoints; ix++) {
+				boolean anyNegative = false;
+				boolean allZero    = true;
+				for (int iy = 0; iy < nAmpPoints; iy++) {
+					if (imageData[ix][iy] < 0) { anyNegative = true; break; }
+					if (imageData[ix][iy] != 0) allZero = false;
+				}
+				skipBin[ix] = anyNegative || allZero;
+			}
+
 			double xScale = (double) (x2 - x1) / (double) nTimePoints;
 			double yScale = getHeight() / (minMaxValue[1] - minMaxValue[0]);
 			int lastX = -9999, lastY = 0, x, y;
@@ -327,6 +357,10 @@ public class DataStreamPanel extends JPanel implements DataMapObserver {
 				g.setColor(PamColors.getInstance().getWhaleColor(iy + 1));
 				lastX = -9999;
 				for (int ix = 0; ix < nTimePoints; ix++) {
+					if (skipBin[ix]) {
+						lastX = -9999;
+						continue;
+					}
 					x = (int) (xScale * ix) + x1;
 					y = h - (int) (yScale * (imageData[ix][iy] - minMaxValue[0]));
 					if (lastX != -9999) {
@@ -336,7 +370,6 @@ public class DataStreamPanel extends JPanel implements DataMapObserver {
 					lastY = y;
 				}
 			}
-
 		}
 
 		/**

@@ -438,7 +438,10 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 	void selectRecorderStorage() {
 		//		AudioFileFormat.Type.
 		if (recorderSettings.getFileType() == AudioFileFormat.Type.WAVE) {
-			recorderStorage = new WavFileStorage(this); 
+			recorderStorage = new WavFileStorage(this);
+		}
+		else if (recorderSettings.getFileType() == SUD) {
+			recorderStorage = new SudFileStorage(this);
 		}
 		else if (recorderSettings.getFileType() == SUD) {
 			recorderStorage = new SudFileStorage(this);

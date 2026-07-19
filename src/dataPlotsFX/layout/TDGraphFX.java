@@ -831,8 +831,39 @@ public class TDGraphFX extends PamBorderPane {
 	public void addDataItem(TDDataInfoFX dataInfo) {
 		dataList.add(dataInfo);
 		tdDisplay.subscribeScrollDataBlocks();
+
+		// A 'base priority' plot (e.g. a spectrogram) should own the Y axis. When one
+		// is added to a graph currently showing another axis (e.g. amplitude), switch
+		// the axis to the base-priority plot's data type (e.g. frequency). Without
+		// this, findFirstActiveDataInfo() only considers data infos matching the
+		// current axis, so the spectrogram would be ignored and the axis would not
+		// change.
+		DataTypeInfo baseType = getBasePriorityDataType(dataInfo);
+		if (baseType != null && !baseType.equals(graphParameters.currentDataType)) {
+			setAxisName(baseType);
+		}
+
 		sortAxisandPanes();
 		tdControl.dataModelToDisplay();
+	}
+
+	/**
+	 * If the given data info is a 'base priority' plot (e.g. a spectrogram) that
+	 * should own the Y axis, return the data type of its base-priority scale info.
+	 *
+	 * @param dataInfo the data info to check.
+	 * @return the base-priority data type, or null if the plot is not base priority.
+	 */
+	private DataTypeInfo getBasePriorityDataType(TDDataInfoFX dataInfo) {
+		if (dataInfo == null) {
+			return null;
+		}
+		for (TDScaleInfo scaleInfo : dataInfo.getScaleInfos()) {
+			if (scaleInfo.getPlotPriority() == TDScaleInfo.BASE_PRIORITY) {
+				return scaleInfo.getDataTypeInfo();
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -1430,6 +1461,40 @@ public class TDGraphFX extends PamBorderPane {
 		public List<MenuItem> getPopUpMenuItems(MouseEvent e) {
 			return totalMouseHandler.getPopupMenuItems(e);
 		}
+
+		/**
+		 * Add an extra mouse handler to this plot pane, e.g. so an overlay can respond
+		 * to hover / drag events. The handler is added after the standard marker and
+		 * plot handlers so it sees events last.
+		 *
+		 * @param adapter the mouse handler to add.
+		 */
+		public void addMouseHandler(ExtMouseAdapter adapter) {
+			totalMouseHandler.addMouseHandler(adapter);
+		}
+	}
+
+	/**
+	 * Add an extra mouse handler to all of this graph's plot panes (one per plot
+	 * channel). Used by overlays (e.g. the spectrogram annotation resize handles)
+	 * that need hover / drag mouse events with pixel coordinates.
+	 *
+	 * @param adapter the mouse handler to add.
+	 */
+	public void addPlotMouseHandler(ExtMouseAdapter adapter) {
+		for (TDPlotPane pane : tdPlotPanels) {
+			pane.addMouseHandler(adapter);
+		}
+	}
+
+	/**
+	 * Get the plot panes (one per plot channel/panel) of this graph. The list index
+	 * is the plot number used by the drawing / channel-filtering methods.
+	 *
+	 * @return the plot panes.
+	 */
+	public java.util.List<TDPlotPane> getPlotPanes() {
+		return tdPlotPanels;
 	}
 
 	/**

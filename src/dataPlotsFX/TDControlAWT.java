@@ -79,7 +79,8 @@ public class TDControlAWT  extends TDControl implements UserDisplayComponent {
 		 * Need to send a message to PamController to hold off enabling the start 
 		 * button and other controls until this thread has completed.
 		 */
-		PAMStartupEnabler.addDisableCount();
+		//FIXME - causing thread lock on startup. Need to investigate.
+		//PAMStartupEnabler.addDisableCount();
 		
 		Platform.runLater(new Runnable() {
 			@Override
@@ -98,8 +99,8 @@ public class TDControlAWT  extends TDControl implements UserDisplayComponent {
 				if (timeScroller != null && isViewer()) {
 					timeScroller.coupleScroller(userDisplayControl.getUnitName());
 				}
-
-				PAMStartupEnabler.dropDisableCount();
+				//FIXME - causing thread lock on startup. Need to investigate.
+				//PAMStartupEnabler.dropDisableCount();
 			}
 		});		
 

@@ -160,8 +160,8 @@ public class PamFlipPane extends FlipPane {
 		//		backButton.setStyle("-fx-background-color: -color-base-6"); 
 		//backButton.setStyle("-fx-padding: 0,0,0,0");
 
-		//make the back button blue so users can easily see the button. 
-		backButton.setStyle("-fx-background-radius: 0 5 5 0; -fx-border-radius: 0 5 5 0; -fx-background-color: -color-accent-6");
+		//make the back button blue so users can easily see the button.
+		backButton.getStyleClass().add("flip-pane-back-button");
 
 		backButton.setOnAction((action)->{
 //			System.out.println("FLIP BACK TO FRONT"); 

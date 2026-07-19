@@ -243,6 +243,7 @@ public class StandardMHTChi2Pane extends SettingsPane<StandardMHTChi2Params> {
 		});
 		
 		advElecNoiseButton = new PamButton(); 
+		advElecNoiseButton.getStyleClass().add("icon-button");
 //		advElecNoiseButton.setGraphic(PamGlyphDude.createPamGlyph(MaterialIcon.SETTINGS, PamGuiManagerFX.iconSize));
 		advElecNoiseButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
 		advElecNoiseButton.setOnAction((action)->{

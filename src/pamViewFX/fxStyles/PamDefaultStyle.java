@@ -24,6 +24,8 @@ package pamViewFX.fxStyles;
 
 import java.util.ArrayList;
 
+import PamUtils.PlatformInfo;
+import PamUtils.PlatformInfo.OSType;
 import PamView.ColourScheme;
 import PamView.PamColors;
 
@@ -61,14 +63,16 @@ public class PamDefaultStyle {
 	 * Relative location of the CSS style sheet to be used for the Pamguard standard
 	 * dialogs
 	 */
-	protected String dialogCSS = "/Resources/css/pamDefaultDialogCSS.css";
+	protected String dialogCSS = defaultDialogCSS();
 
 	/**
 	 * Relative location of the CSS style sheet to be used for the Pamguard std
-	 * dialogs when in night mode. If there is not a style sheet specific to night
-	 * mode, set it to null or point back to the dialogCSS field.
+	 * dialogs when in night mode. This is an OVERRIDE sheet which is layered on
+	 * top of the dialogCSS sheet (it just redefines colours), not a standalone
+	 * style. If there is not a style sheet specific to night mode, set it to null
+	 * or point back to the dialogCSS field.
 	 */
-	protected String dialogCSSNightMode = dialogCSS;
+	protected String dialogCSSNightMode = defaultDialogDarkCSS();
 
 	/**
 	 * Relative location of the CSS style sheet to be used for the Pamguard sliding
@@ -82,6 +86,33 @@ public class PamDefaultStyle {
 	 * mode, set it to null or point back to the slidingDialogCSS field.
 	 */
 	protected String slidingDialogCSSNightMode = slidingDialogCSS;
+
+	/**
+	 * Pick the default dialog style sheet to match the Swing look and feel set in
+	 * Pamguard.main(): the Windows system look and feel on Windows, FlatLaf Light
+	 * everywhere else (macOS / Linux).
+	 *
+	 * @return the resource path of the default dialog CSS style sheet
+	 */
+	private static String defaultDialogCSS() {
+		if (PlatformInfo.calculateOS() == OSType.WINDOWS) {
+			return "/Resources/css/pamWindowsLight.css";
+		}
+		return "/Resources/css/pamFlatLafLight.css";
+	}
+
+	/**
+	 * Pick the default night-mode override sheet matching the default dialog CSS.
+	 * This sheet only redefines colours and is added on top of the base sheet.
+	 *
+	 * @return the resource path of the dark-mode override CSS style sheet
+	 */
+	private static String defaultDialogDarkCSS() {
+		if (PlatformInfo.calculateOS() == OSType.WINDOWS) {
+			return "/Resources/css/pamWindowsDark.css";
+		}
+		return "/Resources/css/pamFlatLafDark.css";
+	}
 
 	/**
 	 * <p>
@@ -123,11 +154,12 @@ public class PamDefaultStyle {
 	public ArrayList<String> getDialogCSS() {
 		ArrayList<String> cssStyles = new ArrayList<String>();
 		if (dialogCSS==null) return cssStyles;
+		cssStyles.add(getClass().getResource(dialogCSS).toExternalForm());
+		// the night-mode sheet is a colour override which is layered on top of
+		// the base style sheet.
 		if (PamColors.getInstance().getColourScheme().getName() == ColourScheme.NIGHTSCHEME
-				&& dialogCSSNightMode != null) {
+				&& dialogCSSNightMode != null && !dialogCSSNightMode.equals(dialogCSS)) {
 			cssStyles.add(getClass().getResource(dialogCSSNightMode).toExternalForm());
-		} else {
-			cssStyles.add(getClass().getResource(dialogCSS).toExternalForm());
 		}
 		return cssStyles;
 	}

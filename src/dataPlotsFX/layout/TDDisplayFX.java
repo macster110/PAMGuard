@@ -239,7 +239,7 @@ public class TDDisplayFX extends PamBorderPane {
 		controlPane=new TDControlPaneFX(tdControl,this);
 		controlPane.setParams(tdParametersFX);
 		controlPane.setPrefHeight(CONTROL_PANE_HEIGHT);
-		controlPane.setStyle("-fx-background-color: -fx-background;");
+		//controlPane.setStyle("-fx-background-color: -fx-background;");
 
 
 		hidingControlPane=new HidingPane(Side.TOP, controlPane, this, false );

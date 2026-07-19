@@ -103,11 +103,16 @@ public class Pamguard {
 	public static void main(String[] args) {
 		
 		Debug.setPrintDebug(false); // make sure the class instantiates static members. 
+
 		try {			
 			if (PlatformInfo.calculateOS() == OSType.WINDOWS) {
 				UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 			}
 			else {
+				// Use the macOS system menu bar for Swing JMenuBar menus
+				System.setProperty("apple.laf.useScreenMenuBar", "true");
+				// Set the application name shown in the macOS menu bar
+				System.setProperty("apple.awt.application.name", "PAMGuard");
 				//do not use the mac version...it's awful
 				//UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
 			    UIManager.setLookAndFeel(new FlatLightLaf() );	

@@ -560,4 +560,18 @@ public class PamColors implements PamSettings {
 		return colourScheme;
 	}
 
+	/**
+	 * Set the colour scheme by name and refresh all colours.
+	 * @param schemeName - the scheme name, e.g. ColourScheme.DAYSCHEME or ColourScheme.NIGHTSCHEME
+	 */
+	public void setColourScheme(String schemeName) {
+		colourScheme = colorSettings.selectScheme(schemeName);
+		setColors();
+		if (colourMenuItems != null) {
+			for (int i = 0; i < colourMenuItems.length; i++) {
+				colourMenuItems[i].setSelected(colourMenuItems[i].getText().equals(schemeName));
+			}
+		}
+	}
+
 }

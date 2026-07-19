@@ -88,10 +88,12 @@ public class PamAtlantaStyle extends PamDefaultStyle {
 	@Override
 	public ArrayList<String> getGUICSS() {
 		ArrayList<String> cssStyles = new ArrayList<String>();
-		if (PamColors.getInstance().getColourScheme().getName() == ColourScheme.NIGHTSCHEME
-				&& guiCSSNightMode != null) {
+		System.out.println("Current colour scheme: " + PamColors.getInstance().getColourScheme().getName() + " " + guiCSSNightMode);
+		if (PamColors.getInstance().getColourScheme().getName() == ColourScheme.NIGHTSCHEME) {
+			System.out.println("Using NIGHT MODE GUI CSS");
 			cssStyles.add(getClass().getResource(primerdark).toExternalForm());
 		} else {
+			System.out.println("Using LIGHT MODE GUI CSS");
 			cssStyles.add(getClass().getResource(primerlight).toExternalForm());
 		}
 		cssStyles.add(getClass().getResource(primerPAMGuard).toExternalForm());

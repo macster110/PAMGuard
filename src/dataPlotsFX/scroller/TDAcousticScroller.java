@@ -10,6 +10,8 @@ import PamController.PamController;
 import PamController.PamSettings;
 import PamDetection.RawDataUnit;
 import PamUtils.PamUtils;
+import fftManager.FFTDataBlock;
+import pamViewFX.fxNodes.pamScrollers.acousticScroller.FFTScrollBarGraphics;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
 import PamguardMVC.PamObservable;
@@ -469,21 +471,21 @@ public class TDAcousticScroller extends AcousticScrollerFX implements PamSetting
 	 * Add data block graphics to the scroll bar. 
 	 */
 	public void addDataBlockGraphics(PamDataBlock dataBlock){
-		//		//if FFT data need to add FFT datablock 
-//		if (dataBlock instanceof FFTDataBlock){
-//			this.addAcousticScrollGraphics(new FFTScrollBarGraphics(this , (FFTDataBlock) dataBlock));
-//			/**
-//			 * Only need to add an observer in  real time mode. Otherwise observers are handled in AcousticScrollerFX
-//			 */
-////			if (!isViewer) addAcousticObserver(dataBlock, PamUtils.getLowestChannel(dataBlock.getChannelMap()));
-//			if (!isViewer) addAcousticObserver(dataBlock, PamUtils.getLowestChannel(dataBlock.getSequenceMap()));
-//		}
-		//		if (dataBlock instanceof ClickDataBlock) {
-		//			System.out.println("Adding to another click datablock " + dataBlock.hashCode());
-		//		}
-		//else check for datagram graphics. 
-		if (dataBlock.getDatagramProvider()!=null){
-			//check that the datagram 
+		// FFT data blocks get a spectrogram preview in the scroll bar. The preview
+		// loads in the background only when the FFT block is idle (see
+		// FFTScrollBarGraphics.orderOfflineData), so it does not compete with the
+		// spectrogram display's loading.
+		if (dataBlock instanceof FFTDataBlock){
+			this.addAcousticScrollGraphics(new FFTScrollBarGraphics(this , (FFTDataBlock) dataBlock));
+			/**
+			 * Only need to add an observer in real time mode. Otherwise observers are
+			 * handled in AcousticScrollerFX.
+			 */
+			if (!isViewer) addAcousticObserver(dataBlock, PamUtils.getLowestChannel(dataBlock.getSequenceMap()));
+		}
+		//else check for datagram graphics.
+		else if (dataBlock.getDatagramProvider()!=null){
+			//check that the datagram
 			this.addAcousticScrollGraphics(new AcousticDataGramGraphics(this , dataBlock));
 			if (!isViewer) addAcousticObserver(dataBlock, -1);
 		}

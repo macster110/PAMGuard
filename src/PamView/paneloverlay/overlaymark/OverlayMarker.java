@@ -191,7 +191,10 @@ abstract public class OverlayMarker extends ExtMouseAdapter implements MarkManag
 			completeMark(e);
 			nowMarking = false;
 		}
-		nowMarking = false;
+		// NB: do NOT unconditionally set nowMarking = false here. Doing so kills
+		// polygon marks, which must stay 'marking' across multiple mouse
+		// press/release/click events while the user adds vertices. Only rectangle
+		// marks (completed above) end marking on release.
 		return wasMarking;
 	}
 	

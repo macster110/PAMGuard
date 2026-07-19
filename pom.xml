@@ -1419,6 +1419,22 @@
 			<version>2.1.0</version>
 		</dependency>
 
+
+		<!-- Markdown -> HTML conversion for the FX help viewer (rendered in a
+		     JavaFX WebView with GitHub-style CSS). commonmark is a small, pure-Java
+		     library with no runtime transitive dependencies. The gfm-tables
+		     extension adds support for GitHub-style pipe tables (e.g. cpod_help.md). -->
+		<dependency>
+		    <groupId>org.commonmark</groupId>
+		    <artifactId>commonmark</artifactId>
+		    <version>0.21.0</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.commonmark</groupId>
+		    <artifactId>commonmark-ext-gfm-tables</artifactId>
+		    <version>0.21.0</version>
+		</dependency>
+
 		<!-- Four dependencies from xbee library that are needed for Genus
 		module. -->
 		<dependency>

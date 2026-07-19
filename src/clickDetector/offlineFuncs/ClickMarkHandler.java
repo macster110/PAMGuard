@@ -20,6 +20,7 @@ import PamView.paneloverlay.OverlayDataManager;
 import PamView.paneloverlay.overlaymark.BasicMarkDataSelector;
 import PamView.paneloverlay.overlaymark.GeneralMarkDialog;
 import PamView.paneloverlay.overlaymark.MarkDataSelector;
+import PamView.paneloverlay.overlaymark.MarkRelationships;
 import PamView.paneloverlay.overlaymark.OverlayMark;
 import PamView.paneloverlay.overlaymark.OverlayMarkDataInfo;
 import PamView.paneloverlay.overlaymark.OverlayMarkObserver;
@@ -70,6 +71,15 @@ public class ClickMarkHandler implements OverlayMarkObserver {
 			}
 		}
 		WarningSystem.getWarningSystem().removeWarning(MarkWarning);
+
+		// Only show the pop up menu automatically on mark completion if the user has
+		// asked for immediate menus (Display > 'Display marks and observers...' >
+		// 'Show popup menus immediately'). Otherwise the menu is obtained by right
+		// clicking the completed mark, which is consistent with single-click
+		// selection and avoids an unwanted pop up every time a box/polygon is drawn.
+		if (!MarkRelationships.getInstance().getMarkRelationshipsData().isImmediateMenus()) {
+			return false;
+		}
 
 		List<PamDataUnit> selData = overlayMarker.getSelectedMarkedDataUnits(overlayMark, markDataSelector);
 		if (selData == null || selData.size() == 0) {

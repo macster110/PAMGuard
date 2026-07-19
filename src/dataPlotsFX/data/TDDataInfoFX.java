@@ -161,6 +161,7 @@ public abstract class TDDataInfoFX {
 	 * @return the currentScaleInfo
 	 */
 	public TDScaleInfo getCurrentScaleInfo() {
+		if (scaleInfoIndex==-1) return null;
 		return scaleInfos.get(scaleInfoIndex);
 	}
 

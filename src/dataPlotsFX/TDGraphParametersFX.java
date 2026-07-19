@@ -46,7 +46,7 @@ public class TDGraphParametersFX implements Serializable, Cloneable, ManagedPara
 	/**
 	 * Flag which indicates what type of pop up menu to use;
 	 */
-	public int popUpMenuType = SIMPLE_POP_UP; 
+	public int popUpMenuType = ADV_POP_UP; 
 
 	/**
 	 * The current data type to show.
