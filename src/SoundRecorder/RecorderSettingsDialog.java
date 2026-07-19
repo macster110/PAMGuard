@@ -431,10 +431,10 @@ public class RecorderSettingsDialog extends PamDialog {
 			for (int i = 0; i < types.length; i++) {
 				fileType.addItem(types[i]);
 			}
-
+			
 			// SUD (X3-compressed SoundTrap files) is always available.
 			fileType.addItem(RecorderControl.SUD);
-
+			
 			// if the decimus flag is set, add the X3 file type
 			if (SMRUEnable.isEnableDecimus()) {
 				fileType.addItem(RecorderControl.X3);
@@ -452,12 +452,14 @@ public class RecorderSettingsDialog extends PamDialog {
 				recorderSettings.fileInitials = fileInitials.getText();
 			}
 			catch (NullPointerException Ex) {
+				Ex.printStackTrace();
 				return showWarning("Error in file initials");
 			}
 			try {
 				recorderSettings.bitDepth = (int) bitDepth.getSelectedItem();
 			}
 			catch (Exception e) {
+				e.printStackTrace();
 				return showWarning("Error in Bit Depth selction");
 			}
 			return true;

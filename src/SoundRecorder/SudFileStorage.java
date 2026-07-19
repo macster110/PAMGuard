@@ -48,7 +48,7 @@ public class SudFileStorage implements RecorderStorage {
 	private final RecorderControl recorderControl;
 
 	private Type audioFileType;
-
+	
 	private float sampleRate;
 
 	private int nChannels;
