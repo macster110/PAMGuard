@@ -33,12 +33,12 @@ import pamViewFX.fxNodes.PamVBox;
 public class DeepWhistleMaskPane extends FFTMaskSettingsPane {
 
 	/**
-	 * Analysis window length the model expects, in seconds (2 ms).
+	 * Analysis window length the DeepWhistle model expects, in seconds (2 ms).
 	 */
 	private static final double WINDOW_SECONDS = 0.002;
 
 	/**
-	 * Hop the model expects, in seconds (8 ms).
+	 * Hop the DeepWhistle model expects, in seconds (8 ms).
 	 */
 	private static final double HOP_SECONDS = 0.008;
 
@@ -47,6 +47,36 @@ public class DeepWhistleMaskPane extends FFTMaskSettingsPane {
 	 * shown (10%).
 	 */
 	private static final double TOLERANCE = 0.10;
+
+	/**
+	 * The analysis window length the model expects, in seconds. Subclasses (e.g.
+	 * the SAM-Whistle pane) override this for models trained with a different FFT
+	 * length.
+	 *
+	 * @return the required window length in seconds.
+	 */
+	protected double getWindowSeconds() {
+		return WINDOW_SECONDS;
+	}
+
+	/**
+	 * The hop the model expects, in seconds. Subclasses override this for models
+	 * trained with a different hop.
+	 *
+	 * @return the required hop in seconds.
+	 */
+	protected double getHopSeconds() {
+		return HOP_SECONDS;
+	}
+
+	/**
+	 * Human readable name of the model, used in the FFT-configuration messages.
+	 *
+	 * @return the model name.
+	 */
+	protected String getModelName() {
+		return "Deep Whistle";
+	}
 
 	/**
 	 * The main content node holding the controls.
@@ -136,7 +166,7 @@ public class DeepWhistleMaskPane extends FFTMaskSettingsPane {
 	 * @return the required (even) FFT length in samples.
 	 */
 	private int requiredFFTLength(double sampleRate) {
-		int n = (int) Math.round(sampleRate * WINDOW_SECONDS);
+		int n = (int) Math.round(sampleRate * getWindowSeconds());
 		if (n < 2) {
 			n = 2;
 		}
@@ -153,7 +183,7 @@ public class DeepWhistleMaskPane extends FFTMaskSettingsPane {
 	 * @return the required hop in samples.
 	 */
 	private int requiredHop(double sampleRate) {
-		return (int) Math.round(sampleRate * HOP_SECONDS);
+		return (int) Math.round(sampleRate * getHopSeconds());
 	}
 
 	/**
@@ -168,8 +198,9 @@ public class DeepWhistleMaskPane extends FFTMaskSettingsPane {
 		if (fftSource == null || fftSource.getSampleRate() <= 0) {
 			//cannot validate - show neutral guidance.
 			Label info = makeWrappedLabel(
-					"Select an FFT data source. The Deep Whistle model expects a ~2 ms FFT "
-					+ "length and ~8 ms hop (these depend on the sample rate).",
+					String.format("Select an FFT data source. The %s model expects a ~%.0f ms FFT "
+					+ "length and ~%.0f ms hop (these depend on the sample rate).",
+					getModelName(), getWindowSeconds() * 1000.0, getHopSeconds() * 1000.0),
 					"mdi2i-information-outline", Color.GRAY);
 			fftConfigBox.getChildren().add(info);
 			return;
@@ -187,8 +218,8 @@ public class DeepWhistleMaskPane extends FFTMaskSettingsPane {
 
 		if (fftOk && hopOk) {
 			Label ok = makeWrappedLabel(
-					String.format("FFT length (%d) and hop (%d) are set correctly for the Deep Whistle model.",
-							curFFT, curHop),
+					String.format("FFT length (%d) and hop (%d) are set correctly for the %s model.",
+							curFFT, curHop, getModelName()),
 					"mdi2c-check-circle-outline", Color.web("#2e7d32"));
 			fftConfigBox.getChildren().add(ok);
 			return;
@@ -196,9 +227,9 @@ public class DeepWhistleMaskPane extends FFTMaskSettingsPane {
 
 		//not configured correctly - show warning and a fix button.
 		Label warning = makeWrappedLabel(
-				String.format("The FFT source is not set up for the Deep Whistle model. Required for "
+				String.format("The FFT source is not set up for the %s model. Required for "
 						+ "%.0f kHz: FFT length %d, hop %d (current: FFT length %d, hop %d).",
-						sampleRate / 1000.0, reqFFT, reqHop, curFFT, curHop),
+						getModelName(), sampleRate / 1000.0, reqFFT, reqHop, curFFT, curHop),
 				"mdi2a-alert-outline", Color.web("#ef6c00"));
 
 		PamButton setButton = new PamButton("Set FFT parameters");

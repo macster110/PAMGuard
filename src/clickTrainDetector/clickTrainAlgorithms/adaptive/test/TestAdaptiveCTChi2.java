@@ -45,6 +45,7 @@ public class TestAdaptiveCTChi2 {
 		testBearingRotatingTrains();
 		testNoisyBearingTrain();
 		testCorrelationSeparatedTrains();
+		testPeakFreqSeparatedTrains();
 		testRejectTooSlow();
 
 		System.out.println("\n==================================");
@@ -270,6 +271,31 @@ public class TestAdaptiveCTChi2 {
 		List<Integer> trains = runKernel(clicks, params, false, true);
 
 		assertTrue("Correlation-separated trains: two trains detected with waveform correlation (got " + trains.size()
+				+ " sizes " + trains + ")", trains.size() == 2);
+	}
+
+	/**
+	 * Two interleaved trains with identical ICI and amplitude but clicks of
+	 * different peak frequency should be separated when the peak-frequency feature is
+	 * enabled (with waveform correlation off, so only peak frequency distinguishes
+	 * them).
+	 */
+	private static void testPeakFreqSeparatedTrains() {
+		double[] waveformA = clickWaveform(40000, 64); // 40 kHz click
+		double[] waveformB = clickWaveform(120000, 64); // 120 kHz click
+
+		List<SimpleClick> clicks = new ArrayList<>();
+		generateTrainWaveform(clicks, 0, 1.00, 0.10, 0.003, 118, waveformA, 25, new Random(30));
+		generateTrainWaveform(clicks, 100, 1.05, 0.10, 0.003, 118, waveformB, 25, new Random(31));
+		sortByTime(clicks);
+
+		AdaptiveCTParams params = defaultParams();
+		params.useCorrelation = false;
+		params.usePeakFreq = true;
+
+		List<Integer> trains = runKernel(clicks, params, false, true);
+
+		assertTrue("Peak-frequency-separated trains: two trains detected with peak frequency (got " + trains.size()
 				+ " sizes " + trains + ")", trains.size() == 2);
 	}
 

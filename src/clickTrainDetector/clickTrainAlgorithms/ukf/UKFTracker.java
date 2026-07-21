@@ -5,6 +5,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import PamguardMVC.PamDataUnit;
+import clickTrainDetector.clickTrainAlgorithms.ClickFeatureUtils;
 import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.BearingChi2VarParams;
 
 /**
@@ -19,7 +20,26 @@ import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.BearingChi2VarParams;
 public class UKFTracker {
 
 	/** Length of the affinity feature vector. */
-	public static final int FEATURE_DIM = 5;
+	public static final int FEATURE_DIM = 7;
+
+	/**
+	 * Sentinel value written into a feature slot when that feature is disabled or
+	 * cannot be measured for a pairing (e.g. amplitude tracking off, or no waveform
+	 * for correlation / peak frequency). Every real feature is a non-negative
+	 * distance / magnitude, so a single negative sentinel is unambiguous: the
+	 * affinity network is trained (with feature dropout) to recognise it as "this
+	 * feature is absent" and to fall back on the remaining features. See
+	 * {@link #maskableFeatures()} and {@link AffinityMLPTrainer}.
+	 */
+	public static final double ABSENT = -1.0;
+
+	/**
+	 * Divisor applied to the raw peak-frequency difference (Hz) so the feature is
+	 * O(1). Only affects the pre-standardisation scale (the trainer standardises
+	 * features, and the default gate ignores this feature), so the exact value is
+	 * not critical.
+	 */
+	private static final double PEAK_FREQ_NORM_HZ = 1000.0;
 
 	/** A large cost used for forbidden (gated-out) track-detection pairs. */
 	private static final double FORBIDDEN_COST = 1e6;
@@ -302,7 +322,7 @@ public class UKFTracker {
 					cost[r][cc] = FORBIDDEN_COST;
 					continue;
 				}
-				double aff = affinity.affinity(associationFeatures(track, z, t, params, prediction));
+				double aff = affinity.affinity(associationFeatures(track, det, z, t, params, prediction));
 				cost[r][cc] = aff < params.minAffinity ? FORBIDDEN_COST : -Math.log(aff);
 			}
 		}
@@ -414,7 +434,7 @@ public class UKFTracker {
 					// bearing jumps too far (in the policed direction): leave this pairing forbidden.
 					continue;
 				}
-				double aff = affinity.affinity(associationFeatures(track, z, time, params, prediction));
+				double aff = affinity.affinity(associationFeatures(track, det, z, time, params, prediction));
 				if (aff >= params.minAffinity) {
 					cost[r][c] = -Math.log(aff);
 				}
@@ -570,35 +590,52 @@ public class UKFTracker {
 	 * training examples, so that the trained network sees exactly the same features
 	 * as inference. Only feature 0 (Mahalanobis distance) is used by the default
 	 * network; the rest exist for a trained network.
+	 * <p>
+	 * Layout (length {@link #FEATURE_DIM}):
+	 *
+	 * <pre>
+	 * 0 Mahalanobis distance (always)
+	 * 1 normalised |ICI innovation| (always)
+	 * 2 normalised |amplitude innovation|  - {@link #ABSENT} if amplitude not tracked
+	 * 3 normalised |bearing innovation|    - {@link #ABSENT} if bearing not tracked
+	 * 4 observed/expected ICI ratio (always)
+	 * 5 -log(waveform correlation)         - {@link #ABSENT} if disabled/no waveform
+	 * 6 normalised |peak-frequency diff|   - {@link #ABSENT} if disabled/no waveform
+	 * </pre>
 	 *
 	 * @param track  - the candidate track.
+	 * @param det    - the candidate detection (for the waveform features); may be null.
 	 * @param z      - the candidate measurement (from {@link ClickTrack#measurement}).
 	 * @param t      - the candidate click's time in seconds.
 	 * @param params - the UKF parameters (for the measurement-noise normalisers).
 	 */
-	public static double[] associationFeatures(ClickTrack track, double[] z, double t, UKFParams params) {
-		return associationFeatures(track, z, t, params, track.predictMeasurement());
+	public static double[] associationFeatures(ClickTrack track, PamDataUnit<?, ?> det, double[] z, double t,
+			UKFParams params) {
+		return associationFeatures(track, det, z, t, params, track.predictMeasurement());
 	}
 
 	/**
-	 * As {@link #associationFeatures(ClickTrack, double[], double, UKFParams)} but
-	 * against a precomputed {@link UnscentedKalmanFilter.Prediction}, so the
+	 * As
+	 * {@link #associationFeatures(ClickTrack, PamDataUnit, double[], double, UKFParams)}
+	 * but against a precomputed {@link UnscentedKalmanFilter.Prediction}, so the
 	 * expensive unscented transform is done once per track rather than once per
 	 * candidate detection.
 	 */
-	public static double[] associationFeatures(ClickTrack track, double[] z, double t, UKFParams params,
-			UnscentedKalmanFilter.Prediction prediction) {
+	public static double[] associationFeatures(ClickTrack track, PamDataUnit<?, ?> det, double[] z, double t,
+			UKFParams params, UnscentedKalmanFilter.Prediction prediction) {
 		double[] f = new double[FEATURE_DIM];
 		f[0] = track.mahalanobis(z, prediction);
 		double[] innov = track.getModel().measResidual(z, prediction.zPred());
 		f[1] = Math.abs(innov[0]) / Math.sqrt(params.iciMeasNoise);
-		if (track.getModel().usesAmplitude()) {
-			f[2] = Math.abs(innov[track.getModel().ampMeasIndex()]) / Math.sqrt(params.ampMeasNoise);
-		}
-		if (track.getModel().usesBearing()) {
-			f[3] = Math.abs(innov[track.getModel().bearingMeasIndex()]) / params.bearingToleranceRad();
-		}
+		f[2] = track.getModel().usesAmplitude()
+				? Math.abs(innov[track.getModel().ampMeasIndex()]) / Math.sqrt(params.ampMeasNoise)
+				: ABSENT;
+		f[3] = track.getModel().usesBearing()
+				? Math.abs(innov[track.getModel().bearingMeasIndex()]) / params.bearingToleranceRad()
+				: ABSENT;
 		f[4] = (t - track.getLastTimeSeconds()) / Math.max(track.expectedICI(), 1e-3);
+		f[5] = correlationFeature(track, det, params);
+		f[6] = peakFreqFeature(track, det, params);
 		return f;
 	}
 
@@ -621,6 +658,74 @@ public class UKFTracker {
 		double signedJump = track.getModel().measResidual(z, prediction.zPred())[track.getModel().bearingMeasIndex()];
 		return BearingChi2VarParams.exceedsMaxJump(signedJump, Math.toRadians(params.maxBearingJumpDeg),
 				params.bearingJumpDrctn);
+	}
+
+	/**
+	 * The (track, detection) waveform-correlation feature: {@code -log(correlation)}
+	 * of the candidate against the track's most recent click (so 0 is a perfect
+	 * match and larger is worse), or {@link #ABSENT} when correlation is disabled or
+	 * no waveform is available.
+	 */
+	private static double correlationFeature(ClickTrack track, PamDataUnit<?, ?> det, UKFParams params) {
+		if (!params.useCorrelation || det == null) {
+			return ABSENT;
+		}
+		PamDataUnit<?, ?> last = lastClick(track);
+		if (last == null) {
+			return ABSENT;
+		}
+		double corr = ClickFeatureUtils.waveformCorrelation(last, det);
+		if (Double.isNaN(corr)) {
+			return ABSENT;
+		}
+		return -Math.log(Math.max(corr, 1e-3));
+	}
+
+	/**
+	 * The (track, detection) peak-frequency feature: the normalised absolute
+	 * difference between the candidate's peak frequency and the track's most recent
+	 * click, or {@link #ABSENT} when peak frequency is disabled or cannot be
+	 * measured.
+	 */
+	private static double peakFreqFeature(ClickTrack track, PamDataUnit<?, ?> det, UKFParams params) {
+		if (!params.usePeakFreq || det == null) {
+			return ABSENT;
+		}
+		PamDataUnit<?, ?> last = lastClick(track);
+		if (last == null) {
+			return ABSENT;
+		}
+		double pfDet = ClickFeatureUtils.getPeakFrequency(det);
+		double pfLast = ClickFeatureUtils.getPeakFrequency(last);
+		if (Double.isNaN(pfDet) || Double.isNaN(pfLast)) {
+			return ABSENT;
+		}
+		return Math.abs(pfDet - pfLast) / PEAK_FREQ_NORM_HZ;
+	}
+
+	/** The most recent click assigned to a track, or null if it has none. */
+	private static PamDataUnit<?, ?> lastClick(ClickTrack track) {
+		ArrayList<PamDataUnit> clicks = track.getClicks();
+		if (clicks == null || clicks.isEmpty()) {
+			return null;
+		}
+		return clicks.get(clicks.size() - 1);
+	}
+
+	/**
+	 * Which affinity features can be absent (and so are subject to training-time
+	 * dropout): amplitude, bearing, correlation and peak frequency. The always-on
+	 * ICI-derived features (0, 1, 4) are never dropped.
+	 *
+	 * @return a length-{@link #FEATURE_DIM} mask, true where the feature is optional.
+	 */
+	public static boolean[] maskableFeatures() {
+		boolean[] mask = new boolean[FEATURE_DIM];
+		mask[2] = true; // amplitude
+		mask[3] = true; // bearing
+		mask[5] = true; // correlation
+		mask[6] = true; // peak frequency
+		return mask;
 	}
 
 	/** Number of currently active tracks (for diagnostics/tests). */

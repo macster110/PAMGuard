@@ -102,6 +102,22 @@ public class AdaptiveCTParams extends MHTChi2Params implements Serializable, Clo
 	public boolean useCorrelation = false;
 
 	/**
+	 * Use peak-frequency consistency to group clicks. The clicks of a train
+	 * typically share a similar peak frequency, so an off-frequency click is
+	 * penalised. Automatically ignored when no waveform / peak-frequency data is
+	 * available.
+	 */
+	public boolean usePeakFreq = false;
+
+	/**
+	 * The peak-frequency "jump floor" in Hz - the minimum scale used to standardise
+	 * peak-frequency residuals. Keeps peak frequency a meaningful cue on very
+	 * consistent trains; raise it for species with naturally variable peak
+	 * frequencies.
+	 */
+	public double peakFreqFloorHz = 2000.0;
+
+	/**
 	 * Parameters for the underlying MHT kernel (track search). These have sensible
 	 * defaults and are not usually changed by the user.
 	 */

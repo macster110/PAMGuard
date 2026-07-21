@@ -24,5 +24,18 @@ public interface PamFFTMask {
 	 * @return List of FFTDataUnit objects after applying the mask
 	 */
 	public List<FFTDataUnit> applyMask(List<FFTDataUnit> batch);
- 
+
+	/**
+	 * The buffer length (in seconds) this mask prefers to process at. Masks whose
+	 * model was trained on a fixed block length can override this so the number of
+	 * buffered FFT slices matches the model, regardless of the user-configured
+	 * buffer. A value &le; 0 (the default) means "use the user-configured buffer".
+	 *
+	 * @return the preferred buffer length in seconds, or &le; 0 to use the
+	 *         configured buffer.
+	 */
+	default double getPreferredBufferSeconds() {
+		return -1;
+	}
+
 }

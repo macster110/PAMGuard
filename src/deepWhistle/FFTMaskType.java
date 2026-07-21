@@ -17,7 +17,28 @@ public enum FFTMaskType {
 	 * The DeepWhistle mask which removes noise from a spectrogram using a deep
 	 * learning model.
 	 */
-	DEEP_WHISTLE("Deep Whistle", DeepWhistleMask.MODEL_URL, new String[] {DeepWhistleMask.MODEL_FILE_NAME});
+	DEEP_WHISTLE("Deep Whistle", DeepWhistleMask.MODEL_URL, new String[] {DeepWhistleMask.MODEL_FILE_NAME},
+			"Removes non-whistle energy from the spectrogram using the DeepWhistle convolutional network "
+			+ "(from silbido). The model was trained on synthetic whistle data and outputs, for each "
+			+ "time-frequency bin, a confidence that the bin belongs to a tonal whistle contour.",
+			"Li, P. et al. (2020) 'Learning deep models from synthetic data for extracting dolphin whistle "
+			+ "contours', 2020 International Joint Conference on Neural Networks (IJCNN). IEEE, pp. 1-10. "
+			+ "doi:10.1109/IJCNN48605.2020.9206992.",
+			"https://doi.org/10.1109/IJCNN48605.2020.9206992"),
+
+	/**
+	 * The SAM-Whistle mask which removes noise from a spectrogram using a
+	 * Segment-Anything based deep learning model trained on the DCLDE dataset.
+	 */
+	SAM_WHISTLE("SAM-Whistle", SamWhistleMask.MODEL_URL, new String[] {SamWhistleMask.MODEL_FILE_NAME},
+			"Removes non-whistle energy from the spectrogram using SAM-Whistle, an adaptation of Meta's "
+			+ "Segment Anything Model (SAM). A fine-tuned Vision-Transformer encoder and a lightweight "
+			+ "decoder output, for each time-frequency bin, a confidence that the bin belongs to a delphinid "
+			+ "whistle. The distributed model was trained on the DCLDE 2011 dataset.",
+			"Zhang, X. et al. (2025) 'Automating time x frequency annotations of delphinid whistles by "
+			+ "adapting a foundational transformer neural network', Scientific Reports, 15, 37809. "
+			+ "doi:10.1038/s41598-025-21642-x.",
+			"https://doi.org/10.1038/s41598-025-21642-x");
 
 	/**
 	 * Human readable name shown to the user in the selection control.
@@ -37,10 +58,28 @@ public enum FFTMaskType {
 	 */
 	private final String[] modelFileNames;
 
-	FFTMaskType(String name, String modelURL, String[] modelFileNames) {
+	/**
+	 * Brief description of the model, shown in the model information pop-up.
+	 */
+	private final String description;
+
+	/**
+	 * Full reference (Harvard format) for the paper describing the model.
+	 */
+	private final String reference;
+
+	/**
+	 * DOI URL for the paper describing the model.
+	 */
+	private final String doiURL;
+
+	FFTMaskType(String name, String modelURL, String[] modelFileNames, String description, String reference, String doiURL) {
 		this.name = name;
 		this.modelURL = modelURL;
 		this.modelFileNames = modelFileNames;
+		this.description = description;
+		this.reference = reference;
+		this.doiURL = doiURL;
 	}
 
 	/**
@@ -60,6 +99,33 @@ public enum FFTMaskType {
 	 */
 	public String getModelURL() {
 		return modelURL;
+	}
+
+	/**
+	 * Get a brief description of the model, shown in the model information pop-up.
+	 *
+	 * @return the model description, or null.
+	 */
+	public String getDescription() {
+		return description;
+	}
+
+	/**
+	 * Get the full reference (Harvard format) for the paper describing the model.
+	 *
+	 * @return the reference, or null.
+	 */
+	public String getReference() {
+		return reference;
+	}
+
+	/**
+	 * Get the DOI URL for the paper describing the model.
+	 *
+	 * @return the DOI URL, or null.
+	 */
+	public String getDoiURL() {
+		return doiURL;
 	}
 
 	/**
@@ -89,6 +155,8 @@ public enum FFTMaskType {
 		switch (this) {
 		case DEEP_WHISTLE:
 			return new DeepWhistleMaskPane();
+		case SAM_WHISTLE:
+			return new SamWhistleMaskPane();
 		default:
 			return null;
 		}
@@ -104,6 +172,8 @@ public enum FFTMaskType {
 		switch (this) {
 		case DEEP_WHISTLE:
 			return new DeepWhistleMask(process);
+		case SAM_WHISTLE:
+			return new SamWhistleMask(process);
 		default:
 			return null;
 		}

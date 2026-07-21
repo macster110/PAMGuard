@@ -10,6 +10,9 @@ import clickTrainDetector.clickTrainAlgorithms.adaptive.AdaptiveClickTrainAlgori
 import clickTrainDetector.clickTrainAlgorithms.adaptive.DefaultAdaptiveParams;
 import clickTrainDetector.clickTrainAlgorithms.adaptive.DefaultAdaptiveParams.DefaultAdaptiveSpecies;
 import clickTrainDetector.layout.mht.BearingJumpPane;
+
+import org.controlsfx.control.PopOver;
+
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -18,17 +21,25 @@ import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.Slider;
 import javafx.scene.control.Spinner;
-import javafx.scene.control.TitledPane;
 import javafx.scene.control.Tooltip;
+import javafx.scene.layout.ColumnConstraints;
+import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import pamViewFX.PamGuiManagerFX;
+import pamViewFX.fxGlyphs.PamGlyphDude;
 import pamViewFX.fxNodes.PamBorderPane;
+import pamViewFX.fxNodes.PamButton;
 import pamViewFX.fxNodes.PamGridPane;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamSpinner;
 import pamViewFX.fxNodes.PamVBox;
 import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
+import pamViewFX.validator.PamValidator;
 
 /**
  * Settings pane for the adaptive click train algorithm. Exposes a handful of
@@ -60,7 +71,12 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 	/** Reusable controls for the maximum bearing jump cutoff and its direction. */
 	private BearingJumpPane bearingJumpPane;
 
+	/** Popover holding {@link #bearingJumpPane}, opened by the bearing settings button. */
+	private PopOver bearingPopOver;
+
 	private PamToggleSwitch useCorrelation;
+
+	private PamToggleSwitch usePeakFreq;
 
 	private PamSpinner<Integer> maxCoastSpinner;
 
@@ -69,6 +85,18 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 	private PamSpinner<Integer> nPrunebackSpinner;
 
 	private PamSpinner<Integer> nPruneBackStartSpinner;
+
+	/** Content of the advanced (multi-hypothesis search) settings, shown in a popover. */
+	private Pane advancedPane;
+
+	/** Popover holding {@link #advancedPane}, opened by the advanced settings button. */
+	private PopOver advancedPopOver;
+
+	/** Width (pixels) used for small square icon-only buttons (e.g. settings buttons). */
+	private static final double ICON_BUTTON_WIDTH = 30;
+
+	/** Validates the advanced (multi-hypothesis) settings, e.g. prune-back vs prune-back start. */
+	private final PamValidator validator = new PamValidator();
 
 	public AdaptiveCTSettingsPane(AdaptiveClickTrainAlgorithm adaptiveClickTrainAlgorithm) {
 		super(null);
@@ -105,6 +133,10 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 			"Group clicks by waveform similarity (cross correlation), and refine the ICI measurement.\n"
 					+ "More accurate but more processor intensive. Available only when waveform data is present.";
 
+	private static final String TIP_PEAKFREQ =
+			"Group clicks by the consistency of their peak frequency. The clicks of a train usually share\n"
+					+ "a similar peak frequency. Available only when waveform (or CPOD) data is present.";
+
 	private static final String TIP_MAXCOAST =
 			"Maximum number of consecutive missed clicks (coasts) bridged before a train is ended.";
 
@@ -122,62 +154,109 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 	private Pane createPane() {
 
 		Label title = new Label("Adaptive Detector Settings");
-		title.setFont(Font.font(null, FontWeight.BOLD, 11));
+		PamGuiManagerFX.titleFont2style(title);
+//		title.setFont(Font.font(null, FontWeight.BOLD, 11));
 
 		PamGridPane grid = new PamGridPane();
 		grid.setHgap(5);
 		grid.setVgap(8);
-		int row = 0;
+		// let the grid fill the available width so the slider column can grow.
+		grid.setMaxWidth(Double.MAX_VALUE);
 
-		// max ICI
-		maxICISpinner = new PamSpinner<>(0.0, Double.MAX_VALUE, 0.4, 0.01);
-		maxICISpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
-		maxICISpinner.setEditable(true);
-		maxICISpinner.setPrefWidth(90);
-		maxICISpinner.setTooltip(new Tooltip(TIP_MAXICI));
-		PamHBox iciBox = new PamHBox();
-		iciBox.setAlignment(Pos.CENTER_LEFT);
-		iciBox.setSpacing(5);
-		iciBox.getChildren().addAll(maxICISpinner, new Label("s"));
-		grid.add(tipLabel("Max. ICI", TIP_MAXICI), 0, row);
-		grid.add(iciBox, 1, row);
-		row++;
+		// column layout: label | min-label | slider (grows) | max-label | value
+		ColumnConstraints labelCol = new ColumnConstraints();
+		ColumnConstraints minLabelCol = new ColumnConstraints();
+		ColumnConstraints sliderCol = new ColumnConstraints();
+		sliderCol.setHgrow(Priority.ALWAYS);
+		sliderCol.setFillWidth(true);
+		ColumnConstraints maxLabelCol = new ColumnConstraints();
+		ColumnConstraints valueCol = new ColumnConstraints();
+		grid.getColumnConstraints().addAll(labelCol, minLabelCol, sliderCol, maxLabelCol, valueCol);
+
+		int row = 0;
 
 		// sensitivity
 		sensitivitySlider = new Slider(0, 1, 0.5);
 		sensitivitySlider.setShowTickMarks(true);
 		sensitivitySlider.setMajorTickUnit(0.5);
-		sensitivitySlider.setPrefWidth(160);
 		sensitivitySlider.setTooltip(new Tooltip(TIP_SENSITIVITY));
-		grid.add(tipLabel("Sensitivity", TIP_SENSITIVITY), 0, row);
-		grid.add(labelledSlider(sensitivitySlider, "loose", "tight"), 1, row);
-		row++;
+		addSliderRow(grid, row++, "Sensitivity", TIP_SENSITIVITY, sensitivitySlider, "loose", "tight");
 
 		// detection probability
 		detectionProbSlider = new Slider(0, 1, 0.9);
 		detectionProbSlider.setShowTickMarks(true);
 		detectionProbSlider.setMajorTickUnit(0.5);
-		detectionProbSlider.setPrefWidth(160);
 		detectionProbSlider.setTooltip(new Tooltip(TIP_DETPROB));
-		grid.add(tipLabel("Detection prob.", TIP_DETPROB), 0, row);
-		grid.add(labelledSlider(detectionProbSlider, "lenient", "strict"), 1, row);
-		row++;
+		addSliderRow(grid, row++, "Detection prob.", TIP_DETPROB, detectionProbSlider, "lenient", "strict");
 
 		PamVBox holder = new PamVBox();
 		holder.setSpacing(8);
 		holder.setPadding(new Insets(10, 0, 0, 0));
-		holder.getChildren().addAll(title, grid, new javafx.scene.control.Separator(), createFeaturePane(),
-				createAdvancedPane(), new javafx.scene.control.Separator(), createDefaultSpeciesPane());
+		holder.getChildren().addAll(title, grid, createAdvancedSettingsRow(), createFeaturePane(),
+				new javafx.scene.control.Separator(), createDefaultSpeciesPane());
 
 		return holder;
 	}
 
 	/**
-	 * Create the collapsible "Advanced" pane exposing the underlying multi-hypothesis
-	 * (MHT) kernel search parameters. These have sensible defaults and are not usually
-	 * changed, so the pane is collapsed by default.
+	 * Add a labelled slider to the grid, laid out so that the sliders (and their
+	 * min/max labels) align across rows and grow to fill the available width.
 	 */
-	private Node createAdvancedPane() {
+	private void addSliderRow(PamGridPane grid, int row, String labelText, String tip, Slider slider, String minLabel,
+			String maxLabel) {
+		// snap to clean 0.05 steps and give keyboard/scroll a sensible increment.
+		slider.setBlockIncrement(0.05);
+		slider.setMinorTickCount(1);
+		slider.setSnapToTicks(true);
+		// grow to fill the slider column.
+		slider.setMaxWidth(Double.MAX_VALUE);
+
+		Label value = new Label();
+		value.setMinWidth(32);
+		value.textProperty().bind(slider.valueProperty().asString("%.2f"));
+
+		grid.add(tipLabel(labelText, tip), 0, row);
+		grid.add(new Label(minLabel), 1, row);
+		grid.add(slider, 2, row);
+		GridPane.setHgrow(slider, Priority.ALWAYS);
+		grid.add(new Label(maxLabel), 3, row);
+		grid.add(value, 4, row);
+	}
+
+	/**
+	 * Create the row (label + settings button) shown at the bottom of the pane that
+	 * opens the advanced (multi-hypothesis search) settings in a popover. These have
+	 * sensible defaults and are not usually changed, so they are tucked away.
+	 */
+	private Node createAdvancedSettingsRow() {
+		advancedPane = createAdvancedPane();
+
+		PamButton advancedSettings = new PamButton();
+		advancedSettings.getStyleClass().add("icon-button");
+		advancedSettings.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
+		advancedSettings.setMaxWidth(ICON_BUTTON_WIDTH);
+		advancedSettings.setTooltip(new Tooltip("Advanced multi-hypothesis search settings."));
+		advancedSettings.setOnAction(action -> showAdvancedPane(advancedSettings));
+
+		Label label = new Label("Multi-hypothesis settings");
+
+		Region spacer = new Region();
+		HBox.setHgrow(spacer, Priority.ALWAYS);
+
+		PamHBox box = new PamHBox();
+		box.setAlignment(Pos.CENTER_LEFT);
+		box.setSpacing(5);
+		box.setPadding(new Insets(5, 0, 0, 0));
+		box.getChildren().addAll(label, spacer, advancedSettings);
+		return box;
+	}
+
+	/**
+	 * Create the content of the advanced pane exposing the underlying multi-hypothesis
+	 * (MHT) kernel search parameters. Shown in a popover from the advanced settings
+	 * button.
+	 */
+	private Pane createAdvancedPane() {
 		PamGridPane grid = new PamGridPane();
 		grid.setHgap(5);
 		grid.setVgap(8);
@@ -203,9 +282,34 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		grid.add(tipLabel("Prune-back start", TIP_NPRUNEBACKSTART), 0, row);
 		grid.add(withUnit(nPruneBackStartSpinner, "clicks"), 1, row++);
 
-		TitledPane titled = new TitledPane("Advanced (multi-hypothesis search)", grid);
-		titled.setExpanded(false);
-		return titled;
+		// prune-back must be less than prune-back start: pruning cannot commit further
+		// back than the point at which pruning is allowed to begin.
+		validator.createCheck()
+				.dependsOn("pruneBack", nPrunebackSpinner.valueProperty())
+				.dependsOn("pruneBackStart", nPruneBackStartSpinner.valueProperty())
+				.withMethod(c -> {
+					Integer pruneBack = c.get("pruneBack");
+					Integer pruneBackStart = c.get("pruneBackStart");
+					if (pruneBack != null && pruneBackStart != null && pruneBack >= pruneBackStart) {
+						c.error("Prune-back must be less than prune-back start.");
+					}
+				})
+				.decorates(nPrunebackSpinner)
+				.immediate();
+
+		return grid;
+	}
+
+	/**
+	 * Show the advanced settings popover next to the given node.
+	 */
+	private void showAdvancedPane(Node node) {
+		if (advancedPopOver == null) {
+			advancedPopOver = new PopOver();
+			advancedPane.setPadding(new Insets(5, 5, 5, 5));
+			advancedPopOver.setContentNode(advancedPane);
+		}
+		advancedPopOver.show(node);
 	}
 
 	private PamSpinner<Integer> intSpinner(int min, int max, int init) {
@@ -250,8 +354,28 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 	 * Create the pane that lets the user pick which features the detector uses.
 	 */
 	private Pane createFeaturePane() {
-		Label label = new Label("Features used");
-		label.setFont(Font.font(null, FontWeight.BOLD, 11));
+		Label label = new Label("Click Association Settings");
+		PamGuiManagerFX.titleFont2style(label);
+		
+		Label label1 = new Label("Inter Click Interval");
+		label1.setFont(Font.font(null, FontWeight.BOLD, 11));
+		
+		// max ICI
+		maxICISpinner = new PamSpinner<>(0.0, Double.MAX_VALUE, 0.4, 0.01);
+		maxICISpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+		maxICISpinner.setEditable(true);
+		maxICISpinner.setPrefWidth(90);
+		maxICISpinner.setTooltip(new Tooltip(TIP_MAXICI));
+		PamHBox iciBox = new PamHBox();
+		iciBox.setAlignment(Pos.CENTER_LEFT);
+		iciBox.setSpacing(5);
+		iciBox.getChildren().addAll(tipLabel("Max. ICI", TIP_MAXICI), maxICISpinner, new Label("s"));
+		
+
+		
+		Label label2 = new Label("Click Features Used");
+		label2.setFont(Font.font(null, FontWeight.BOLD, 11));
+		
 		label.setTooltip(new Tooltip("Select which click features are used to group clicks into trains."));
 
 		useICI = new PamToggleSwitch("Inter-click interval (ICI)");
@@ -263,21 +387,49 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		useBearing = new PamToggleSwitch("Bearing");
 		useBearing.setTooltip(new Tooltip(TIP_BEARING));
 
-		// the maximum bearing jump cutoff, indented to sit under the bearing toggle.
+		// the maximum bearing jump cutoff, shown in a popover from the settings button.
 		bearingJumpPane = new BearingJumpPane();
-		bearingJumpPane.setPadding(new Insets(0, 0, 0, 20));
 		// the jump cutoff only applies when bearing grouping is on.
 		useBearing.selectedProperty().addListener((o, ov, nv) -> bearingJumpPane.setAvailable(nv));
+
+		PamButton bearingSettings = new PamButton();
+		bearingSettings.getStyleClass().add("icon-button");
+		bearingSettings.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
+		bearingSettings.setMaxWidth(ICON_BUTTON_WIDTH);
+		bearingSettings.setTooltip(new Tooltip("Bearing jump settings."));
+		bearingSettings.setOnAction(action -> showBearingPane(bearingSettings));
+
+		Region bearingSpacer = new Region();
+		HBox.setHgrow(bearingSpacer, Priority.ALWAYS);
+		PamHBox bearingRow = new PamHBox();
+		bearingRow.setAlignment(Pos.CENTER_LEFT);
+		bearingRow.setSpacing(5);
+		bearingRow.getChildren().addAll(useBearing, bearingSpacer, bearingSettings);
 
 		useCorrelation = new PamToggleSwitch("Waveform correlation");
 		useCorrelation.setTooltip(new Tooltip(TIP_CORRELATION));
 
+		usePeakFreq = new PamToggleSwitch("Peak frequency");
+		usePeakFreq.setTooltip(new Tooltip(TIP_PEAKFREQ));
+
 		PamVBox box = new PamVBox();
 		box.setSpacing(5);
 		box.setPadding(new Insets(5, 0, 0, 0));
-		box.getChildren().addAll(label, useICI, useAmplitude, useBearing, bearingJumpPane,
-				useCorrelation);
+		box.getChildren().addAll(label, label1, iciBox, label2, useICI, useAmplitude, bearingRow, usePeakFreq, useCorrelation);
 		return box;
+	}
+
+	/**
+	 * Show the bearing settings popover (the maximum bearing jump cutoff) next to the
+	 * given node.
+	 */
+	private void showBearingPane(Node node) {
+		if (bearingPopOver == null) {
+			bearingPopOver = new PopOver();
+			bearingJumpPane.setPadding(new Insets(5, 5, 5, 5));
+			bearingPopOver.setContentNode(bearingJumpPane);
+		}
+		bearingPopOver.show(node);
 	}
 
 	/**
@@ -288,26 +440,6 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		Label label = new Label(text);
 		label.setTooltip(new Tooltip(tip));
 		return label;
-	}
-
-	/**
-	 * Wrap a slider with min/max text labels and a live numeric value readout.
-	 */
-	private Pane labelledSlider(Slider slider, String minLabel, String maxLabel) {
-		// snap to clean 0.05 steps and give keyboard/scroll a sensible increment.
-		slider.setBlockIncrement(0.05);
-		slider.setMinorTickCount(1);
-		slider.setSnapToTicks(true);
-
-		Label value = new Label();
-		value.setMinWidth(32);
-		value.textProperty().bind(slider.valueProperty().asString("%.2f"));
-
-		PamHBox box = new PamHBox();
-		box.setAlignment(Pos.CENTER_LEFT);
-		box.setSpacing(5);
-		box.getChildren().addAll(new Label(minLabel), slider, new Label(maxLabel), value);
-		return box;
 	}
 
 	/**
@@ -333,10 +465,15 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 			bearingJumpPane.setAvailable(bearingAvailable && useBearing.isSelected());
 		}
 		useCorrelation.setDisable(!waveformAvailable);
+		usePeakFreq.setDisable(!waveformAvailable);
 	}
 
 	@Override
 	public AdaptiveCTParams getParams(AdaptiveCTParams currParams) {
+		validator.validate();
+		if (validator.containsErrors()) {
+			return null;
+		}
 		AdaptiveCTParams params = currParams.clone();
 		params.maxICI = maxICISpinner.getValue();
 		params.sensitivity = sensitivitySlider.getValue();
@@ -348,6 +485,7 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		params.maxBearingJumpDeg = bearingJumpPane.getMaxJumpDeg();
 		params.bearingJumpDrctn = bearingJumpPane.getJumpDirection();
 		params.useCorrelation = useCorrelation.isSelected();
+		params.usePeakFreq = usePeakFreq.isSelected();
 		if (params.mhtKernel != null) {
 			params.mhtKernel.maxCoast = maxCoastSpinner.getValue();
 			params.mhtKernel.nHold = nHoldSpinner.getValue();
@@ -367,6 +505,7 @@ public class AdaptiveCTSettingsPane extends SettingsPane<AdaptiveCTParams> {
 		useBearing.setSelected(input.useBearing);
 		bearingJumpPane.setParams(input.bearingJumpEnable, input.maxBearingJumpDeg, input.bearingJumpDrctn);
 		useCorrelation.setSelected(input.useCorrelation);
+		usePeakFreq.setSelected(input.usePeakFreq);
 		if (input.mhtKernel != null) {
 			maxCoastSpinner.getValueFactory().setValue(input.mhtKernel.maxCoast);
 			nHoldSpinner.getValueFactory().setValue(input.mhtKernel.nHold);

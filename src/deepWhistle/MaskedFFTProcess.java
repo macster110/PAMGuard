@@ -241,10 +241,27 @@ public abstract class MaskedFFTProcess extends PamProcess {
         maskedFFTDataBlock.setFftLength(inputFFTData.getFftLength());
         setSampleRate(inputFFTData.getSampleRate(), false);
 
-        // compute how many units correspond to bufferSeconds
+        // create the mask based on the selected mask type. Only recreate the mask
+        // if the user has selected a different mask type so we don't needlessly
+        // reload the model. This is done before computing the buffer length so the
+        // mask can request a preferred buffer.
+        if (params.maskType != null && (this.mask == null || currentMaskType != params.maskType)) {
+            PamFFTMask newMask = params.maskType.createMask(this);
+            if (newMask != null) {
+                setMask(newMask);
+                currentMaskType = params.maskType;
+            }
+        }
+
+        // compute how many units correspond to the buffer length. A mask may request
+        // a preferred buffer length (e.g. SAM-Whistle needs ~3 s blocks to match the
+        // size the model was trained on); otherwise the user-configured bufferSeconds
+        // is used.
         double hopSec = (double) inputFFTData.getHopSamples() / inputFFTData.getSampleRate();
         if (params.bufferSeconds <= 0) params.bufferSeconds = 1.0; // safety
-        unitsToBuffer = (int) Math.ceil(params.bufferSeconds / hopSec);
+        double bufferSeconds = this.mask.getPreferredBufferSeconds();
+        if (bufferSeconds <= 0) bufferSeconds = params.bufferSeconds;
+        unitsToBuffer = (int) Math.ceil(bufferSeconds / hopSec);
         if (unitsToBuffer < 1) unitsToBuffer = 1;
 
         // create single-thread executor if not existing
@@ -254,17 +271,6 @@ public abstract class MaskedFFTProcess extends PamProcess {
                 t.setDaemon(true);
                 return t;
             });
-        }
-
-        // create the mask based on the selected mask type. Only recreate the mask
-        // if the user has selected a different mask type so we don't needlessly
-        // reload the model.
-        if (params.maskType != null && (this.mask == null || currentMaskType != params.maskType)) {
-            PamFFTMask newMask = params.maskType.createMask(this);
-            if (newMask != null) {
-                setMask(newMask);
-                currentMaskType = params.maskType;
-            }
         }
 
         //init the mask - this may contain complex model

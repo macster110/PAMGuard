@@ -139,17 +139,17 @@ public class TestUKFTracker {
 	 */
 	private static void testCustomAffinity() {
 		try {
-			// default-gate weights written to a file.
+			// default-gate weights written to a file (built for the current FEATURE_DIM so
+			// the test tracks changes to the feature-vector length).
 			File good = File.createTempFile("affinity", ".json");
 			good.deleteOnExit();
-			try (FileWriter w = new FileWriter(good)) {
-				w.write("{ \"weights\": [ [[-0.5, 0, 0, 0, 0]], [[4.0]] ], \"biases\": [ [3.0], [0.0] ] }");
-			}
+			AffinityNN.defaultGate(UKFTracker.FEATURE_DIM).writeJson(good);
 
 			AffinityNN custom = AffinityNN.fromFile(good, UKFTracker.FEATURE_DIM);
 			AffinityNN deflt = AffinityNN.defaultGate(UKFTracker.FEATURE_DIM);
-			double[] near = { 0, 0, 0, 0, 0 };
-			double[] far = { 12, 0, 0, 0, 0 };
+			double[] near = new double[UKFTracker.FEATURE_DIM];
+			double[] far = new double[UKFTracker.FEATURE_DIM];
+			far[0] = 12;
 			boolean matches = Math.abs(custom.affinity(near) - deflt.affinity(near)) < 1e-9
 					&& Math.abs(custom.affinity(far) - deflt.affinity(far)) < 1e-9;
 			assertTrue("Custom affinity loaded from file reproduces the default network", matches);

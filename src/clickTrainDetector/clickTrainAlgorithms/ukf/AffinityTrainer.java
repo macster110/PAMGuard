@@ -32,6 +32,14 @@ public class AffinityTrainer {
 	private static final double DEFAULT_MOMENTUM = 0.9;
 	private static final long SEED = 42;
 
+	/**
+	 * Per-feature, per-example probability that a maskable feature (amplitude,
+	 * bearing, correlation, peak frequency) is dropped during training, so the
+	 * trained network still produces sensible affinities when that feature is
+	 * disabled at inference. See {@link UKFTracker#maskableFeatures()}.
+	 */
+	public static final double DEFAULT_DROPOUT = 0.15;
+
 	/** Maximum number of distractor (negative) examples generated per click step. */
 	private static final int MAX_NEG_PER_STEP = 3;
 
@@ -97,7 +105,8 @@ public class AffinityTrainer {
 		}
 
 		AffinityMLPTrainer trainer = new AffinityMLPTrainer(UKFTracker.FEATURE_DIM, hidden);
-		trainer.train(data.x, data.y, epochs, DEFAULT_LR, DEFAULT_MOMENTUM, SEED, (epoch, total, loss) -> {
+		trainer.train(data.x, data.y, epochs, DEFAULT_LR, DEFAULT_MOMENTUM, SEED, UKFTracker.maskableFeatures(),
+				DEFAULT_DROPOUT, UKFTracker.ABSENT, (epoch, total, loss) -> {
 			if (listener != null && (epoch % 10 == 0 || epoch == total)) {
 				listener.onProgress(0.1 + 0.9 * epoch / total,
 						String.format("Training… epoch %d/%d, loss %.4f", epoch, total, loss));
@@ -160,7 +169,7 @@ public class AffinityTrainer {
 
 				// positive: the true continuation.
 				double[] zPos = track.measurement(t, trueNext.getAmplitudeDB(), UKFTracker.bearingOf(trueNext));
-				features.add(UKFTracker.associationFeatures(track, zPos, t, params));
+				features.add(UKFTracker.associationFeatures(track, trueNext, zPos, t, params));
 				labels.add(1.0);
 				nPos++;
 
@@ -173,7 +182,7 @@ public class AffinityTrainer {
 					}
 					double[] zNeg = track.measurement(d.time, d.click.getAmplitudeDB(),
 							UKFTracker.bearingOf(d.click));
-					features.add(UKFTracker.associationFeatures(track, zNeg, d.time, params));
+					features.add(UKFTracker.associationFeatures(track, d.click, zNeg, d.time, params));
 					labels.add(0.0);
 					nNeg++;
 					if (++added >= MAX_NEG_PER_STEP) {

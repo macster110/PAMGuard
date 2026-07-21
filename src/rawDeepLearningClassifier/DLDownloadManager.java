@@ -87,6 +87,35 @@ public class DLDownloadManager {
 		return new File(getModelFolder(modelName)  + File.separator + fileName);
 	}
 
+	/**
+	 * Check whether the model referenced by the URI has already been downloaded and
+	 * decompressed to the local model folder, returning the path to the model file
+	 * if it is present. This lets callers avoid re-downloading a model which has
+	 * already been downloaded (and unzipped) on a previous occasion.
+	 *
+	 * @param modelURI - the URI (URL) of the model archive.
+	 * @param modelFileNames - candidate model file names to search for within the
+	 *        local model folder (e.g. the <code>.pt</code> file inside the archive).
+	 * @return the local model file if it already exists, otherwise null.
+	 */
+	public File getExistingModelFile(URI modelURI, String[] modelFileNames) {
+		if (modelURI == null || modelFileNames == null) {
+			return null;
+		}
+		//local files are already "there" - nothing to download.
+		if ("file".equalsIgnoreCase(modelURI.getScheme())) {
+			File file = new File(modelURI);
+			return file.exists() ? file : null;
+		}
+		String modelName = getModelName(modelURI);
+		String folder = getModelFolder(modelName);
+		if (folder == null) {
+			return null;
+		}
+		//search the (previously unzipped) model folder for the model file.
+		return findModelFile(new File(folder), modelFileNames);
+	}
+
 
 	/**
 	 * Get the path to a model. If the URI is a URL then the model is download to a local folder and the path to

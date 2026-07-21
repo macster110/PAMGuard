@@ -8,9 +8,11 @@ import clickTrainDetector.classification.templateClassifier.DefualtSpectrumTempl
 import clickTrainDetector.classification.templateClassifier.TemplateClassifierParams;
 import clickTrainDetector.layout.classification.idiClassifier.IDIPane;
 import clickTrainDetector.layout.classification.simplechi2classifier.SimpleCTClassifierPane;
+import clickTrainDetector.layout.classification.CTClassifierPane;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -22,7 +24,6 @@ import pamViewFX.fxNodes.PamButton;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamSpinner;
 import pamViewFX.fxNodes.PamVBox;
-import pamViewFX.fxNodes.flipPane.PamFlipPane;
 import pamViewFX.fxNodes.utilsFX.ControlField;
 
 /**
@@ -61,13 +62,9 @@ public class TemplateClassifierPane extends SettingsPane<TemplateClassifierParam
 	private ControlField<Double> spectrumthreshold;
 
 	/**
-	 * Flip pane - front is the classifier settings, back is the pane for
-	 * generating a template from click events.
-	 */
-	private PamFlipPane flipPane;
-
-	/**
-	 * Pane which generates a spectrum template from annotated click events.
+	 * Pane which generates a spectrum template from annotated click events. Shown
+	 * on the back of the enclosing classifier pane's flip pane so the event table
+	 * can fill the whole classifier pane.
 	 */
 	private TemplateGeneratePane templateGeneratePane;
 
@@ -86,26 +83,40 @@ public class TemplateClassifierPane extends SettingsPane<TemplateClassifierParam
 //		ScrollPane scrollPane = new  ScrollPane(createTemplatePane());
 //		scrollPane.setVbarPolicy(ScrollBarPolicy.AS_NEEDED);
 
-		// front = the classifier settings (which include the "Generate template..." button);
-		// back = the generate template pane. Flipping is triggered by that button.
-		Node front = createTemplatePane();
 		templateGeneratePane = new TemplateGeneratePane(this::onTemplateGenerated);
 
-		flipPane = new PamFlipPane();
-		flipPane.getAdvLabel().setText("Generate Spectrum Template");
-		flipPane.setFrontContent(front);
-		flipPane.setAdvPaneContent(templateGeneratePane.getNode());
+		mainPane.setCenter(createTemplatePane());
 
 		generateTemplateButton.setOnAction(e -> {
+			CTClassifierPane classifierPane = findClassifierPane();
+			if (classifierPane == null) {
+				System.err.println("TemplateClassifierPane: could not find the enclosing classifier pane to flip.");
+				return;
+			}
 			templateGeneratePane.refresh();
-			flipPane.flipToBack();
+			classifierPane.flipToBack("Generate Spectrum Template", templateGeneratePane.getNode());
 		});
 
-		mainPane.setCenter(flipPane);
 		//TEMP
 		this.setParams(new TemplateClassifierParams());
 
 
+	}
+
+	/**
+	 * Find the enclosing classifier pane, which holds the flip pane used to show
+	 * the generate template pane over the whole classifier pane.
+	 * @return the enclosing classifier pane, or null if there is not one.
+	 */
+	private CTClassifierPane findClassifierPane() {
+		Parent parent = mainPane.getParent();
+		while (parent != null) {
+			if (parent instanceof CTClassifierPane) {
+				return (CTClassifierPane) parent;
+			}
+			parent = parent.getParent();
+		}
+		return null;
 	}
 
 	/**
@@ -115,7 +126,10 @@ public class TemplateClassifierPane extends SettingsPane<TemplateClassifierParam
 	 */
 	private void onTemplateGenerated(MatchTemplate template) {
 		spectrumTemplatePane.setSpectrum(template);
-		flipPane.flipToFront();
+		CTClassifierPane classifierPane = findClassifierPane();
+		if (classifierPane != null) {
+			classifierPane.flipToFront();
+		}
 	}
 
 	private Node createTemplatePane() {

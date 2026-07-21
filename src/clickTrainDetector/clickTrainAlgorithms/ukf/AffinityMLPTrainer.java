@@ -49,7 +49,7 @@ public class AffinityMLPTrainer {
 	}
 
 	/**
-	 * Train the network.
+	 * Train the network with no feature dropout.
 	 *
 	 * @param x        - feature rows (n x inputDim).
 	 * @param y        - labels (0 or 1), length n.
@@ -61,12 +61,52 @@ public class AffinityMLPTrainer {
 	 */
 	public void train(double[][] x, double[] y, int epochs, double lr, double momentum, long seed,
 			EpochListener listener) {
+		train(x, y, epochs, lr, momentum, seed, null, 0.0, 0.0, listener);
+	}
+
+	/**
+	 * Train the network, optionally with <b>feature dropout</b>: during training a
+	 * maskable feature is, with probability {@code dropoutProb}, replaced by its
+	 * "absent" value ({@code absentValue}) for that example. This teaches the
+	 * network to produce a sensible affinity even when a feature is switched off at
+	 * inference, so a supplied/trained network degrades gracefully when the user
+	 * disables (say) waveform correlation rather than behaving unpredictably.
+	 * <p>
+	 * Dropout is applied in the standardised feature space to the same standardised
+	 * value the raw {@code absentValue} maps to, so it matches exactly what the
+	 * exported network sees at inference when the raw feature is {@code absentValue}.
+	 *
+	 * @param x           - feature rows (n x inputDim).
+	 * @param y           - labels (0 or 1), length n.
+	 * @param epochs      - number of passes over the data.
+	 * @param lr          - learning rate.
+	 * @param momentum    - SGD momentum (0-1).
+	 * @param seed        - RNG seed for reproducible initialisation and shuffling.
+	 * @param maskable    - length-inputDim mask, true for features that may be
+	 *                      dropped; null or all-false disables dropout.
+	 * @param dropoutProb - per-feature, per-example dropout probability (0-1).
+	 * @param absentValue - the raw value a dropped feature is set to (the sentinel
+	 *                      used at inference for an absent feature).
+	 * @param listener    - optional per-epoch progress callback.
+	 */
+	public void train(double[][] x, double[] y, int epochs, double lr, double momentum, long seed, boolean[] maskable,
+			double dropoutProb, double absentValue, EpochListener listener) {
 		int n = x.length;
 		standardise(x);
 		double[][] xs = new double[n][inputDim];
 		for (int i = 0; i < n; i++) {
 			for (int j = 0; j < inputDim; j++) {
 				xs[i][j] = (x[i][j] - mean[j]) / std[j];
+			}
+		}
+
+		// the standardised value a dropped feature takes (matches the exported,
+		// standardisation-folded network fed a raw absentValue at inference).
+		boolean dropout = maskable != null && dropoutProb > 0;
+		double[] absentStd = new double[inputDim];
+		if (dropout) {
+			for (int j = 0; j < inputDim; j++) {
+				absentStd[j] = (absentValue - mean[j]) / std[j];
 			}
 		}
 
@@ -89,6 +129,17 @@ public class AffinityMLPTrainer {
 			double lossSum = 0;
 			for (int idx : order) {
 				double[] xi = xs[idx];
+
+				// feature dropout: randomly present some maskable features as "absent" so
+				// the network learns to cope when a feature is disabled at inference.
+				if (dropout) {
+					xi = xi.clone();
+					for (int j = 0; j < inputDim; j++) {
+						if (maskable[j] && rnd.nextDouble() < dropoutProb) {
+							xi[j] = absentStd[j];
+						}
+					}
+				}
 
 				// forward
 				double[] a1 = new double[hidden];

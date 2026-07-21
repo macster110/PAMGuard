@@ -3,6 +3,7 @@ package clickTrainDetector.layout.ukf;
 import PamController.SettingsPane;
 import PamDetection.LocContents;
 import PamguardMVC.PamDataBlock;
+import PamguardMVC.RawDataHolder;
 import clickTrainDetector.ClickTrainControl;
 import clickTrainDetector.clickTrainAlgorithms.ukf.AffinityNN;
 import clickTrainDetector.clickTrainAlgorithms.ukf.UKFClickTrainAlgorithm;
@@ -60,6 +61,8 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 
 	private PamToggleSwitch useAmplitude;
 	private PamToggleSwitch useBearing;
+	private PamToggleSwitch useCorrelation;
+	private PamToggleSwitch usePeakFreq;
 
 	/** Reusable controls for the maximum bearing jump cutoff and its direction. */
 	private BearingJumpPane bearingJumpPane;
@@ -100,12 +103,23 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 
 	private PamToggleSwitch useMultiHypothesis;
 
+	private PamVBox ampltudeThreshBox;
+
+	private PopOver ampPopOver;
+
 	/** Width (pixels) used for small square icon-only buttons (e.g. settings/browse buttons). */
 	private static final double ICON_BUTTON_WIDTH = 30;
 
 	private static final String TIP_AMPLITUDE = "Track amplitude consistency (in addition to ICI).";
 	private static final String TIP_BEARING =
 			"Track bearing consistency. Available only for multi-channel data that provides a bearing.";
+	private static final String TIP_CORRELATION =
+			"Use waveform cross-correlation (similarity between a click and the track's most recent click)\n"
+					+ "as an association feature. Only a trained affinity network uses it (the default network\n"
+					+ "ignores it). More discriminating but more processor intensive. Needs waveform data.";
+	private static final String TIP_PEAKFREQ =
+			"Use peak-frequency consistency (difference from the track's most recent click) as an\n"
+					+ "association feature. Only a trained affinity network uses it. Needs waveform (or CPOD) data.";
 	private static final String TIP_MAXICI =
 			"The absolute maximum inter-click interval allowed within a click train (seconds).";
 	private static final String TIP_FRAME =
@@ -536,7 +550,7 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 	 */
 	private int createFeaturePane(PamGridPane mainPane, int row) {
 		
-		Label label = new Label("Features used");
+		Label label = new Label("Click Features Used");
 		label.setFont(Font.font(null, FontWeight.BOLD, 11));
 		mainPane.add(label, 0, row++);
 		GridPane.setColumnSpan(label, 5);
@@ -556,18 +570,21 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		confidenceAmplitudeSpinner = doubleSpinner(0.0, Double.MAX_VALUE, 0.0, 1.0);
 		confidenceAmplitudeSpinner.setTooltip(new Tooltip(TIP_CONFAMP));
 
-		PamHBox confBox = new PamHBox();
-		confBox.setAlignment(Pos.CENTER_LEFT);
-		confBox.setSpacing(5);
-		confBox.getChildren().addAll(tipLabel("Confidence amplitude", TIP_CONFAMP), confidenceAmplitudeSpinner,
+		PamHBox amplitudeThreshPane = new PamHBox();
+		amplitudeThreshPane.setAlignment(Pos.CENTER_LEFT);
+		amplitudeThreshPane.setSpacing(5);
+		amplitudeThreshPane.getChildren().addAll(tipLabel("Confidence amplitude", TIP_CONFAMP), confidenceAmplitudeSpinner,
 				new Label("dB"));
+		
+		ampltudeThreshBox = new PamVBox(); 
+		ampltudeThreshBox.getChildren().add(amplitudeThreshPane); 
 		
 		
 		PamButton confSettings = new PamButton();
 		confSettings.getStyleClass().add("icon-button");
 		confSettings.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
 		confSettings.setOnAction((action)->{
-			showMultiHypothesisPane(confSettings);
+			showAmplitudePane(confSettings);
 		});
 		mainPane.add(confSettings, 4, row++);
 		GridPane.setHalignment(confSettings, HPos.RIGHT);
@@ -594,6 +611,26 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		bearingJumpPane = new BearingJumpPane();
 		useBearing.selectedProperty().addListener((o, ov, nv) -> bearingJumpPane.setAvailable(nv));
 
+		useCorrelation = new PamToggleSwitch("Waveform correlation");
+		useCorrelation.setTooltip(new Tooltip(TIP_CORRELATION));
+		mainPane.add(useCorrelation, 0, row);
+		GridPane.setColumnSpan(useCorrelation, 4);
+		row++;
+
+		usePeakFreq = new PamToggleSwitch("Peak frequency");
+		usePeakFreq.setTooltip(new Tooltip(TIP_PEAKFREQ));
+		mainPane.add(usePeakFreq, 0, row);
+		GridPane.setColumnSpan(usePeakFreq, 4);
+		row++;
+
+		// correlation and peak frequency are only consumed by a trained affinity network.
+		Label trainedNote = new Label("Correlation and peak frequency are only used by a trained affinity "
+				+ "network (below); the built-in default network ignores them.");
+		trainedNote.setWrapText(true);
+		trainedNote.setFont(Font.font(null, 10));
+		mainPane.add(trainedNote, 0, row++);
+		GridPane.setColumnSpan(trainedNote, 5);
+
 		return row;
 	}
 
@@ -609,6 +646,20 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		}
 		bearingPopOver.show(node);
 	}
+	
+	/* 
+	 * Show the amplitude settings popover next to a given node. 
+	 */
+	private void showAmplitudePane(Node node) {
+		if (ampPopOver == null) {
+			ampPopOver = new PopOver();
+			ampltudeThreshBox.setPadding(new Insets(5, 5, 5, 5));
+			ampPopOver.setContentNode(ampltudeThreshBox);
+		}
+		ampPopOver.show(node);
+	}
+	
+	
 
 
 	private PamSpinner<Double> doubleSpinner(double min, double max, double init, double step) {
@@ -652,10 +703,13 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		}
 		boolean bearingAvailable = block != null && block.getLocalisationContents() != null
 				&& block.getLocalisationContents().hasLocContent(LocContents.HAS_BEARING);
+		boolean waveformAvailable = block != null && RawDataHolder.class.isAssignableFrom(block.getUnitClass());
 		useBearing.setDisable(!bearingAvailable);
 		if (bearingJumpPane != null) {
 			bearingJumpPane.setAvailable(bearingAvailable && useBearing.isSelected());
 		}
+		useCorrelation.setDisable(!waveformAvailable);
+		usePeakFreq.setDisable(!waveformAvailable);
 	}
 
 	@Override
@@ -670,6 +724,8 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		params.bearingJumpEnable = bearingJumpPane.isJumpEnabled();
 		params.maxBearingJumpDeg = bearingJumpPane.getMaxJumpDeg();
 		params.bearingJumpDrctn = bearingJumpPane.getJumpDirection();
+		params.useCorrelation = useCorrelation.isSelected();
+		params.usePeakFreq = usePeakFreq.isSelected();
 		params.maxICI = maxICISpinner.getValue();
 		params.frameDuration = frameDurationSpinner.getValue();
 		params.maxCoast = maxCoastSpinner.getValue();
@@ -694,6 +750,8 @@ public class UKFCTSettingsPane extends SettingsPane<UKFParams> {
 		useAmplitude.setSelected(input.useAmplitude);
 		useBearing.setSelected(input.useBearing);
 		bearingJumpPane.setParams(input.bearingJumpEnable, input.maxBearingJumpDeg, input.bearingJumpDrctn);
+		useCorrelation.setSelected(input.useCorrelation);
+		usePeakFreq.setSelected(input.usePeakFreq);
 		maxICISpinner.getValueFactory().setValue(input.maxICI);
 		frameDurationSpinner.getValueFactory().setValue(input.frameDuration);
 		maxCoastSpinner.getValueFactory().setValue(input.maxCoast);

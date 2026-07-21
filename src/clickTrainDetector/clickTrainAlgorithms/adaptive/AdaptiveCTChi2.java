@@ -5,6 +5,7 @@ import java.util.BitSet;
 
 import PamguardMVC.PamDataUnit;
 import clickTrainDetector.clickTrainAlgorithms.CTAlgorithmInfo;
+import clickTrainDetector.clickTrainAlgorithms.ClickFeatureUtils;
 import clickTrainDetector.clickTrainAlgorithms.mht.MHTChi2;
 import clickTrainDetector.clickTrainAlgorithms.mht.TrackBitSet;
 import clickTrainDetector.clickTrainAlgorithms.mht.mhtvar.BearingChi2VarParams;
@@ -136,6 +137,8 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 	/** Non-null when the feature is enabled and available. */
 	private FeatureState amplitude;
 	private FeatureState bearing;
+	/** Peak frequency, roughly constant along a train -> first-difference feature. */
+	private FeatureState peakFrequency;
 	/** Waveform correlation is scored absolutely, so it needs no per-train state. */
 	private boolean correlationActive;
 
@@ -155,6 +158,9 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 		// but smoothly -> second difference (penalise off-trajectory jumps, not rate).
 		amplitude = params.useAmplitude ? new FeatureState(false, false) : null;
 		bearing = (params.useBearing && provider.isBearingAvailable()) ? new FeatureState(true, true) : null;
+		// peak frequency is roughly constant along a train, like amplitude -> first
+		// difference.
+		peakFrequency = (params.usePeakFreq && provider.isWaveformAvailable()) ? new FeatureState(false, false) : null;
 		correlationActive = params.useCorrelation && provider.isWaveformAvailable();
 	}
 
@@ -227,6 +233,17 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 					}
 				}
 
+				if (peakFrequency != null) {
+					double pf = ClickFeatureUtils.getPeakFrequency(newDataUnit);
+					if (!Double.isNaN(pf)) {
+						double c = peakFrequency.score(pf, floorMult * params.peakFreqFloorHz);
+						if (!Double.isNaN(c)) {
+							clickHuber += c;
+							clickFeatures++;
+						}
+					}
+				}
+
 				if (correlationActive) {
 					double corr = idiManager.getCorrelationManager()
 							.getCorrelationValue(lastIncludedUnit, newDataUnit).correlationValue;
@@ -257,6 +274,12 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 					Double b = getBearing(newDataUnit);
 					if (b != null) {
 						bearing.score(b, bearingFloor);
+					}
+				}
+				if (peakFrequency != null) {
+					double pf = ClickFeatureUtils.getPeakFrequency(newDataUnit);
+					if (!Double.isNaN(pf)) {
+						peakFrequency.score(pf, floorMult * params.peakFreqFloorHz);
 					}
 				}
 				// ICI and correlation both need a previous included click - nothing to seed.
@@ -453,6 +476,7 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 			cloned.iciWindow = Arrays.copyOf(iciWindow, iciWindow.length);
 			cloned.amplitude = amplitude == null ? null : amplitude.copy();
 			cloned.bearing = bearing == null ? null : bearing.copy();
+			cloned.peakFrequency = peakFrequency == null ? null : peakFrequency.copy();
 			return cloned;
 		} catch (CloneNotSupportedException e) {
 			e.printStackTrace();
@@ -496,6 +520,9 @@ public class AdaptiveCTChi2 implements MHTChi2<PamDataUnit>, Cloneable {
 		}
 		if (bearing != null) {
 			names.add("Bearing");
+		}
+		if (peakFrequency != null) {
+			names.add("Peak frequency");
 		}
 		if (correlationActive) {
 			names.add("Correlation");

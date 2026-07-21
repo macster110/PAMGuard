@@ -24,6 +24,24 @@ public class UKFParams implements Serializable, Cloneable, ManagedParameters {
 	/** Track bearing. Automatically ignored when no bearing is available. */
 	public boolean useBearing = true;
 
+	/**
+	 * Use waveform cross-correlation (similarity between a candidate click and the
+	 * track's most recent click) as an association feature. Automatically ignored
+	 * when no waveform data is available. More discriminating but more processor
+	 * intensive, and only used by a trained affinity network (the built-in default
+	 * network ignores it).
+	 */
+	public boolean useCorrelation = false;
+
+	/**
+	 * Use peak-frequency consistency (the difference between a candidate click's
+	 * peak frequency and the track's most recent click) as an association feature.
+	 * Automatically ignored when no waveform / peak-frequency data is available, and
+	 * only used by a trained affinity network (the built-in default network ignores
+	 * it).
+	 */
+	public boolean usePeakFreq = false;
+
 	/* ---- gating / lifecycle ---- */
 
 	/** The absolute maximum inter-click interval allowed within a train (seconds). */
