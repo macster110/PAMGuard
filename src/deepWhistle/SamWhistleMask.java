@@ -3,7 +3,10 @@ package deepWhistle;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.jamdev.jdl4pam.deepWhistle.DeepWhistleTest.DeepWhistleInfo;
 import org.jamdev.jdl4pam.transforms.DLTransform.DLTransformType;
@@ -13,6 +16,7 @@ import org.jamdev.jdl4pam.transforms.SimpleTransformParams;
 import org.jamdev.jdl4pam.utils.DLUtils;
 import org.jamdev.jpamutils.JamArr;
 
+import PamUtils.PamUtils;
 import ai.djl.Device;
 import ai.djl.Model;
 import ai.djl.inference.Predictor;
@@ -112,21 +116,31 @@ public class SamWhistleMask extends AbstractFFTMask {
 	 */
 	private static final double ZSCORE_EPS = 1e-8;
 
-	private Predictor<float[][], float[]> specPredictor;
+	private Predictor<float[][][], float[]> specPredictor;
 
 	/**
 	 * The device the model was actually loaded on (e.g. mps or cpu), for logging.
 	 */
 	private Device modelDevice;
 
-	//Running (global) statistics of the dB spectrogram, accumulated across all
-	//processed blocks with Welford's algorithm. The reference implementation
-	//z-score normalises over the whole recording, so we approximate that here with
-	//statistics that accumulate over the whole run rather than normalising each
-	//block on its own. Reset in initMask().
-	private long runningCount = 0;
-	private double runningMean = 0.0;
-	private double runningM2 = 0.0;
+	/**
+	 * Per-channel running (global) statistics of the dB spectrogram, accumulated
+	 * across all processed blocks with Welford's algorithm. The reference
+	 * implementation z-score normalises over the whole recording, so we approximate
+	 * that here with statistics that accumulate over the whole run rather than
+	 * normalising each block on its own. Kept per channel (each channel is a
+	 * separate "recording"). Reset in {@link #initMask()}.
+	 */
+	private final Map<Integer, RunningStats> channelStats = new HashMap<>();
+
+	/**
+	 * Welford online mean/variance accumulator for one channel.
+	 */
+	private static class RunningStats {
+		long count = 0;
+		double mean = 0.0;
+		double m2 = 0.0;
+	}
 
 	public SamWhistleMask(MaskedFFTProcess maksedFFTProcess) {
 		super(maksedFFTProcess);
@@ -141,10 +155,8 @@ public class SamWhistleMask extends AbstractFFTMask {
 			specPredictor = null;
 		}
 
-		//reset the running global normalisation statistics for the new run.
-		runningCount = 0;
-		runningMean = 0.0;
-		runningM2 = 0.0;
+		//reset the per-channel running global normalisation statistics for the new run.
+		channelStats.clear();
 
 		MaskedFFTParamters fftParams = this.maksedFFTProcess.getMaskFFTParams();
 
@@ -221,87 +233,89 @@ public class SamWhistleMask extends AbstractFFTMask {
 
 	@Override
 	public List<FFTDataUnit> applyMask(List<FFTDataUnit> batch) {
-
-		//transform the batch of FFT data units into the model input format
-		FreqTransform freqTransform = transformFFTBatch(batch);
-
-		double[] freqLimits = freqTransform.getFreqlims();
-
-		//clamp the upper limit to Nyquist - see the equivalent comment in DeepWhistleMask.
-		double nyquist = maksedFFTProcess.getInputFFTData().getSampleRate() / 2.0;
-		freqLimits = new double[] { freqLimits[0], Math.min(freqLimits[1], nyquist) };
-
-		//the transformed dB spectrogram [timeUnit][freqBin] (NOT yet normalised)
-		float[][] dataF = DLUtils.toFloatArray(freqTransform.getSpecTransfrom().getTransformedData());
-
-		//z-score using running global statistics (see normaliseRunning / createTransforms).
-		float[][] dataFNorm = normaliseRunning(dataF);
-
-		//run the model -> mask indexed [timeUnit][trimmedFreqBin]
-		double[][] mask = runSamWhistle(dataFNorm);
-		if (mask == null) {
-			return batch;
-		}
-
-		return applyMask(batch, mask, freqLimits);
+		//single-channel convenience: process as a one-channel batch.
+		List<List<FFTDataUnit>> single = new ArrayList<List<FFTDataUnit>>(1);
+		single.add(batch);
+		return applyMaskChannels(single).get(0);
 	}
 
 	/**
-	 * Run the SAM-Whistle model over a transformed spectrogram block.
-	 * <p>
-	 * The transformed spectrogram from the jpamutils pipeline is indexed
-	 * <code>[timeUnit][freqBin]</code>; the model wants <code>[freqBin][timeUnit]</code>
-	 * (H = frequency, W = time), so it is transposed. It is then resized to the
-	 * model's traced input size (the traced model bakes in its input dimensions),
-	 * frequency-flipped to match training, run, flipped back and resized back to the
-	 * original block dimensions.
-	 *
-	 * @param dataF - the transformed spectrogram [timeUnit][freqBin].
-	 * @return the confidence mask indexed [timeUnit][freqBin] (the orientation
-	 *         {@link #applyMask(List, double[][], double[])} expects), or null if
-	 *         the model failed.
+	 * Apply the mask to one block from each channel in a single batched inference.
+	 * All channels' blocks cover the same time window, so batching them into one
+	 * <code>[nChannels, 3, H, W]</code> model call greatly improves throughput
+	 * (especially on the GPU) without adding latency.
 	 */
-	private double[][] runSamWhistle(float[][] dataF) {
+	@Override
+	public List<List<FFTDataUnit>> applyMaskChannels(List<List<FFTDataUnit>> channelBatches) {
 
-		//[timeUnit][freqBin] -> [freqBin][timeUnit] (H=freq, W=time)
-		float[][] specFreqTime = JamArr.transposeMatrix(dataF);
+		int nChan = channelBatches.size();
+		if (nChan == 0) {
+			return channelBatches;
+		}
 
-		int freqBins = specFreqTime.length;
-		int timeSteps = specFreqTime[0].length;
+		double nyquist = maksedFFTProcess.getInputFFTData().getSampleRate() / 2.0;
 
-		//resize to the model's traced input size so the fixed-shape traced model runs
-		//correctly regardless of the current FFT length / buffer.
-		float[][] resized = resize(specFreqTime, MODEL_INPUT_FREQ_BINS, MODEL_INPUT_TIME_STEPS);
+		//--- per channel: transform, normalise and build the model input block ---
+		float[][][] modelInputs = new float[nChan][][];   //[chan][MODEL_FREQ][MODEL_TIME]
+		double[][] freqLimsArr = new double[nChan][];
+		int[] freqBinsArr = new int[nChan];
+		int[] timeStepsArr = new int[nChan];
 
-		//the model was trained on frequency-flipped spectrograms (highest frequency
-		//at the top). Flip before inference and flip the result back.
-		float[][] modelInput = FLIP_FREQ ? reverseRows(resized) : resized;
+		for (int c = 0; c < nChan; c++) {
+			List<FFTDataUnit> batch = channelBatches.get(c);
 
+			FreqTransform freqTransform = transformFFTBatch(batch);
+
+			double[] freqLimits = freqTransform.getFreqlims();
+			freqLimsArr[c] = new double[] { freqLimits[0], Math.min(freqLimits[1], nyquist) };
+
+			//transformed dB spectrogram [timeUnit][freqBin] (not yet normalised)
+			float[][] dataF = DLUtils.toFloatArray(freqTransform.getSpecTransfrom().getTransformedData());
+
+			//z-score using this channel's running global statistics.
+			int channel = PamUtils.getSingleChannel(batch.get(0).getChannelBitmap());
+			float[][] dataFNorm = normaliseRunning(channel, dataF);
+
+			//[timeUnit][freqBin] -> [freqBin][timeUnit] (H=freq, W=time)
+			float[][] specFreqTime = JamArr.transposeMatrix(dataFNorm);
+			freqBinsArr[c] = specFreqTime.length;
+			timeStepsArr[c] = specFreqTime[0].length;
+
+			//resize to the model's traced input size; flip so the highest frequency is at the top.
+			float[][] resized = resize(specFreqTime, MODEL_INPUT_FREQ_BINS, MODEL_INPUT_TIME_STEPS);
+			modelInputs[c] = FLIP_FREQ ? reverseRows(resized) : resized;
+		}
+
+		//--- one batched inference across all channels ---
+		float[] output;
 		try {
-			//model output flattened from [1, 1, MODEL_INPUT_FREQ_BINS, MODEL_INPUT_TIME_STEPS]
 			long startTime = System.nanoTime();
-			float[] output = specPredictor.predict(modelInput);
+			output = specPredictor.predict(modelInputs);   //[nChan, 1, MODEL_FREQ, MODEL_TIME] flattened
 			double seconds = (System.nanoTime() - startTime) / 1.0e9;
-			System.out.println("SamWhistleMask: image processed in " + seconds + " s on " + deviceName());
+			System.out.println("SamWhistleMask: " + nChan + " channel(s) processed in " + seconds + " s on " + deviceName());
+		} catch (TranslateException e) {
+			e.printStackTrace();
+			return channelBatches;
+		}
 
-			//reshape to [freqBin][timeUnit]
-			float[][] maskFreqTime = JamArr.to2D(output, MODEL_INPUT_TIME_STEPS);
+		//--- per channel: slice the output, map it back and apply it ---
+		int blockLen = MODEL_INPUT_FREQ_BINS * MODEL_INPUT_TIME_STEPS;
+		for (int c = 0; c < nChan; c++) {
+			float[] slice = Arrays.copyOfRange(output, c * blockLen, (c + 1) * blockLen);
 
+			//[MODEL_FREQ][MODEL_TIME]
+			float[][] maskFreqTime = JamArr.to2D(slice, MODEL_INPUT_TIME_STEPS);
 			if (FLIP_FREQ) {
 				maskFreqTime = reverseRows(maskFreqTime);
 			}
+			//resize back to this channel's block size, then to [timeUnit][freqBin].
+			float[][] maskResized = resize(maskFreqTime, freqBinsArr[c], timeStepsArr[c]);
+			double[][] mask = JamArr.floatToDouble(JamArr.transposeMatrix(maskResized));
 
-			//resize the mask back to the original block size
-			float[][] maskResized = resize(maskFreqTime, freqBins, timeSteps);
-
-			//applyMask indexes the mask as [timeUnit][freqBin], so transpose.
-			return JamArr.floatToDouble(JamArr.transposeMatrix(maskResized));
-
-		} catch (TranslateException e) {
-			e.printStackTrace();
+			applyMask(channelBatches.get(c), mask, freqLimsArr[c]);
 		}
 
-		return null;
+		return channelBatches;
 	}
 
 	/**
@@ -315,35 +329,38 @@ public class SamWhistleMask extends AbstractFFTMask {
 	 * This avoids the per-block normalisation which stretches noise-only blocks to
 	 * unit variance and causes false positives.
 	 * <p>
-	 * Statistics accumulate over the whole run (reset in {@link #initMask()}), which
-	 * matches the "whole recording" reference for a stationary noise field. For a
-	 * long, non-stationary deployment a rolling / exponentially-weighted estimate
-	 * could be substituted here.
+	 * Statistics accumulate per channel over the whole run (reset in
+	 * {@link #initMask()}), which matches the "whole recording" reference for a
+	 * stationary noise field. For a long, non-stationary deployment a rolling /
+	 * exponentially-weighted estimate could be substituted here.
 	 *
+	 * @param channel - the audio channel the block belongs to.
 	 * @param dB - the dB spectrogram block [timeUnit][freqBin].
 	 * @return a new, z-score normalised block of the same shape.
 	 */
-	private float[][] normaliseRunning(float[][] dB) {
+	private float[][] normaliseRunning(int channel, float[][] dB) {
+
+		RunningStats stats = channelStats.computeIfAbsent(channel, k -> new RunningStats());
 
 		//update the running statistics with every value in this block.
 		for (int i = 0; i < dB.length; i++) {
 			for (int j = 0; j < dB[i].length; j++) {
 				double v = dB[i][j];
-				runningCount++;
-				double delta = v - runningMean;
-				runningMean += delta / runningCount;
-				runningM2 += delta * (v - runningMean);
+				stats.count++;
+				double delta = v - stats.mean;
+				stats.mean += delta / stats.count;
+				stats.m2 += delta * (v - stats.mean);
 			}
 		}
 
 		//population standard deviation (matches numpy std, ddof=0).
-		double variance = runningCount > 0 ? runningM2 / runningCount : 0.0;
+		double variance = stats.count > 0 ? stats.m2 / stats.count : 0.0;
 		double denom = Math.sqrt(variance) + ZSCORE_EPS;
 
 		float[][] out = new float[dB.length][dB[0].length];
 		for (int i = 0; i < dB.length; i++) {
 			for (int j = 0; j < dB[i].length; j++) {
-				out[i][j] = (float) ((dB[i][j] - runningMean) / denom);
+				out[i][j] = (float) ((dB[i][j] - stats.mean) / denom);
 			}
 		}
 		return out;
@@ -418,7 +435,7 @@ public class SamWhistleMask extends AbstractFFTMask {
 	 * @return the predictor which returns a flattened confidence surface, or null
 	 *         if the model could not be loaded on any device.
 	 */
-	public Predictor<float[][], float[]> loadSamWhistleModel(String modelPathS) {
+	public Predictor<float[][][], float[]> loadSamWhistleModel(String modelPathS) {
 
 		Path modelPath = Paths.get(modelPathS);
 		Path modelDirectory = modelPath.getParent();
@@ -426,8 +443,8 @@ public class SamWhistleMask extends AbstractFFTMask {
 
 		modelDevice = null;
 
-		//a dummy input to warm up / validate the device.
-		float[][] warmup = new float[MODEL_INPUT_FREQ_BINS][MODEL_INPUT_TIME_STEPS];
+		//a dummy single-channel batch to warm up / validate the device.
+		float[][][] warmup = new float[1][MODEL_INPUT_FREQ_BINS][MODEL_INPUT_TIME_STEPS];
 
 		for (Device device : getCandidateDevices()) {
 			Model loadedModel = null;
@@ -435,7 +452,7 @@ public class SamWhistleMask extends AbstractFFTMask {
 				loadedModel = Model.newInstance("SamWhistle", device);
 				loadedModel.load(modelDirectory, modelName);
 
-				Predictor<float[][], float[]> predictor = loadedModel.newPredictor(new SamSpectrumTranslator());
+				Predictor<float[][][], float[]> predictor = loadedModel.newPredictor(new SamSpectrumTranslator());
 
 				//run one inference to confirm the model actually runs on this device.
 				predictor.predict(warmup);

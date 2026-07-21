@@ -34,6 +34,10 @@ public abstract class MaskedFFTProcess extends PamProcess {
 
     private int unitsToBuffer = 0;
 
+    // the active channels (the channels in the output channel map), in ascending
+    // order. Blocks from all of these are batched together into a single mask call.
+    private int[] activeChannels = new int[0];
+
     // the FFT length and hop the process (and mask) was last prepared for. Used to
     // detect when the source FFT settings change underneath us (e.g. the user changes
     // the parent FFT module) so we can clear stale buffered units and re-initialise.
@@ -130,23 +134,37 @@ public abstract class MaskedFFTProcess extends PamProcess {
         ComplexArray fftClone = fft.clone();
         FFTDataUnit clonedUnit = new FFTDataUnit(inUnit.getTimeMilliseconds(), inUnit.getChannelBitmap(), inUnit.getStartSample(), inUnit.getSampleDuration(), fftClone, inUnit.getFftSlice());
 
-        List<FFTDataUnit> batchToProcess = null;
+        // A batch is only dispatched once EVERY active channel has a full block ready,
+        // and all channels' blocks are then processed together in one call. Because all
+        // channels are fed FFT slices at the same rate their blocks become ready at the
+        // same time, so this adds no latency but lets a model-based mask run a single
+        // batched inference across all channels (much better GPU utilisation). A channel
+        // that briefly runs ahead simply keeps its surplus slices buffered for the next
+        // block.
+        List<List<FFTDataUnit>> multiBatch = null;
         synchronized (buffer) {
-            int channelMap = PamUtils.PamUtils.getSingleChannel(clonedUnit.getChannelBitmap());
-            
-            buffer[channelMap].add(clonedUnit); // add the data unit to the correct channel's buffer
+            int channel = PamUtils.PamUtils.getSingleChannel(clonedUnit.getChannelBitmap());
+
+            buffer[channel].add(clonedUnit); // add the data unit to the correct channel's buffer
             if (unitsToBuffer <= 0) {
                 // fallback to at least 1 if unitsToBuffer not yet computed
                 unitsToBuffer = 1;
             }
-            if (buffer[channelMap].size() >= unitsToBuffer) {
-                // copy buffer into batch and clear
-                batchToProcess = new ArrayList<>(buffer[channelMap]);
-                buffer[channelMap].clear();
+
+            if (activeChannels != null && activeChannels.length > 0 && allChannelsReady()) {
+                // extract exactly one block (unitsToBuffer slices) from each active channel.
+                multiBatch = new ArrayList<>(activeChannels.length);
+                for (int ch : activeChannels) {
+                    List<FFTDataUnit> chBatch = new ArrayList<>(unitsToBuffer);
+                    for (int i = 0; i < unitsToBuffer; i++) {
+                        chBatch.add(buffer[ch].removeFirst());
+                    }
+                    multiBatch.add(chBatch);
+                }
             }
         }
 
-        if (batchToProcess != null) {
+        if (multiBatch != null) {
             // submit batch for processing on worker thread with backpressure
             try {
                 // wait until there is capacity; also increments pending counter atomically
@@ -154,17 +172,19 @@ public abstract class MaskedFFTProcess extends PamProcess {
                     return; // interrupted while waiting
                 }
 
-                final List<FFTDataUnit> batch = batchToProcess;
+                final List<List<FFTDataUnit>> batch = multiBatch;
                 executor.submit(() -> {
                     try {
-                        List<FFTDataUnit> processed = applyMask(batch);
+                        List<List<FFTDataUnit>> processed = applyMaskChannels(batch);
                         if (processed != null) {
                             // push processed units into output data block
-                            for (FFTDataUnit u : processed) {
-                                try {
-                                    maskedFFTDataBlock.addPamData(u);
-                                } catch (Exception ex) {
-                                    ex.printStackTrace();
+                            for (List<FFTDataUnit> chBatch : processed) {
+                                for (FFTDataUnit u : chBatch) {
+                                    try {
+                                        maskedFFTDataBlock.addPamData(u);
+                                    } catch (Exception ex) {
+                                        ex.printStackTrace();
+                                    }
                                 }
                             }
                         }
@@ -180,6 +200,20 @@ public abstract class MaskedFFTProcess extends PamProcess {
                 rex.printStackTrace();
             }
         }
+    }
+
+    /**
+     * @return true if every active channel has at least one full block
+     *         ({@link #unitsToBuffer} slices) buffered. Caller must hold the
+     *         {@code buffer} lock.
+     */
+    private boolean allChannelsReady() {
+        for (int ch : activeChannels) {
+            if (buffer[ch].size() < unitsToBuffer) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // Blocks until the number of in-flight tasks is below maxPendingBatches. Returns false if interrupted
@@ -240,6 +274,9 @@ public abstract class MaskedFFTProcess extends PamProcess {
         maskedFFTDataBlock.setFftHop(inputFFTData.getFftHop());
         maskedFFTDataBlock.setFftLength(inputFFTData.getFftLength());
         setSampleRate(inputFFTData.getSampleRate(), false);
+
+        // the channels we process, batched together into a single mask call.
+        activeChannels = PamUtils.PamUtils.getChannelArray(maskedFFTDataBlock.getChannelMap());
 
         // create the mask based on the selected mask type. Only recreate the mask
         // if the user has selected a different mask type so we don't needlessly
@@ -317,6 +354,18 @@ public abstract class MaskedFFTProcess extends PamProcess {
      */
     protected List<FFTDataUnit> applyMask(List<FFTDataUnit> batch) {
         return this.mask.applyMask(batch);
+    }
+
+    /**
+     * Apply the mask to one block from each active channel in a single call. Called
+     * on the worker thread. A model-based mask can use this to run one batched
+     * inference across all channels.
+     *
+     * @param channelBatches - one FFT block per active channel.
+     * @return the processed blocks in the same channel order.
+     */
+    protected List<List<FFTDataUnit>> applyMaskChannels(List<List<FFTDataUnit>> channelBatches) {
+        return this.mask.applyMaskChannels(channelBatches);
     }
 
     /**
