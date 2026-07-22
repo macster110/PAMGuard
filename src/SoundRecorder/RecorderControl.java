@@ -10,6 +10,7 @@ import java.util.Calendar;
 
 import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFileFormat.Type;
+import javax.sound.sampled.AudioSystem;
 import javax.swing.JMenuItem;
 import javax.swing.Timer;
 
@@ -93,6 +94,13 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 
 	public static final String GlobalWavPrefixArg = "-recording.Prefix";
 
+	/**
+	 * Global command line argument to set the recording file type at startup, e.g. 
+	 * "-recording.FileType sud". Accepts the same names / extensions as the 
+	 * "filetype" tellModule command (wav, sud, x3, aiff, au, snd etc).
+	 */
+	public static final String GlobalFileTypeArg = "-recording.FileType";
+
 	public RecorderControl(String name) {
 
 		super(recorderUnitType, name);
@@ -167,6 +175,17 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 			}
 			else {
 				System.err.println("Unable to set recording storage folder " + globFolder);
+			}
+		}
+		
+		String globFileType = GlobalArguments.getParam(RecorderControl.GlobalFileTypeArg);
+		if (globFileType != null) {
+			AudioFileFormat.Type newType = findFileType(globFileType);
+			if (newType != null) {
+				recorderSettings.setFileType(newType);
+			}
+			else {
+				System.err.println("Unable to set recording file type " + globFileType);
 			}
 		}
 		
@@ -667,10 +686,64 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 			break;
 		case "outputfolder":
 			return setOutputFolder(command);
+		case "filetype":
+			return setRecordingFileType(command);
 		default:
 			return "Unknown command to sound recorder: " + command;
 		}
 		return getUnitName() + " executed " + command;
+	}
+
+	/**
+	 * Set the type of file to use for recordings (e.g. wav, sud, x3, aiff, au, snd).
+	 * The command is expected in the form "filetype wav". 
+	 * @param command full command string
+	 * @return status message
+	 */
+	private String setRecordingFileType(String command) {
+		String[] parts = CommandManager.splitCommandLine(command);
+		if (parts.length < 2) {
+			return "Unspecified file type for sound recorder";
+		}
+		String typeName = parts[1].trim();
+		AudioFileFormat.Type newType = findFileType(typeName);
+		if (newType == null) {
+			return getUnitName() + " unknown recording file type " + typeName;
+		}
+		recorderSettings.setFileType(newType);
+		selectRecorderStorage();
+		return getUnitName() + " set recording file type to " + newType.getExtension();
+	}
+
+	/**
+	 * Find an AudioFileFormat.Type (including the custom X3 and SUD types) from
+	 * a name or file extension supplied by the user (case insensitive). 
+	 * @param typeName name or extension of the file type, e.g. "wav", "WAVE", "sud"
+	 * @return matching Type, or null if not recognised
+	 */
+	private AudioFileFormat.Type findFileType(String typeName) {
+		if (typeName == null) {
+			return null;
+		}
+		// allow common alternate name for wav files. 
+		String name = typeName.trim();
+		if (name.equalsIgnoreCase("wav")) {
+			name = "WAVE";
+		}
+		AudioFileFormat.Type[] candidates = AudioSystem.getAudioFileTypes();
+		for (AudioFileFormat.Type t : candidates) {
+			if (t.toString().equalsIgnoreCase(name) || t.getExtension().equalsIgnoreCase(typeName.trim())) {
+				return t;
+			}
+		}
+		// also check the custom, non AudioSystem registered types. 
+		if (X3.toString().equalsIgnoreCase(name) || X3.getExtension().equalsIgnoreCase(typeName.trim())) {
+			return X3;
+		}
+		if (SUD.toString().equalsIgnoreCase(name) || SUD.getExtension().equalsIgnoreCase(typeName.trim())) {
+			return SUD;
+		}
+		return null;
 	}
 
 	/**
@@ -720,7 +793,12 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 
 		String stateName = (recorderStatus == RECORDING) ? "recording" : "idle";
 
-		
+		String fileName = "";
+		String rawFileName = recorderStorage.getFileName();
+		if (rawFileName != null) {
+			fileName = new File(rawFileName).getName();
+		}
+
 		double[] lastAmplitudes = recorderProcess.getLastAmplitudedB();
 		
 		StringBuilder sb = new StringBuilder();
@@ -729,6 +807,7 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 		sb.append(String.format("<state>%s</state>", stateName));
 		sb.append(String.format("<freeSpaceMB>%.1f</freeSpaceMB>", freeSpaceMB));
 		sb.append(String.format("<fileSizeMB>%.1f</fileSizeMB>", fileSizeMB));
+		sb.append(String.format("<fileName>%s</fileName>", fileName));
 
 		sb.append("<channelAmplitudesdB>");
 		if (lastAmplitudes != null) {

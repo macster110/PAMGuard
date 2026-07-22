@@ -335,6 +335,12 @@ public class Pamguard {
 					GlobalArguments.setParam(RecorderControl.GlobalWavPrefixArg, wavPrefix);
 					System.out.println("Setting recording prefix to " + wavPrefix);
 				}
+				else if (anArg.equalsIgnoreCase(RecorderControl.GlobalFileTypeArg)) {
+					// file type for the sound recorder module (e.g. wav, sud, x3)
+					String fileType = args[iArg++];
+					GlobalArguments.setParam(RecorderControl.GlobalFileTypeArg, fileType);
+					System.out.println("Setting recording file type to " + fileType);
+				}
 				else if (anArg.equalsIgnoreCase(PamController.AUTOSTART)) {
 					// auto start processing. 
 					GlobalArguments.setParam(PamController.AUTOSTART, PamController.AUTOSTART);
