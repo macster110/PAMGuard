@@ -189,6 +189,30 @@
           <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
             <version>3.12.1</version>
+            <executions>
+              <execution>
+                <id>default-compile</id>
+                <phase>compile</phase>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+                <configuration>
+                  <release>21</release>
+                  <compilerId>jdt</compilerId>
+                </configuration>
+              </execution>
+              <execution>
+                <id>default-testCompile</id>
+                <phase>test-compile</phase>
+                <goals>
+                  <goal>testCompile</goal>
+                </goals>
+                <configuration>
+                  <release>21</release>
+                  <compilerId>jdt</compilerId>
+                </configuration>
+              </execution>
+            </executions>
             <dependencies>
               <dependency>
                 <groupId>org.eclipse.tycho</groupId>
@@ -226,6 +250,17 @@
                     </transformer>
                     <transformer />
                   </transformers>
+                  <filters>
+                    <filter>
+                      <artifact>*:*</artifact>
+                      <excludes>
+                        <exclude>META-INF/*.SF</exclude>
+                        <exclude>META-INF/*.DSA</exclude>
+                        <exclude>META-INF/*.RSA</exclude>
+                        <exclude>test/resources/**</exclude>
+                      </excludes>
+                    </filter>
+                  </filters>
                 </configuration>
               </execution>
             </executions>
@@ -254,21 +289,6 @@
           <plugin>
             <artifactId>maven-dependency-plugin</artifactId>
             <version>3.10.0</version>
-            <executions>
-              <execution>
-                <id>copy-dependencies</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>copy-dependencies</goal>
-                </goals>
-                <configuration>
-                  <outputDirectory>${project.build.directory}/tempDependencies</outputDirectory>
-                  <overWriteReleases>false</overWriteReleases>
-                  <overWriteSnapshots>false</overWriteSnapshots>
-                  <overWriteIfNewer>true</overWriteIfNewer>
-                </configuration>
-              </execution>
-            </executions>
           </plugin>
         </plugins>
       </build>

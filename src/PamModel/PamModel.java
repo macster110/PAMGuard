@@ -9,7 +9,6 @@
  * as published by the Free Software Foundation; either version 3
  * of the License, or (at your option) any later version.
  * 
- * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
@@ -61,6 +60,7 @@ import fftManager.FFTDataUnit;
 import fftManager.PamFFTControl;
 import group3dlocaliser.Group3DLocaliserControl;
 import landMarks.LandmarkControl;
+import loggerForms.cameragrabber.CameraGrabber;
 import mel.MelControl;
 import meygenturbine.MeygenTurbine;
 import printscreen.PrintScreenControl;
@@ -1005,6 +1005,10 @@ final public class PamModel implements PamSettings {
 		mi.setMaxNumber(1);
 		mi.setHelpPoint("visual_methods/loggerFormsHelp/docs/loggerFormsOverview.html");
 
+		mi = PamModuleInfo.registerControlledUnit(CameraGrabber.class.getName(), CameraGrabber.unitType);
+		mi.setModulesMenuGroup(visualGroup);
+		mi.setToolTipText("Grab and store still frames from a webcam or other connected camera");
+		
 		//		}
 
 		//		mi = PamModuleInfo.registerControlledUnit("autecPhones.AutecPhonesControl", "AUTEC Phones");

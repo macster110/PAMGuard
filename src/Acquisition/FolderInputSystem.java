@@ -96,6 +96,8 @@ public class FolderInputSystem extends FileInputSystem implements PamSettings, D
 	private FolderInputParameters folderInputParameters;
 
 	public static final String GlobalWavFolderArg = "-wavfilefolder";
+	
+	public static final String GlobalWavPrefixArg = "-recording.Prefix";
 
 
 	/**
@@ -212,6 +214,8 @@ public class FolderInputSystem extends FileInputSystem implements PamSettings, D
 		 */
 		newFileTimer = new Timer(1000, new RestartTimer());
 		newFileTimer.setRepeats(false);
+		
+		checkComandLineFolder();
 		//		timer = new Timer(1000, new TimerAction());
 	}
 
@@ -220,7 +224,7 @@ public class FolderInputSystem extends FileInputSystem implements PamSettings, D
 	 */
 	private String[] checkComandLineFolder() {
 		String globalFolder = GlobalArguments.getParam(GlobalWavFolderArg);
-		Debug.out.println("Checking -wavfilefolder option: is " + globalFolder);
+		System.out.println("Checking -wavfilefolder option: is " + globalFolder);
 		if (globalFolder == null) {
 			return null;
 		}
@@ -231,6 +235,8 @@ public class FolderInputSystem extends FileInputSystem implements PamSettings, D
 			//			return null;
 		}
 		String[] selList = {globalFolder};
+		// put this into the folderparameters so that it's held and comes up in Viewer
+		folderInputParameters.setSelectedFiles(selList);
 		//		folderInputParameters.setSelectedFiles(selList);
 		// need to immediately make the allfiles list since it's about to get used by the reprocess manager
 		// need to worry about how to wait for this since it's starting in a different thread.
@@ -467,7 +473,7 @@ public class FolderInputSystem extends FileInputSystem implements PamSettings, D
 
 		if (folderInputPane==null) {
 
-			//need to make sure this is dynamically set - following means that the dialog will work 
+			//need to make sure this is dynamically set - following means that the dialog will work
 			//with whatever has been set by the user but if cancel is pressed settings will still revert.
 			boolean useSubFolders = false;
 			//			if (subFolders!=null) {
@@ -476,9 +482,21 @@ public class FolderInputSystem extends FileInputSystem implements PamSettings, D
 			//			else {
 			useSubFolders = folderInputParameters.subFolders;
 			//			}
-			//Swing way
-			wavListWorker.startFileListProcess(PamController.getMainFrame(), rootList,
-					useSubFolders, true);
+			if (PamGUIManager.getGUIType() == PamGUIManager.NOGUI) {
+				/*
+				 * Headless operation: catalogue the files synchronously so that allFiles
+				 * is complete before -autostart tries to prepare the acquisition. The
+				 * threaded version races the automatic start and loses on slow (e.g.
+				 * network mounted) file systems, aborting the run with
+				 * "No sound input files have been found".
+				 */
+				wavListWorker.startFileListProcessSync(rootList, useSubFolders, true);
+			}
+			else {
+				//Swing way
+				wavListWorker.startFileListProcess(PamController.getMainFrame(), rootList,
+						useSubFolders, true);
+			}
 		}
 		else {
 			//FX system
