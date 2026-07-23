@@ -169,16 +169,15 @@
     -fx-background-color: -win-accent, -win-hover-face;
 }
 
-/* focused: accent border plus the classic dotted focus rectangle */
+/* focused: accent outline. NB do not use -fx-border here - a JavaFX border
+   contributes to the node's insets and so resizes the button when it gains
+   focus (very visible on icon-only buttons that have no min-width). The
+   accent outer background layer below indicates focus without changing size. */
 .button:focused,
 .toggle-button:focused,
 .menu-button:focused,
 .split-menu-button:focused {
     -fx-background-color: -win-accent, -win-button-face;
-    -fx-border-color: #666666;
-    -fx-border-width: 1;
-    -fx-border-insets: 3;
-    -fx-border-style: segments(1, 1) line-cap butt;
 }
 
 .button:focused:hover,

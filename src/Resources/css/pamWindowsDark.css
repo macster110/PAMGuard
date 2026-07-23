@@ -39,16 +39,6 @@
 }
 
 
-/* ---- Button: lighter dotted focus rectangle ---- */
-
-.button:focused,
-.toggle-button:focused,
-.menu-button:focused,
-.split-menu-button:focused {
-    -fx-border-color: #aaaaaa;
-}
-
-
 /* ---- CheckBox / RadioButton / ToggleSwitch outlines: light on dark ---- */
 
 .check-box > .box,
