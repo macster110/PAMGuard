@@ -161,6 +161,7 @@ public class DetectionGroupDisplay extends PamBorderPane {
 		detectionDisplay= new DetectionPlotDisplay();
 
 		arrowLeft= new PamButton();
+		arrowLeft.getStyleClass().add("icon-button");
 //		arrowLeft.setGraphic(PamGlyphDude.createPamGlyph(MaterialIcon.KEYBOARD_ARROW_LEFT, PamGuiManagerFX.iconSize));
 		arrowLeft.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", PamGuiManagerFX.iconSize));
 		arrowLeft.setOnAction((action)->{
@@ -170,6 +171,7 @@ public class DetectionGroupDisplay extends PamBorderPane {
 		});
 
 		arrowRight= new PamButton();
+		arrowRight.getStyleClass().add("icon-button");
 //		arrowRight.setGraphic(PamGlyphDude.createPamGlyph(MaterialIcon.KEYBOARD_ARROW_RIGHT, PamGuiManagerFX.iconSize));
 		arrowRight.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-right", PamGuiManagerFX.iconSize));
 		arrowRight.setOnAction((action)->{

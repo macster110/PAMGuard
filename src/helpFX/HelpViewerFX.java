@@ -176,12 +176,14 @@ public class HelpViewerFX extends Stage {
 	private VBox buildLayout() {
 		// --- Toolbar ---
 		backButton = new Button();
+		backButton.getStyleClass().add("icon-button");
 		backButton.setGraphic(PamGlyphDude.createPamIcon("mdi2a-arrow-left", 16));
 		backButton.setTooltip(new javafx.scene.control.Tooltip("Back"));
 		backButton.setDisable(true);
 		backButton.setOnAction(e -> navigateBack());
 
 		forwardButton = new Button();
+		forwardButton.getStyleClass().add("icon-button");
 		forwardButton.setGraphic(PamGlyphDude.createPamIcon("mdi2a-arrow-right", 16));
 		forwardButton.setTooltip(new javafx.scene.control.Tooltip("Forward"));
 		forwardButton.setDisable(true);

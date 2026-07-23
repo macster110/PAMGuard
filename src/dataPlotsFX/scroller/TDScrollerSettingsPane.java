@@ -71,6 +71,7 @@ public class TDScrollerSettingsPane extends DynamicSettingsPane<TDAcousticScroll
 		highValue.textProperty().bind(datagramColours.getColourSlider().maxProperty().asString());
 
 		PamButton backButton = new PamButton(); 
+		backButton.getStyleClass().add("icon-button");
 //		backButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.CHEVRON_LEFT, PamGuiManagerFX.iconSize));
 		backButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", PamGuiManagerFX.iconSize));
 		backButton.setOnAction((action)->{

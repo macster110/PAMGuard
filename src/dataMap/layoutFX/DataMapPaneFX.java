@@ -130,6 +130,7 @@ public class DataMapPaneFX extends PamBorderPane implements UserDisplayNodeFX, P
 
 		//		showButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.CHEVRON_DOWN, PamGuiManagerFX.iconColor, PamGuiManagerFX.iconSize));\
 		showButton.setGraphic( PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
+		showButton.getStyleClass().add("icon-button");
 		showButton.setPrefHeight(60);
 		scrollingDataPanel.setRight(showButton);
 

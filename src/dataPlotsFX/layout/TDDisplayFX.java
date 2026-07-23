@@ -262,6 +262,7 @@ public class TDDisplayFX extends PamBorderPane {
 //		showButton.getStyleClass().add("transparent-button-square");
 		showButton.setStyle("-fx-background-radius: 0 0 0 5; -fx-border-color: none;");
 		showButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-down", PamGuiManagerFX.iconSize));
+		showButton.getStyleClass().add("icon-button");
 		showButton.setPrefWidth(30);
 		showButton.setMaxHeight(timeAxisSize-20);
 

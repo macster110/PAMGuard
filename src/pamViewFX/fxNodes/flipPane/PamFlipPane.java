@@ -156,6 +156,7 @@ public class PamFlipPane extends FlipPane {
 	private PamBorderPane createAdvSettingsPane() {
 
 		backButton = new PamButton(); 
+		backButton.getStyleClass().add("icon-button");
 		backButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", Color.WHITE, PamGuiManagerFX.iconSize));
 		//		backButton.setStyle("-fx-background-color: -color-base-6"); 
 		//backButton.setStyle("-fx-padding: 0,0,0,0");

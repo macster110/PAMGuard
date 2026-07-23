@@ -238,6 +238,7 @@ public class HidingPane extends StackPane {
 	 * @param side - the side the button should be styled for. 
 	 */
 	public void styleHideButton(PamButton button, Side side){
+		button.getStyleClass().add("icon-button");
 		switch (side){
 		case RIGHT:
 			//button.setGraphic(new ImageView(new Image(getClass().getResourceAsStream("/Resources/SidePanelShow2.png"))));

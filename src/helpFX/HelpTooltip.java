@@ -116,6 +116,7 @@ public class HelpTooltip extends Tooltip {
 
 		// Create the help button
 		Button helpBtn = new Button();
+		helpBtn.getStyleClass().add("icon-button");
 		helpBtn.setGraphic(PamGlyphDude.createPamIcon("mdi2h-help-circle-outline", 14));
 		helpBtn.setStyle("-fx-background-color: transparent; -fx-padding: 2;");
 		helpBtn.setTooltip(new Tooltip("Open help"));

@@ -279,6 +279,7 @@ public class TDMenuPane extends PamBorderPane {
 		//create info and toggle detection buttons that always sit at the top of the display
 
 		PamButton infoButton = new PamButton();
+		infoButton.getStyleClass().add("icon-button");
 		infoButton.getStyleClass().add("square-button-trans");
 		infoButton.setTooltip(new Tooltip("Show detection info"));
 //		infoButton.setGraphic(PamGlyphDude.createPamGlyph(MaterialIcon.INFO, PamGuiManagerFX.iconSize));
@@ -320,6 +321,7 @@ public class TDMenuPane extends PamBorderPane {
 
 		//create info pane
 		PamButton reverseInfo = new PamButton();
+		reverseInfo.getStyleClass().add("icon-button");
 		reverseInfo.getStyleClass().add("square-button-trans");
 		reverseInfo.setTooltip(new Tooltip("Show menu"));
 //		reverseInfo.setGraphic(PamGlyphDude.createPamGlyph(MaterialIcon.MENU, PamGuiManagerFX.iconSize));
