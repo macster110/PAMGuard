@@ -112,7 +112,7 @@ public class TDControlPaneFX extends Pane  {
 
 		//CSS styling- pane has the standard PAMGUARD settings pane styling. 		  
 //		this.getStylesheets().addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());
-		this.getStyleClass().add("pane");
+//		this.getStyleClass().add("pane");
 
 		PamBorderPane mainPane=new PamBorderPane();
 

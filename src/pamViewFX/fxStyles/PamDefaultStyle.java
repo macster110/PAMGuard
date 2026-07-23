@@ -50,7 +50,7 @@ public class PamDefaultStyle {
 	 * Relative location of the CSS style sheet to be used for the Pamguard GUI (but
 	 * not dialogs)
 	 */
-	protected String guiCSS = null;
+	protected String guiCSS = defaultDialogCSS();
 
 	/**
 	 * Relative location of the CSS style sheet to be used for the Pamguard GUI when
