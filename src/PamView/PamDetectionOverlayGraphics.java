@@ -339,7 +339,7 @@ public class PamDetectionOverlayGraphics extends PanelOverlayDraw {
 //				}
 		if (localisation == null || 
 				((localisation.getLocContents().getLocContent() & 
-						(LocContents.HAS_BEARING | LocContents.HAS_RANGE)) == 0)) {
+						(LocContents.HAS_BEARING | LocContents.HAS_RANGE | LocContents.HAS_LATLONG)) == 0)) {
 			// no localisation information, so draw the symbol and return.
 			generalProjector.addHoverData(detectionCentre, pamDetection);
 			return getPamSymbol(pamDetection, generalProjector).draw(g, detectionCentre.getXYPoint(), drawingOptions);
@@ -664,30 +664,34 @@ public class PamDetectionOverlayGraphics extends PanelOverlayDraw {
 		if (angleError == 0 || angleError > Math.PI) {
 			return drawLineOnly(g, pamDataUnit, p1, p2, symbol, drawingOptions);
 		}
+		
+//		angleError = 0;
 		Graphics2D g2d = (Graphics2D) g;
 		// keep it simple with only a few points at different angles. 
 		int nAng = Math.max((int) Math.round(180*angleError/10), 2);
-		int[] x = new int[nAng+1];
-		int[] y = new int[nAng+1];
+		int[] x = new int[nAng+2];
+		int[] y = new int[nAng+2];
 		x[0] = p1.x;
 		y[0] = p1.y;
 		double r = Math.sqrt(Math.pow(p2.x-p1.x, 2) + Math.pow(p2.y-p1.y, 2));
 		double aStart = Math.atan2(p2.y-p1.y, p2.x-p1.x);
 		aStart -= angleError;
 		double aStep = 2*angleError/nAng;
-		for (int i = 0; i < nAng; i++) {
+		for (int i = 0; i <= nAng; i++) {
 			double a = aStart + i*aStep;
 			x[i+1] = (int) (x[0] + r * Math.cos(a));
 			y[i+1] = (int) (y[0] + r * Math.sin(a));
 		}
-		Polygon p = new Polygon(x, y, nAng+1);
+		Polygon p = new Polygon(x, y, nAng+2);
 		if (symbol.isFill() && angleError < Math.PI) {
-		g2d.setColor(symbol.getFillColor());
-		g2d.fill(p);
+			g2d.setColor(symbol.getFillColor());
+			g2d.fill(p);
 		}
 		g2d.setColor(symbol.getLineColor());
 		g2d.draw(p);
 		
+//		symbol.setLineColor(Color.black);
+//		drawLineOnly(g2d, pamDataUnit, p1, p2, symbol, drawingOptions);
 		
 		return null;
 	}
@@ -760,8 +764,11 @@ public class PamDetectionOverlayGraphics extends PanelOverlayDraw {
 		Coordinate3d botRight = generalProjector.getCoord3d(pamDetection.getTimeMilliseconds() + 
 				dur, frequency[0], 0);
 				
+		boolean isWrapped = false;
 		if (botRight.x < topLeft.x){
-			botRight.x = g.getClipBounds().width;
+			// this means it's wrapped.
+			isWrapped = true;
+			botRight.x += g.getClipBounds().width;
 		}
 		if (generalProjector.isViewer()) {
 			Coordinate3d middle = new Coordinate3d();
@@ -783,8 +790,13 @@ public class PamDetectionOverlayGraphics extends PanelOverlayDraw {
 			// Not actually drawing on a spectrogramProjector, so don't have any info on the background color
 		}
 
+		if (isWrapped) {
+			g.drawRect((int) topLeft.x-g.getClipBounds().width, (int) topLeft.y, 
+					(int) botRight.x - (int) topLeft.x, (int) botRight.y - (int) topLeft.y);
+		}
 		g.drawRect((int) topLeft.x, (int) topLeft.y, 
 				(int) botRight.x - (int) topLeft.x, (int) botRight.y - (int) topLeft.y);
+		
 		return new Rectangle((int) topLeft.x, (int) topLeft.y, 
 				(int) botRight.x - (int) topLeft.x, (int) botRight.y - (int) topLeft.y);
 	}

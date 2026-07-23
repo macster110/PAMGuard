@@ -19,6 +19,7 @@ import clipgenerator.ClipDataUnit;
 import noiseMonitor.NoiseBinaryDataSource;
 import noiseMonitor.NoiseDataBlock;
 import noiseMonitor.NoiseDataUnit;
+import noiseMonitor.NoiseJsonDataSource;
 import noiseMonitor.NoiseLogging;
 import whistlesAndMoans.ConnectedRegionDataUnit;
 
@@ -32,6 +33,7 @@ public class NoiseBandProcess extends PamProcess {
 	private NoiseDataBlock noiseDataBlock;
 	private AcquisitionProcess daqProcess;
 	private NoiseBinaryDataSource noiseBinaryDataSource;
+	private NoiseJsonDataSource noiseJsonDataSource;
 	private NoiseLogging noiseLogging;
 
 	public NoiseBandProcess(NoiseBandControl noiseBandControl) {
@@ -41,6 +43,8 @@ public class NoiseBandProcess extends PamProcess {
 		noiseDataBlock.setStatisticTypes(NoiseDataBlock.NOISE_MEAN | NoiseDataBlock.NOISE_PEAK);
 		noiseBinaryDataSource = new NoiseBinaryDataSource(noiseBandControl, noiseDataBlock);
 		noiseDataBlock.setBinaryDataSource(noiseBinaryDataSource);
+		noiseJsonDataSource = new NoiseJsonDataSource(noiseDataBlock,this.noiseBandControl);
+		noiseDataBlock.setJSONDataSource(noiseJsonDataSource);
 		noiseDataBlock.SetLogging(noiseLogging = new NoiseLogging(noiseDataBlock));
 		noiseDataBlock.setDatagramProvider(new NoiseBandDatagramProvider(noiseBandControl, this));
 		addOutputDataBlock(noiseDataBlock);

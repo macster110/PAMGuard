@@ -1,7 +1,10 @@
 package rawDeepLearningClassifier;
 
 import java.awt.Frame;
+import java.io.File;
 import java.io.Serializable;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 
 import javax.swing.JMenu;
@@ -31,6 +34,7 @@ import dataPlotsFX.data.TDDataProviderRegisterFX;
 import detectionPlotFX.data.DDPlotRegister;
 import generalDatabase.SQLLoggingAddon;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX2AWT;
+import pamguard.GlobalArguments;
 import rawDeepLearningClassifier.dataPlotFX.DLDetectionPlotProvider;
 import rawDeepLearningClassifier.dataPlotFX.DLGroupSymbolManager;
 import rawDeepLearningClassifier.dataPlotFX.DLPredictionProvider;
@@ -134,6 +138,12 @@ public class DLControl extends PamControlledUnit implements PamSettings, ClipDis
 	 * currently held click trains etc once processing has completed.
 	 */
 	public static final int PROCESSING_END = 2;
+	
+	
+	/**
+	 * Global flag for deep learning model name
+	 */
+	public static final String MODELPATH = "-modelPath";
 
 	/**
 	 * List of different deep learning models that are available.
@@ -250,6 +260,8 @@ public class DLControl extends PamControlledUnit implements PamSettings, ClipDis
 		PamRawDataBlock rawDataBlock = PamController.getInstance()
 				.getRawDataBlock(rawDLParmas.groupedSourceParams.getDataSource());
 		
+		// load the previous settings
+		PamSettingManager.getInstance().registerSettings(this);
 		
 //		/**
 //		 * In the latest release of djl (0.11.0) there is a bug with the dll's of tensorflow and 
@@ -360,8 +372,7 @@ public class DLControl extends PamControlledUnit implements PamSettings, ClipDis
 		// register the DD display
 		DDPlotRegister.getInstance()
 				.registerDataInfo(new RawDLDDPlotProvider(this, dlClassifyProcess.getDLDetectionDatablock()));
-		// load the previous settings
-		PamSettingManager.getInstance().registerSettings(this);
+		
 
 		// because this was added after some settings classes have already been
 		// serialized
@@ -467,8 +478,10 @@ public class DLControl extends PamControlledUnit implements PamSettings, ClipDis
 	@Override
 	public boolean restoreSettings(PamControlledUnitSettings pamControlledUnitSettings) {
 		RawDLParams newParameters = (RawDLParams) pamControlledUnitSettings.getSettings();
-		
 		rawDLParmas = newParameters.clone();
+		if(GlobalArguments.getParam(MODELPATH)!=null) {
+			rawDLParmas.modelURI = new File(GlobalArguments.getParam(MODELPATH)).toURI();
+		}
 		return true;
 	}
 
@@ -696,7 +709,7 @@ public class DLControl extends PamControlledUnit implements PamSettings, ClipDis
 	
 	/**
 	 * Get the data selector. 
-	 * @param source - the source data block 
+	 * @param sourc7e - the source data block 
 	 * @return the data selector.
 	 */
 	public void createDataSelector(PamDataBlock<?> source) {
