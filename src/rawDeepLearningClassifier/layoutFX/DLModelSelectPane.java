@@ -132,6 +132,7 @@ public class DLModelSelectPane extends PamBorderPane {
 		pathLabel = new Label("No classifier file selected"); 
 		//		PamButton pamButton = new PamButton("", PamGlyphDude.createPamGlyph(MaterialDesignIcon.FILE, PamGuiManagerFX.iconSize)); 
 		PamButton pamButton = new PamButton("", PamGlyphDude.createPamIcon("mdi2f-file", PamGuiManagerFX.iconSize));
+		pamButton.getStyleClass().add("icon-button");
 		pathLabel.setMinWidth(100);
 
 		
@@ -172,6 +173,7 @@ public class DLModelSelectPane extends PamBorderPane {
 		urlBox.setSpacing(5);
 		
 		PamButton download = new PamButton();
+		download.getStyleClass().add("icon-button");
 		download.setTooltip(new Tooltip("Download the model from set URL"));
 		download.setGraphic(PamGlyphDude.createPamIcon("mdi2d-download", PamGuiManagerFX.iconSize));
 		download.setDisable(true);
@@ -218,6 +220,7 @@ public class DLModelSelectPane extends PamBorderPane {
 		urlPopOver.setContentNode(urlHolder);
 		
 		PamButton urlButton = new PamButton("", PamGlyphDude.createPamIcon("mdi2l-link-variant", PamGuiManagerFX.iconSize)); 
+		urlButton.getStyleClass().add("icon-button");
 		urlButton.setTooltip(new Tooltip("Load a model from a URL"));
 		urlButton.setOnAction((action)->{
 			urlPopOver.show(urlButton);
@@ -225,6 +228,7 @@ public class DLModelSelectPane extends PamBorderPane {
 
 
 		PamButton defaults = new PamButton(); 
+		defaults.getStyleClass().add("icon-button");
 		defaults.setTooltip(new Tooltip("Default models"));
 		defaults.setGraphic(PamGlyphDude.createPamIcon("mdi2d-dots-vertical", PamGuiManagerFX.iconSize)); 
 		defaults.setTooltip(new Tooltip("Load a default model"));

@@ -119,7 +119,7 @@ public class DeepAcousticsModel extends SimpleArchiveModel {
 						JSONArray boxArray = innerArray.getJSONArray(j);
 						anchorBox = new double[boxArray.length()];
 						for (int k = 0; k < boxArray.length(); k++) {
-							anchorBox[k] = boxArray.getDouble(i);
+							anchorBox[k] = boxArray.getDouble(k);
 						}
 						multiAnchorBox[j] = anchorBox;
 					}
@@ -154,9 +154,11 @@ public class DeepAcousticsModel extends SimpleArchiveModel {
 		try {
 			List<DeepAcousticResultArray> results  = objectPredictor.predict(specImage);
 			//DLUtils.printArray(results);
-			return results; 
+			return results;
 		} catch (TranslateException e) {
-			System.out.println("Error on deep acoustics model: "); 
+			System.err.println("Error running deep acoustics model. The model graph failed to execute - "
+					+ "this usually indicates the exported model itself is broken (e.g. a channel-split/route "
+					+ "slice exported with a batch size of 0 instead of -1) rather than a problem with the input data.");
 			e.printStackTrace();
 		}
 		return null;

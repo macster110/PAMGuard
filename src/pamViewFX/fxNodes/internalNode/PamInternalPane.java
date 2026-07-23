@@ -276,6 +276,7 @@ public class PamInternalPane extends Group {
 	
 		/*Create buttons*/
 		PamButton expand=new PamButton();
+		expand.getStyleClass().add("icon-button");
 		expand.setGraphic(PamGlyphDude.createPamIcon("mdi2a-arrow-expand-all", PamGuiManagerFX.iconSize));
 		expand.layoutXProperty().bind(mainPane.layoutXProperty().add(mainPane.widthProperty().subtract(anchorSize*2).subtract(expand.widthProperty())));
 		expand.layoutYProperty().bind(mainPane.layoutYProperty().add(10));

@@ -202,12 +202,14 @@ public class AcousticScrollerFX extends AbstractPamScrollerFX {
 
 		//buttons for moving the scroll bar. 
 		arrowBottomLeft=new PamButton(); 
+		arrowBottomLeft.getStyleClass().add("icon-button");
 		arrowBottomLeft.getStyleClass().add("opaque-button-square"); 
 		arrowBottomLeft.setOnAction((action)->{
 			scrollBarPane.moveScrollRectangle(-this.scrollArrowIncrement);
 		});
 
 		arrowTopRight=new PamButton(); 
+		arrowTopRight.getStyleClass().add("icon-button");
 		arrowTopRight.getStyleClass().add("opaque-button-square"); 
 		arrowTopRight.setOnAction((action)->{
 			scrollBarPane.moveScrollRectangle(this.scrollArrowIncrement);

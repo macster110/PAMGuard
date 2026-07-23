@@ -184,6 +184,7 @@ public class DataStreamPaneFX extends PamBorderPane {
 		pane.setCenter(topPane);
 		
 		showButton = new PamButton();
+		showButton.getStyleClass().add("icon-button");
 		showButton.setStyle("-fx-padding: 0 10 0 10; -fx-border-radius: 0 0 0 0; -fx-background-radius: 0 0 0 0;");
 		showButton.setOnAction((action)->{
 			this.setCollapsed(!this.isCollapsed()); 

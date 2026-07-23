@@ -206,6 +206,7 @@ public class StandardMHTChi2Pane extends SettingsPane<StandardMHTChi2Params> {
 		advSettingsPane.setPadding(new Insets(5,5,5,5));
 		
 		advSettingsButton = new PamButton(); 
+		advSettingsButton.getStyleClass().add("icon-button");
 //		advSettingsButton.setGraphic(PamGlyphDude.createPamGlyph(MaterialIcon.SETTINGS, PamGuiManagerFX.iconSize));
 		advSettingsButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
 		advSettingsButton.setOnAction((action)->{
