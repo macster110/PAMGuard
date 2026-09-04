@@ -347,6 +347,9 @@ public class ScrollingDataPanel extends PamBorderPanel {
 	 */
 	public int createDataGraphs() {
 		scrolledPanel.removeAll();
+		for (DataStreamPanel oldPanel : dataStreamPanels) {
+			oldPanel.dispose();
+		}
 		dataStreamPanels.clear();
 		ArrayList<PamDataBlock> dataBlocks = dataMapControl.getMappedDataBlocks();
 		if (dataBlocks == null) {

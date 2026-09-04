@@ -38,7 +38,7 @@ import dataMap.filemaps.FileSubSection;
 import dataMap.filemaps.OfflineFileParameters;
 import dataMap.filemaps.OfflineFileServer;
 import dataMap.filemaps.SoundFileDatagramManager;
-import dataMap.filemaps.WaveformDatagramProvider;
+import dataMap.filemaps.SoundFileDatagramProvider;
 import pamScrollSystem.ViewLoadObserver;
 import pamguard.CommandLine;
 import wavFiles.ByteConverter;
@@ -99,8 +99,10 @@ public class OfflineWavFileServer extends OfflineFileServer<FileDataMapPoint> {
 		if (rawDataBlock == null) {
 			return null;
 		}
-		rawDataBlock.setDatagramProvider(new WaveformDatagramProvider());
-		return new SoundFileDatagramManager(this, "Sound Files " + daqControl.getUnitName());
+		SoundFileDatagramManager manager = new SoundFileDatagramManager(this,
+				"Sound Files " + daqControl.getUnitName());
+		rawDataBlock.setDatagramProvider(new SoundFileDatagramProvider(manager, rawDataBlock));
+		return manager;
 	}
 
 	@Override
