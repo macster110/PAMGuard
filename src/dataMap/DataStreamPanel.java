@@ -150,8 +150,8 @@ public class DataStreamPanel extends JPanel implements DataMapObserver {
 		 * interesting, so leave those off.
 		 */
 		showFileBounds = isSoundFileStream();
-		ColourArrayType storedColour = dataMapControl.dataMapParameters.datagramColourMaps
-				.get(dataBlock.getLongDataName());
+		ColourArrayType storedColour = dataMapControl.dataMapParameters
+				.getDatagramColourMap(dataBlock.getLongDataName());
 		if (storedColour != null) {
 			colourArrayType = storedColour;
 		}
@@ -367,9 +367,15 @@ public class DataStreamPanel extends JPanel implements DataMapObserver {
 			setToolTipText(dataBlock.getDataName());
 		}
 
+		/*
+		 * Painted here rather than in paint() so that the datagram goes down before the
+		 * child components rather than over the top of them. A 3D datagram covers the
+		 * entire graph, which would otherwise hide the datagram progress strip and any
+		 * key panel completely.
+		 */
 		@Override
-		public void paint(Graphics g) {
-			super.paint(g);
+		protected void paintComponent(Graphics g) {
+			super.paintComponent(g);
 			if (getHeight() < 2) {
 				return;
 			}
@@ -1194,7 +1200,7 @@ public class DataStreamPanel extends JPanel implements DataMapObserver {
 	 */
 	public void setColourArrayType(ColourArrayType colourArrayType) {
 		this.colourArrayType = colourArrayType;
-		dataMapControl.dataMapParameters.datagramColourMaps.put(dataBlock.getLongDataName(), colourArrayType);
+		dataMapControl.dataMapParameters.setDatagramColourMap(dataBlock.getLongDataName(), colourArrayType);
 		dataGraph.clearDatagramColours();
 		repaintAll();
 	}

@@ -143,6 +143,12 @@ public class OfflineWavFileServer extends OfflineFileServer<FileDataMapPoint> {
 		fileParams.enable = true;
 		fileParams.folderName = folderParams.getMostRecentFile();
 		fileParams.includeSubFolders = folderParams.subFolders;
+		/*
+		 * Carry over the exact list of files and folders the user picked in real time,
+		 * not just the folder they happen to be in, so that a selection of a few files
+		 * from a big folder doesn't turn into the whole folder in viewer mode.
+		 */
+		fileParams.setSelectedFiles(folderParams.getSelectedFiles());
 		System.out.printf("Setting offline wav file folder to %s with subfolders %s\n", fileParams.folderName,
 				Boolean.valueOf(fileParams.includeSubFolders).toString());
 	}

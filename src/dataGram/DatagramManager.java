@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.ListIterator;
 
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import PamController.AWTScheduler;
@@ -251,8 +252,35 @@ public class DatagramManager {
 	 * @param updateList
 	 */
 	public void updateDatagrams(ArrayList<PamDataBlock> updateList) {
-		datagramCreator = new DatagramCreator(updateList);
-		AWTScheduler.getInstance().scheduleTask(datagramCreator);
+		DatagramCreator creator = new DatagramCreator(updateList);
+		datagramCreator = creator;
+		if (isGuiBlocking()) {
+			AWTScheduler.getInstance().scheduleTask(creator);
+		}
+		else {
+			/*
+			 * Start the worker directly rather than through the AWTScheduler, which
+			 * would disable the main frame for the duration of the task.
+			 */
+			SwingUtilities.invokeLater(() -> creator.execute());
+		}
+	}
+
+	/**
+	 * Should the main GUI be locked for user input while the datagrams are being made ?
+	 * <p>
+	 * Datagram creation always happens in a worker thread, but tasks scheduled through
+	 * the {@link AWTScheduler} also disable the main frame so that the user can't start
+	 * anything else while they run. That's needed for the standard datagram creation,
+	 * which clears each data block and reloads it from the data store, but not for
+	 * subclasses which summarise their data without disturbing anything the user has
+	 * loaded. Those should override this and return false so that PAMGuard stays usable
+	 * while a long job runs in the background.
+	 *
+	 * @return true to lock the GUI while the datagrams are made.
+	 */
+	protected boolean isGuiBlocking() {
+		return true;
 	}
 	
 	/**

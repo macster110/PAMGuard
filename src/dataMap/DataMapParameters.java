@@ -27,8 +27,35 @@ public class DataMapParameters implements Cloneable, Serializable, ManagedParame
 	
 	/**
 	 * Colour map to use for each 3D datagram, keyed on the data block's long data name.
+	 * May be null if the settings were serialised by a version of PAMGuard from before
+	 * datagram colours became selectable, so always go through 
+	 * {@link #getDatagramColourMap(String)} and {@link #setDatagramColourMap(String, ColourArrayType)}.
 	 */
 	public HashMap<String, ColourArrayType> datagramColourMaps = new HashMap<>();
+	
+	/**
+	 * Get the stored colour map for a datagram. 
+	 * @param dataName long data name of the data block
+	 * @return the stored colour map, or null if there isn't one. 
+	 */
+	public ColourArrayType getDatagramColourMap(String dataName) {
+		if (datagramColourMaps == null) {
+			return null;
+		}
+		return datagramColourMaps.get(dataName);
+	}
+	
+	/**
+	 * Store the colour map for a datagram. 
+	 * @param dataName long data name of the data block
+	 * @param colourArrayType colour map to remember
+	 */
+	public void setDatagramColourMap(String dataName, ColourArrayType colourArrayType) {
+		if (datagramColourMaps == null) {
+			datagramColourMaps = new HashMap<>();
+		}
+		datagramColourMaps.put(dataName, colourArrayType);
+	}
 	
 	/**
 	 * Which summary to show for raw sound files - see the MODE_ constants in

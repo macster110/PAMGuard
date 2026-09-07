@@ -365,6 +365,10 @@ public class SoundFileDatagramManager extends DatagramManager {
 	 * @param dataBlock the raw data block
 	 */
 	public void createDatagrams(PamDataBlock dataBlock) {
+		if (getStatus()) {
+			// already running - the GUI stays live while we work, so the user can ask twice.
+			return;
+		}
 		/*
 		 * If some files have already been summarised - after new recordings have been
 		 * added to the folder, say - stick with the bin sizes they used, otherwise the
@@ -675,6 +679,18 @@ public class SoundFileDatagramManager extends DatagramManager {
 	}
 
 	/**
+	 * Reading the sound files doesn't touch anything the user has loaded, so there is no
+	 * reason to lock the GUI while it happens. It can easily run for an hour or more over
+	 * a large deployment and the user needs to be able to carry on working meanwhile - the
+	 * data map draws its own progress bar, with a cancel button, for anyone who wants to
+	 * stop it.
+	 */
+	@Override
+	protected boolean isGuiBlocking() {
+		return false;
+	}
+
+	/**
 	 * The data map shows its own progress indicator for sound files, complete with a
 	 * cancel button, so the modal progress dialog the base class would otherwise put up
 	 * is suppressed.
@@ -713,9 +729,14 @@ public class SoundFileDatagramManager extends DatagramManager {
 	@Override
 	protected void datagramsComplete() {
 		filesSinceSave = 0;
-		offlineFileServer.saveSerialisedMap();
 		progress = null;
 		notifyListeners();
+		/*
+		 * This is called on the AWT thread and serialising the map for a large deployment
+		 * takes a noticeable time, so don't do it here.
+		 */
+		Thread saveThread = new Thread(() -> offlineFileServer.saveSerialisedMap(), "Sound file map save");
+		saveThread.start();
 	}
 
 	/**
