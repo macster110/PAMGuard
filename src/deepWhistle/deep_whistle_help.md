@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Deep Whistle** module uses deep-learning models to enhance tonal whistle sounds (e.g. dolphin whistles) in a spectrogram. It takes the output of an FFT (spectrogram) module and applies a learned **mask** that keeps the time-frequency bins belonging to whistle contours and suppresses everything else (background noise, clicks, broadband transients). The result is a new *masked* FFT data block which can be displayed as a much cleaner spectrogram and/or passed to a downstream detector such as the **Whistle and Moan Detector** to improve detection and reduce false positives.
+The **Deep Whistle** module uses deep-learning models to enhance tonal whistle sounds (e.g. dolphin whistles) in a spectrogram. It takes the output of an FFT (spectrogram) module and applies a learned **mask** that keeps the time-frequency bins belonging to whistle contours and suppresses everything else (background noise, clicks, broadband transients). The result is a new *masked* FFT data block which can be displayed as a much cleaner spectrogram and/or passed to a downstream detector such as the **Whistle and Moan Detector** to improve detection and reduce false positives. Essentially, this works by increasing the signal to noise ratio - and a general rule is that most automated detection/classification algorithms are far more accurate at higher SNR. 
 
 The module is deliberately general: the masking model is selected from a list of interchangeable **FFT masks**, and new models can be added over time. Two models are currently available:
 
@@ -11,23 +11,21 @@ The module is deliberately general: the masking model is selected from a list of
 
 Each model has an information button (ⓘ) next to its name that gives a short description and a link to the paper describing it.
 
-![](resources/deepwhistle_overview.png)
+![](resources/deepWhistleSpectrogram.png)
 
-_The Deep Whistle module running in PAMGuard. Top: the source spectrogram with the model output overlaid (blue contours). Bottom: the masked FFT spectrogram, in which only whistle energy remains and can be passed to a whistle detector._
+_The Deep Whistle module running in PAMGuard. Top: the source spectrogram with the whislte and moan detector output (with the deep whislte mask as the source data) overlaid on channel 0. Bottom: the masked FFT spectrogram, in which only whistle energy remains and can be passed to a whistle detector._
 
 ## How it works
 
 For each channel the module buffers a short window of FFT slices, converts them to a spectrogram and applies a set of model-specific pre-processing transforms (frequency trimming, conversion to decibels, normalisation). The buffered spectrogram is passed to the deep-learning model, which returns a **confidence** between 0 and 1 for every time-frequency bin – the probability that the bin is part of a whistle. Bins whose confidence is below the **confidence threshold** are set to zero; the remaining confidences are multiplied into the FFT data. The masked FFT is then published as a new data block.
 
-Because the model works on the spectrogram, the FFT source must be configured with the frequency and time resolution the model expects (see below). The two models were trained with different settings, so the module checks the source automatically and warns if it is not set up correctly.
+Because the model works on the spectrogram, the FFT source should be configured with the frequency and time resolution the model expects, although the models cope with some changes if needed(see below). The two models were trained with different settings, so the module checks the source automatically and warns if it is not set up with the FFT length and hop the model was trained on.
 
 ## Adding the module
 
 The module is added from the PAMGuard **File > Add Modules > Detectors > Deep Whistle** menu. It depends on an **FFT (spectrogram) Engine** module, so add an FFT Engine first (or let PAMGuard add one for you). A typical processing chain is:
 
 `Sound Acquisition → FFT Engine → Deep Whistle → Whistle and Moan Detector`
-
-<!-- TODO: add screenshot of the Add Modules menu / data model here, e.g. resources/deepwhistle_datamodel.png -->
 
 ## Configuring the module
 
@@ -50,7 +48,7 @@ Each model was trained at a particular time-frequency resolution, expressed as a
 | Deep Whistle | ~2 ms | ~8 ms |
 | SAM-Whistle | ~8 ms | ~2 ms |
 
-The pane validates the selected FFT source against the chosen model. If the FFT length or hop is wrong, a warning is shown together with a **Set FFT parameters** button that configures the parent FFT Engine automatically. When the source is correct a green confirmation message is shown.
+The pane validates the selected FFT source against the chosen model. If the FFT length or hop is wrong, a warning is shown together with a **Set FFT parameters** button that configures the parent FFT Engine automatically. When the source is correct a green confirmation message is shown. Note that the deepWhislte model will work with different FFT lengths, although it may not be as effective. 
 
 ### FFT Mask
 
@@ -60,8 +58,6 @@ Two buttons sit next to the model name:
 
 - **ⓘ (information)** – shows a short description of the model and a hyperlink to the scientific paper that describes it (the link text is the full reference; clicking it opens the paper's DOI in your browser).
 - **📂 (import)** – lets you import a **custom** model. If you have retrained one of the models on your own data, use this to select the retrained model file; it replaces the downloaded online model for the selected mask. See *Using a custom (retrained) model* below.
-
-<!-- TODO: add a close-up screenshot of the model information pop-up, e.g. resources/deepwhistle_model_info.png -->
 
 ### Confidence threshold
 
