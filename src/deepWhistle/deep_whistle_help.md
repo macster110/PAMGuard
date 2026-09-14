@@ -2,18 +2,18 @@
 
 ## Overview
 
-The **Deep Whistle** module uses deep-learning models to enhance tonal whistle sounds (e.g. dolphin whistles) in a spectrogram. It takes the output of an FFT (spectrogram) module and applies a learned **mask** that keeps the time-frequency bins belonging to whistle contours and suppresses everything else (background noise, clicks, broadband transients). The result is a new *masked* FFT data block which can be displayed as a much cleaner spectrogram and/or passed to a downstream detector such as the **Whistle and Moan Detector** to improve detection and reduce false positives. Essentially, this works by increasing the signal to noise ratio - and a general rule is that most automated detection/classification algorithms are far more accurate at higher SNR. 
+The **Deep Whistle** module uses deep-learning models to enhance tonal whistle sounds (e.g. dolphin whistles) in a spectrogram. It takes the output of an FFT (spectrogram) module and applies a learned **mask** that keeps the time-frequency bins belonging to whistle contours and suppresses everything else (background noise, clicks, broadband transients). The result is a new *masked* FFT data block which can be displayed as a much cleaner spectrogram and/or passed to a downstream detector such as the **Whistle and Moan Detector** to improve detection and reduce false positives and contour fragmentation. Essentially, this works by increasing the signal to noise ratio (SNR) with a general rule that most automated detection/classification algorithms are far more accurate at higher SNR. 
 
-The module is deliberately general: the masking model is selected from a list of interchangeable **FFT masks**, and new models can be added over time. Two models are currently available:
+The module is general: the masking model is selected from a list of interchangeable **FFT masks**, and new models can be added over time. Two models are currently available:
 
-- **Deep Whistle** – a convolutional network (from the *silbido* DeepWhistle project) trained on synthetic whistle data.
-- **SAM-Whistle** – an adaptation of Meta's *Segment Anything Model* (SAM) foundation model, distributed as an example trained on the DCLDE 2011 dataset.
+- **Deep Whistle** – a convolutional network (from the *silbido* DeepWhistle project) trained on synthetic whistle data. (Li et al. (2020))
+- **SAM-Whistle** – an adaptation of Meta's *Segment Anything Model* (SAM) foundation model, distributed as an example trained on the DCLDE 2011 dataset. (Zhang et al. (2025))
 
 Each model has an information button (ⓘ) next to its name that gives a short description and a link to the paper describing it.
 
 ![](resources/deepWhistleSpectrogram.png)
 
-_The Deep Whistle module running in PAMGuard. Top: the source spectrogram with the whislte and moan detector output (with the deep whislte mask as the source data) overlaid on channel 0. Bottom: the masked FFT spectrogram, in which only whistle energy remains and can be passed to a whistle detector._
+_The Deep Whistle module running in PAMGuard. Top: the source spectrogram with the whistle and moan detector output (with the deep whistle mask as the source data) overlaid on channel 0. Bottom: the masked FFT spectrogram, in which only whistle energy remains and can be passed to a whistle detector - the same whislte and moan contours are shown on channel 0_
 
 ## How it works
 
@@ -86,13 +86,31 @@ For the GPU path to work the model must be exported **without** `torch.jit.freez
 
 ## Tips and troubleshooting
 
+- **SAM whistle is slow.** samWhistle is a much larger model than deepWhistle and runs at less than real time on a standard laptop. Apple Silicon and Nvidea GPU's will run it at around 4 times real time. 
 - **Set the FFT source correctly.** The most common cause of poor results is an FFT length/hop that does not match the model. Use the **Set FFT parameters** button, or configure the FFT Engine manually to the window/hop in the table above.
 - **A model produces a lot of false positives.** This usually means the model does not transfer well to your recordings (different species, equipment or noise), or the model file is incomplete. Try adjusting the confidence threshold; if the output is still noisy across the whole spectrogram, the model likely needs retraining/fine-tuning on data similar to yours.
 - **Sample rate and frequency range.** The models focus on the 5–50 kHz band. Recordings whose Nyquist frequency is below 50 kHz will only be masked up to the Nyquist frequency.
+- **Whistle and Moan Detector Module.** Do not implement the noise reduction features in the whislte and moan module. That may lead to PAMGuard out of memory and there is no need to - the DeepWhistle module is a noise reduction method. 
 
-## References
+
+## References and Repositories
 
 The models used by this module are described in the following papers (also available from the ⓘ information button in the settings pane):
 
-- **Deep Whistle** — Li, P. *et al.* (2020) 'Learning deep models from synthetic data for extracting dolphin whistle contours', *2020 International Joint Conference on Neural Networks (IJCNN)*. IEEE, pp. 1–10. [doi:10.1109/IJCNN48605.2020.9206992](https://doi.org/10.1109/IJCNN48605.2020.9206992)
-- **SAM-Whistle** — Zhang, X. *et al.* (2025) 'Automating time × frequency annotations of delphinid whistles by adapting a foundational transformer neural network', *Scientific Reports*, 15, 37809. [doi:10.1038/s41598-025-21642-x](https://doi.org/10.1038/s41598-025-21642-x)
+### Deep Whistle 
+
+Li, P. *et al.* (2020) 'Learning deep models from synthetic data for extracting dolphin whistle contours', *2020 International Joint Conference on Neural Networks (IJCNN)*. IEEE, pp. 1–10. [doi:10.1109/IJCNN48605.2020.9206992](https://doi.org/10.1109/IJCNN48605.2020.9206992)
+
+The repository for training new deep whistle model is [here](https://github.com/Paul-LiPu/DeepWhistle);
+
+A MATLAB library for running deep Whistle can be found [here](https://github.com/MarineBioAcousticsRC/silbido)
+  
+### SAM-Whistle
+
+Zhang, X. *et al.* (2025) 'Automating time × frequency annotations of delphinid whistles by adapting a foundational transformer neural network', *Scientific Reports*, 15, 37809. [doi:10.1038/s41598-025-21642-x](https://doi.org/10.1038/s41598-025-21642-x)
+
+The repository for training a new sam whistle models is [here](https://github.com/xixinzhang/sam_whistle);
+
+ 
+    
+
