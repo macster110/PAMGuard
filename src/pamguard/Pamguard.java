@@ -439,6 +439,7 @@ public class Pamguard {
 			}
 		}
 		boolean guiStartup = runMode != PamController.RUN_REMOTE && PamGUIManager.getGUIType() != PamGUIManager.NOGUI;
+		
 		if (guiStartup && MacOSIntegration.isMac()) {
 			/*
 			 * On macOS a file double clicked in the Finder arrives as an event, not as a
@@ -450,6 +451,7 @@ public class Pamguard {
 				openFile = MacOSIntegration.waitForLaunchFile(1000);
 			}
 		}
+		
 		if (openFile != null) {
 			int fileMode = MacOSIntegration.getFileRunMode(openFile);
 			if (fileMode < 0) {

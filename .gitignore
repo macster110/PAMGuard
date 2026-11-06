@@ -151,3 +151,4 @@ build/macos/apple_creds.sh
 src/generalDatabase/.Rhistory
 /src/quartohelp
 .classpath
+build/macos/apple_creds.sh

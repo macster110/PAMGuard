@@ -259,7 +259,6 @@
 					<!--There is an issue with coide signing in the macosappbundler-maven-plugin. Details of the issue are here.
 					https://developer.apple.com/library/archive/qa/qa1940/_index.html  
 					To get round this run a script afterwards which signs the .app and create an alternative dmg file which is signed  -->
-					<!-- App sepecific passowrd aqnu-fcyf-itol-dsgq -->
 
 
 					<plugin>

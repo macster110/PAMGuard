@@ -120,15 +120,18 @@
                 <JVMMainClassName>pamguard.Pamguard</JVMMainClassName>
                 <CFBundleIconFile>src/Resources/PamguardIcon2.icns</CFBundleIconFile>
                 <CFBundleDisplayName>PAMGuard</CFBundleDisplayName>
+                <CFBundleIdentifier>org.pamguard.PAMGuard</CFBundleIdentifier>
                 <CFBundleName>${project.build.finalName}</CFBundleName>
                 <CFBundleDevelopmentRegion>English</CFBundleDevelopmentRegion>
                 <CFBundleURLTypes>
                   <string>msa</string>
                 </CFBundleURLTypes>
                 <JVMVersion>21+</JVMVersion>
+                <JVMOptions>
+                  <string>-Xmx8192m</string>
+                </JVMOptions>
                 <JVMArguments>
                   <string>-c</string>
-                  <string>-Xmx8192m</string>
                 </JVMArguments>
                 <NSAppSleepDisabled>true</NSAppSleepDisabled>
                 <NSMicrophoneUsageDescription>"PAMGuard requires
@@ -158,6 +161,26 @@
 									(7365S9DZ34)</identity>
               </codesign>
             </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.5.0</version>
+            <executions>
+              <execution>
+                <id>sign-app</id>
+                <phase>deploy</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>${project.basedir}/build/macos/build_and_sign.sh</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
           </plugin>
         </plugins>
       </build>
