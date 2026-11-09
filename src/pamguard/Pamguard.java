@@ -471,6 +471,8 @@ public class Pamguard {
 		MacOSIntegration.setStartupComplete();
 		//going to need the run mode inside a Runnable later 
 		final int chosenRunMode = runMode;
+		// stop macOS App Nap slowing PAMGuard down when it's hidden or the computer is idle.
+		MacOSAppNap.disableAppNap(chosenRunMode);
 		if(runMode != PamController.RUN_REMOTE && PamGUIManager.getGUIType() != PamGUIManager.NOGUI) {
 			//			ScreenSize.startScreenSizeProcess();
 			ScreenSize.getScreenBounds();

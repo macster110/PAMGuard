@@ -9,6 +9,9 @@
 #  - .sqlite3 / .sqlite databases list PAMGuard under "Open With" but PAMGuard
 #    never takes over as their default app (LSHandlerRank Alternate). Opening one
 #    with PAMGuard starts viewer mode on that database.
+#  - App Nap is switched off (LSAppNapIsDisabled true) so that macOS doesn't
+#    throttle PAMGuard when its windows are hidden or the computer is idle.
+#    PAMGuard also asks macOS for this at run time, see MacOSAppNap.java.
 #  - Multiple instances are allowed (LSMultipleInstancesProhibited false). A new
 #    instance is started from "Open additional instance of PAMGuard" in the Dock
 #    icon's menu, which runs "open -n". Double clicking the app in the Finder
@@ -28,7 +31,7 @@ if [ ! -f "$INFO_PLIST" ]; then
 fi
 
 # Remove keys this script owns so that it can be run again.
-for KEY in LSMultipleInstancesProhibited CFBundleDocumentTypes UTExportedTypeDeclarations; do
+for KEY in LSMultipleInstancesProhibited LSAppNapIsDisabled CFBundleDocumentTypes UTExportedTypeDeclarations; do
     $PB -c "Delete :$KEY" "$INFO_PLIST" 2>/dev/null
 done
 
@@ -39,6 +42,9 @@ fi
 
 # Allow more than one copy of PAMGuard to run.
 $PB -c "Add :LSMultipleInstancesProhibited bool false" "$INFO_PLIST"
+
+# Don't let App Nap slow PAMGuard down when it is in the background.
+$PB -c "Add :LSAppNapIsDisabled bool true" "$INFO_PLIST"
 
 # Declare the PAMGuard settings file type.
 $PB -c "Add :UTExportedTypeDeclarations array" \
@@ -70,7 +76,7 @@ $PB -c "Add :CFBundleDocumentTypes array" \
     "$INFO_PLIST"
 
 if plutil -lint "$INFO_PLIST" >/dev/null; then
-    echo "✅ Info.plist configured: multiple instances, .psfx (owner), .sqlite3 (Open With only)"
+    echo "✅ Info.plist configured: App Nap off, multiple instances, .psfx (owner), .sqlite3 (Open With only)"
 else
     echo "❌ Info.plist is not valid after configuration"
     exit 1
