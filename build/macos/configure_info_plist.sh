@@ -11,7 +11,7 @@
 #    with PAMGuard starts viewer mode on that database.
 #  - App Nap is switched off (LSAppNapIsDisabled true) so that macOS doesn't
 #    throttle PAMGuard when its windows are hidden or the computer is idle.
-#    PAMGuard also asks macOS for this at run time, see MacOSAppNap.java.
+#    PAMGuard also asks macOS for this at run time, see MacOSIntegration.java.
 #  - Multiple instances are allowed (LSMultipleInstancesProhibited false). A new
 #    instance is started from "Open additional instance of PAMGuard" in the Dock
 #    icon's menu, which runs "open -n". Double clicking the app in the Finder
