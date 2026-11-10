@@ -74,6 +74,13 @@ abstract public class JBufferedPanel extends JPanelWithPamKey {
 				|| bufferedImage.getHeight() != getHeight()) {
 			bufferedImage = new ScrollableBufferedImage(getWidth()+extraEast, 
 					getHeight(), BufferedImage.TYPE_INT_RGB);
+			/*
+			 * Without a parent component the image fills its clip rectangle with the
+			 * default Graphics colour, which is white. That shows up as white flashes
+			 * when the panel has a dark (night / dark mode) background. 
+			 */
+			bufferedImage.setParentComponent(this);
+			bufferedImage.fillClipRectangle();
 		}
 		return bufferedImage;
 	}
@@ -98,10 +105,17 @@ abstract public class JBufferedPanel extends JPanelWithPamKey {
 
 	}
 
+	/*
+	 * Note on the repaint overrides below: they only mark the region of the image that
+	 * needs redrawing and must not fill it. repaint can be called from the detection 
+	 * threads, and filling the image there blanks it while the EDT is drawing it to screen, 
+	 * which gave white flashes in dark mode at high click rates. paintComponent clears the 
+	 * clip rectangle with the background colour before calling paintPanel. 
+	 */
 	@Override
 	public void repaint(long tm, int x, int y, int w, int h) {
 		if (bufferedImage == null) return;
-		bufferedImage.setBufferedClipRectangle(x,y,w,h,true);
+		bufferedImage.setBufferedClipRectangle(x,y,w,h,false);
 		//		paintPanel(bufferedImage.getGraphics(), bufferedClipRectangle);
 		super.repaint(tm, x, y, w, h);
 	}
@@ -111,7 +125,7 @@ abstract public class JBufferedPanel extends JPanelWithPamKey {
 		if (getBufferedImage() == null) {
 			return;
 		}
-		bufferedImage.setBufferedClipRectangle(arg0, true);
+		bufferedImage.setBufferedClipRectangle(arg0, false);
 		//		paintPanel(bufferedImage.getGraphics(), bufferedClipRectangle);
 		super.repaint(arg0);
 	}
@@ -121,7 +135,7 @@ abstract public class JBufferedPanel extends JPanelWithPamKey {
 		if (getBufferedImage() == null) {
 			return;
 		}
-		bufferedImage.setBufferedClipRectangle(0,0,getWidth(),getHeight(), true);
+		bufferedImage.setBufferedClipRectangle(0,0,getWidth(),getHeight(), false);
 		//		paintPanel(bufferedImage.getGraphics(), bufferedClipRectangle);
 		super.repaint(100);
 	}
@@ -131,7 +145,7 @@ abstract public class JBufferedPanel extends JPanelWithPamKey {
 		if (getBufferedImage() == null) {
 			return;
 		}
-		bufferedImage.setBufferedClipRectangle(0,0,getWidth(),getHeight(), true);
+		bufferedImage.setBufferedClipRectangle(0,0,getWidth(),getHeight(), false);
 		//		paintPanel(bufferedImage.getGraphics(), bufferedClipRectangle);
 		super.repaint(tm);
 	}
