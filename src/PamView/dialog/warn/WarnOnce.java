@@ -99,6 +99,12 @@ public class WarnOnce implements PamSettings {
 			return singleInstance.showWarningDialogFX(null, 
 					title, message, getAlertType(messageType), helpPoint, error, okButtonText, cancelButtonText, disableCheckBoxes);
 		}
+		/*
+		 * No GUI, so nobody to show a dialog to. Print the warning so it's in the log
+		 * and record it in the run summary (-summary option). 
+		 */
+		pamguard.cli.RunSummary.getInstance().addWarning(title, message);
+		System.out.println("Warning: " + title + ": " + pamguard.cli.RunSummary.stripHTML(message));
 		return -1; 
 	}
 	
@@ -413,6 +419,9 @@ public class WarnOnce implements PamSettings {
 	 */
 	private int showWarningDialog(Window parent, String title, String message, String messageName, int messageType, String helpPoint, Throwable error, String okButtonText, String cancelButtonText, boolean disableCheckBoxes) {
 
+		// record every warning in the run summary (-summary option), even if not shown.
+		pamguard.cli.RunSummary.getInstance().addWarning(title, message);
+
 		// check if we should show the warning again this session
 		Boolean showAgain = showThisSess.get(messageName);
 		if (showAgain == null) {
@@ -460,6 +469,9 @@ public class WarnOnce implements PamSettings {
 	 */
 	private int showWarningDialogFX(javafx.stage.Window parent, String title, String message, AlertType messageType, String helpPoint, 
 			Throwable error, String okButtonText, String cancelButtonText, boolean disableCheckBoxes) {
+
+		// record every warning in the run summary (-summary option), even if not shown.
+		pamguard.cli.RunSummary.getInstance().addWarning(title, message);
 
 		// check if we should show the warning again this session
 		Boolean showAgain = showThisSess.get(title+message);

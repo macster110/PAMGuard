@@ -745,11 +745,16 @@ public class FileInputSystem  extends DaqSystem implements ActionListener, PamSe
 
 			loadByteConverter(audioFormat);
 
+			// record the file in the machine readable run summary (-summary option)
+			pamguard.cli.RunSummary.getInstance().addFileProcessed(currentFile.getAbsolutePath(), 
+					audioFormat.getSampleRate(), audioFormat.getChannels(), fileSamples);
+
 //			System.out.println("FileInputSystem - prepareInputFile done");
 
 
 		} catch (UnsupportedAudioFileException ex) {
 			ex.printStackTrace();
+			pamguard.cli.RunSummary.getInstance().addError("Unsupported audio file " + currentFile.getAbsolutePath());
 			return false;
 		} catch (FileNotFoundException ex) {
 			System.out.println("Input filename: '" + fileNameCombo + "' not found.");

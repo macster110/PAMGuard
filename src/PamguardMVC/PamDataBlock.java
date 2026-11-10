@@ -241,6 +241,16 @@ public class PamDataBlock<Tunit extends PamDataUnit> extends PamObservable {
 
 	protected int unitsAdded = 0;
 
+	/**
+	 * Get the total number of data units added to this data block since it was 
+	 * last cleared (normally at the start of a run). Unlike getUnitsCount() this 
+	 * includes units which have since been deleted from memory. 
+	 * @return total number of data units added. 
+	 */
+	public int getUnitsAdded() {
+		return unitsAdded;
+	}
+
 	protected int unitsUpdated = 0;
 	
 	protected int lastUnitUpdatedAbsoluteIndex = -1;

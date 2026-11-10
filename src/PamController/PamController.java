@@ -20,6 +20,11 @@
  */
 package PamController;
 
+import pamguard.cli.ExitCode;
+import pamguard.cli.RunSummary;
+import pamguard.cli.SettingsDescriber;
+import pamguard.cli.SettingsOverrides;
+import pamguard.cli.ViewerCommandLine;
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -409,6 +414,12 @@ public class PamController implements PamControllerInterface, PamSettings {
 
 		MarkRelationships.getInstance().subscribeAllMarkers();
 		
+		if (SettingsDescriber.getDescribeFile() != null) {
+			// -describe: write a description of the configuration and exit. 
+			boolean ok = SettingsDescriber.write(SettingsDescriber.getDescribeFile());
+			RunSummary.getInstance().exit(ok ? ExitCode.OK : ExitCode.ERROR);
+		}
+		
 		if (GlobalArguments.getParam(PamController.AUTOSTART) != null) {
 			if (getRunMode() == RUN_NORMAL) {
 				startLater(); // may as well give AWT time to loop it's queue once more
@@ -476,6 +487,20 @@ public class PamController implements PamControllerInterface, PamSettings {
 		 * them.
 		 */
 		int loadAns = PamSettingManager.getInstance().loadPAMSettings(runMode);
+		
+		/*
+		 * Apply any settings changes from the command line (-settings and -set) now,
+		 * before modules are created, so that modules start with the changed settings
+		 * exactly as though they had been in the settings file. 
+		 */
+		if (SettingsOverrides.hasOverrides()) {
+			boolean overridesOK = SettingsOverrides.applyToSettingsList(PamSettingManager.getInstance().getInitialSettingsList());
+			if (!overridesOK && (GlobalArguments.getParam(AUTOEXIT) != null || (PamGUIManager.getGUIType() == PamGUIManager.NOGUI) 
+					|| SettingsDescriber.getDescribeFile() != null)) {
+				System.out.println("Command line settings changes could not be applied. PAMGuard will exit.");
+				RunSummary.getInstance().exit(ExitCode.SETTINGS_ERROR);
+			}
+		}
 		
 		if(loadAns!=PamSettingManager.LOAD_SETTINGS_NEW) {
 			forceNetRxIfNecessary();
@@ -898,8 +923,8 @@ public class PamController implements PamControllerInterface, PamSettings {
 			System.out.println(e.getMessage());
 		}
 
-		// terminate the JVM
-		System.exit(getPamStatus());
+		// terminate the JVM. Exit code 0 unless an error was recorded (see pamguard.cli.ExitCode) 
+		RunSummary.getInstance().exit(ExitCode.OK);
 	}
 
 	/**
@@ -1442,7 +1467,8 @@ public class PamController implements PamControllerInterface, PamSettings {
 				 * would ever trigger the -autoexit System.exit).
 				 */
 				System.out.println("Unable to prepare processes for automatic processing. Exiting.");
-				System.exit(1);
+				RunSummary.getInstance().addError("Unable to prepare processes for automatic processing");
+				RunSummary.getInstance().exit(ExitCode.PREPARE_FAILED);
 			}
 			return false;
 		}
@@ -2239,9 +2265,11 @@ public class PamController implements PamControllerInterface, PamSettings {
 		
 		if (changeType == OFFLINE_DATA_LOADED) {
 			// this is the final notification that comes through in Viewer startup. 
-			if (firstDataLoadComplete && runMode == RUN_PAMVIEW && GlobalArguments.isBatch() && batchFirst ) {
+			if (firstDataLoadComplete && runMode == RUN_PAMVIEW && batchFirst 
+					&& (GlobalArguments.isBatch() || ViewerCommandLine.hasActions())) {
 				batchFirst = false; // only happens once. 
-				OfflineTaskManager.getManager().launchOfflineBatchTasks();
+				// run command line tasks (-offlinetask), exports (-export) and go to -viewtime
+				ViewerCommandLine.onViewerDataLoaded();
 			}
 		}
 

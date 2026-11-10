@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import PamController.PamConfiguration;
 import PamController.PamControlledUnit;
 import PamController.PamController;
+import PamController.PamGUIManager;
 import PamUtils.PamCalendar;
 import PamguardMVC.PamDataBlock;
 
@@ -232,8 +233,10 @@ public class OfflineTaskManager implements TaskMonitor {
 	 * Organise and start processing offline tasks created for batck processing. 
 	 */
 	public void startBatchTasks() {
-		// TODO Auto-generated method stub
-		
+		/*
+		 * Nothing to do here: the tasks are launched once the viewer has loaded its first
+		 * data (see PamController.notifyModelChanged and pamguard.cli.ViewerCommandLine). 
+		 */
 	}
 
 	/**
@@ -241,9 +244,29 @@ public class OfflineTaskManager implements TaskMonitor {
 	 * mode. Will launch a new thread to work it's way through all batch jobs. 
 	 */
 	public void launchOfflineBatchTasks() {
-//		if (true) {
-//			return;
-//		}
+		Thread t = new Thread(() -> runCommandLineTasks(), "Offline batch tasks");
+		t.start();
+	}
+
+	/**
+	 * Run the tasks listed on the command line (-offlinetask) and wait for them all
+	 * to finish. With a GUI each group of tasks is run in the standard offline 
+	 * processing dialog; without one (-nogui, or no display) they are run directly, 
+	 * with progress written to the console. Must not be called on the AWT thread.
+	 * @return true if every task completed. 
+	 */
+	public boolean runCommandLineTasks() {
+		ArrayList<OfflineTaskGroup> usedGroups = prepareCommandLineGroups();
+		worker = new BatchWorker(usedGroups);
+		return worker.runAll();
+	}
+
+	/**
+	 * Find the groups for all tasks listed on the command line and select just those 
+	 * tasks within each group. 
+	 * @return list of task groups. 
+	 */
+	private ArrayList<OfflineTaskGroup> prepareCommandLineGroups() {
 		/*
 		 * Start by making a list of task groups that have one or more tasks. 
 		 */
@@ -251,7 +274,10 @@ public class OfflineTaskManager implements TaskMonitor {
 		for (String taskCmd: commandLineTasks) {
 			OfflineTask task = findOfflineTask(taskCmd);
 			if (task == null) {
-				System.out.println("Unable to find task " + taskCmd);
+				String msg = "Unable to find offline task " + taskCmd + ". Use the listtasks command or -describe to list the available tasks";
+				System.out.println(msg);
+				pamguard.cli.RunSummary.getInstance().addError(msg);
+				pamguard.cli.RunSummary.getInstance().setExitCode(pamguard.cli.ExitCode.TASK_FAILED);
 				continue;
 			}
 			System.out.println("Prepare offlinetask " + taskCmd + " " + task);
@@ -271,39 +297,78 @@ public class OfflineTaskManager implements TaskMonitor {
 			groupParams.deleteOld = true;
 			groupParams.taskNote = "Batch process at " + PamCalendar.formatDBDateTime(System.currentTimeMillis());
 			int nT = taskGroup.getNTasks();
-			boolean sameIO = false;
 			for (int i = 0; i < nT; i++) {
 				OfflineTask task = taskGroup.getTask(i);
 				String taskName = task.getLongName();
 				boolean enable =  commandLineTasks.contains(taskName);
 				groupParams.setTaskSelection(i, enable);
+				task.setDoRun(enable);
 				System.out.printf("Set task enable state for %s : %s in %s\n", taskName, enable, taskGroup.getUnitType());
 			}
 			
 			System.out.println("Tasks in group is now " + taskGroup.getNTasks());
 		}
 		/*
-		 *  can possibly now just get on with this using the standard dialog  with a few
-		 *  mods. Disable every control on it and also set up a secondary monitor that passes
-		 *  messages from the tasks back to here or somewhere where they can be packaged up 
-		 *  and given to the batch processor as status messages. Batch status messages are requested
-		 *  with a multicast broadcast of batchstatuscommand from the main controller, to which the running PAMGuards
-		 *  reply with a String for a packet as at line 197 above. So 
-		 *  a) set up a thread to launch the dialog and run everyting in it
-		 *  b) have a secondary Taskmonitor back in this class. 
-		 *  c) use the data received by that monitor to update the getBatchStatus string. 
-		 *  d) when status is changed from processing to closed, then Batch Control should automatically 
-		 *  close this instance and start next job. Easy !
-		 *  What's in what thread ? dialog starts a swing worker. This is in AWT, so probably want out of it. 
-		 *  Need to monitor state of dialog jobs since there may be more than one. 
+		 *  With a GUI, use the standard dialog with a few mods: every control disabled 
+		 *  and a secondary monitor that passes messages from the tasks back to here so
+		 *  they can be packaged up and given to the batch processor as status messages. 
+		 *  Batch status messages are requested with a multicast broadcast of batchstatuscommand
+		 *  from the main controller, to which the running PAMGuards reply with a String 
+		 *  (see getBatchStatus). When status is changed from processing to closed, Batch 
+		 *  Control closes this instance and starts the next job.
 		 */
-		worker = new BatchWorker(usedGroups);
-		Thread t = new Thread(worker);
-		t.start();
-		
+		return usedGroups;
+	}
+
+	/**
+	 * Run a task group without a dialog, waiting for it to finish. Progress is 
+	 * written to the console. Must not be called on the AWT thread. 
+	 * @param taskGroup task group 
+	 * @param monitor additional monitor to receive progress, can be null. 
+	 * @return the completion status of the group
+	 */
+	public static TaskStatus runTaskGroupAndWait(OfflineTaskGroup taskGroup, TaskMonitor monitor) {
+		java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+		TaskStatus[] finalStatus = new TaskStatus[1];
+		long[] lastPrint = new long[1];
+		taskGroup.setTaskMonitor(new TaskMonitor() {
+			@Override
+			public void setTaskStatus(TaskMonitorData tmd) {
+				if (monitor != null) {
+					monitor.setTaskStatus(tmd);
+				}
+				if (tmd == null || tmd.taskStatus == null) {
+					return;
+				}
+				long now = System.currentTimeMillis();
+				if (now - lastPrint[0] > 5000) {
+					lastPrint[0] = now;
+					System.out.printf("Offline task %s: %s %s %d of %d\n", taskGroup.getUnitName(), tmd.taskStatus, 
+							tmd.fileOrStatus == null ? "" : tmd.fileOrStatus, tmd.progValue, tmd.progMaximum);
+				}
+				switch (tmd.taskStatus) {
+				case COMPLETE:
+				case CRASHED:
+				case INTERRUPTED:
+					finalStatus[0] = tmd.taskStatus;
+					latch.countDown();
+					break;
+				default:
+					break;
+				}
+			}
+		});
+		taskGroup.runTasks();
+		try {
+			latch.await();
+		} catch (InterruptedException e) {
+			return TaskStatus.INTERRUPTED;
+		}
+		System.out.printf("Offline task group %s finished: %s\n", taskGroup.getUnitName(), finalStatus[0]);
+		return finalStatus[0];
 	}
 	
-	private class BatchWorker implements Runnable {
+	private class BatchWorker {
 
 		private ArrayList<OfflineTaskGroup> usedGroups;
 		private volatile int currentGroup;
@@ -313,14 +378,31 @@ public class OfflineTaskManager implements TaskMonitor {
 			this.usedGroups = usedGroups;
 		}
 
-		@Override
-		public void run() {
+		public boolean runAll() {
+			boolean headless = PamGUIManager.getGUIType() == PamGUIManager.NOGUI 
+					|| java.awt.GraphicsEnvironment.isHeadless();
+			boolean allOK = true;
 			for (int i = 0; i < usedGroups.size(); i++) {
-				olDialog = new OLProcessDialog(PamController.getMainFrame(), usedGroups.get(i), "Offline batch processing", 
-						true, OfflineTaskManager.this);
-				olDialog.setVisible(true);
+				OfflineTaskGroup group = usedGroups.get(i);
+				if (headless) {
+					TaskStatus status = runTaskGroupAndWait(group, OfflineTaskManager.this);
+					if (status != TaskStatus.COMPLETE) {
+						allOK = false;
+						pamguard.cli.RunSummary.getInstance().addError("Offline task group " + group.getUnitName() + " finished with status " + status);
+						pamguard.cli.RunSummary.getInstance().setExitCode(pamguard.cli.ExitCode.TASK_FAILED);
+					}
+				}
+				else {
+					olDialog = new OLProcessDialog(PamController.getMainFrame(), group, "Offline batch processing", 
+							true, OfflineTaskManager.this);
+					olDialog.setVisible(true);
+					if (group.getCompletionStatus() != TaskStatus.COMPLETE) {
+						allOK = false;
+					}
+				}
 				currentGroup++;
 			}
+			return allOK;
 		}
 		
 	}
@@ -332,7 +414,9 @@ public class OfflineTaskManager implements TaskMonitor {
 		latestTaskData = taskMonitorData;
 //		System.out.println("Task monitor message " + taskMonitorData.taskStatus);
 		if (taskMonitorData.taskStatus == TaskStatus.COMPLETE) {
-			worker.olDialog.setVisible(false);
+			if (worker.olDialog != null) {
+				worker.olDialog.setVisible(false);
+			}
 			if (worker.currentGroup >= worker.usedGroups.size()) {
 				System.out.println(" all batch tasks complete.");
 			}

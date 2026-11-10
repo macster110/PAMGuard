@@ -76,6 +76,36 @@ public class PamguardXMLReader {
 		return settings;
 	}
 	
+	/**
+	 * Get the SETTINGS nodes of a module node. There is one for each settings object. 
+	 * @param moduleNode module node
+	 * @return list of settings nodes. 
+	 */
+	public ArrayList<Node> getSettingsNodes(ModuleNode moduleNode) {
+		return findNodesByType(moduleNode.getNode(), "SETTINGS", null);
+	}
+	
+	/**
+	 * Get the Java class name of the object in a SETTINGS node.  
+	 * @param settingsNode settings node
+	 * @return class name
+	 */
+	public String getSettingsClassName(Node settingsNode) {
+		return getAttrString(settingsNode.getAttributes(), "Class");
+	}
+	
+	/**
+	 * Unpack a SETTINGS node into an existing settings object, changing only 
+	 * the fields which are in the XML. This is what's needed to apply a partial set 
+	 * of settings, e.g. from the -settings command line option.  
+	 * @param settingsNode settings node
+	 * @param dataObj existing settings object, which is modified. 
+	 * @return number of the object's fields which weren't in the XML (or couldn't be read)
+	 */
+	public int unpackSettingsNodeInto(Node settingsNode, Object dataObj) {
+		return unpackSettingsNode(settingsNode, dataObj);
+	}
+	
 	public Object unpackSettingsNode(Node settingsNode) {
 		String className = getAttrString(settingsNode.getAttributes(), "Class");
 		Class<?> moduleClass = null;
@@ -150,7 +180,7 @@ public class PamguardXMLReader {
 			Node fieldNode = findNode(settingsNode, fieldName);
 			if (fieldNode == null) {
 				missing ++;
-				System.out.printf("Unable to find node for field %s\n", fieldName);
+//				System.out.printf("Unable to find node for field %s\n", fieldName);
 				continue;
 			}
 			String fieldClassName = getAttrString(fieldNode.getAttributes(), "Class");
@@ -166,6 +196,15 @@ public class PamguardXMLReader {
 
 			Object obj = readNodeData(dataObj, pamParam, fieldNode, fieldClass);
 //			System.out.printf("Node for %s is %s Class %s, Value %s\n", pamParam.getFieldName(), fieldNode, fieldClass, obj);
+			if (obj == null) {
+				/*
+				 * The value couldn't be read (e.g. a list, which isn't supported yet). Leave
+				 * the existing value alone rather than setting it to null, so that unpacking 
+				 * into an existing settings object only changes what's in the XML.  
+				 */
+				missing++;
+				continue;
+			}
 			try {
 				pamParam.setData(obj);
 			} catch (IllegalArgumentException | IllegalAccessException e) {
@@ -184,6 +223,16 @@ public class PamguardXMLReader {
 		}
 		if (fieldClass == String.class) {
 			return stringValue;
+		}
+		else if (stringValue != null && (Number.class.isAssignableFrom(fieldClass) || fieldClass == Boolean.class 
+				|| fieldClass == Character.class)) {
+			// boxed primitives, e.g. Integer, Double
+			try {
+				return pamguard.cli.SettingsPath.convert(stringValue, fieldClass, null);
+			} catch (pamguard.cli.SettingsPathException e) {
+				System.out.println("PamguardXMLReader: " + e.getMessage());
+				return null;
+			}
 		}
 		else if (fieldClass.isEnum()) {
 			return readEnum(fieldClass, stringValue);
@@ -236,8 +285,12 @@ public class PamguardXMLReader {
 		case "java.lang.String":
 		return bits;
 		}
-
-		return null;
+		// other arrays of simple types, e.g. float[], long[]
+		try {
+			return pamguard.cli.SettingsPath.convert(value, java.lang.reflect.Array.newInstance(arrayClass, 0).getClass(), null);
+		} catch (pamguard.cli.SettingsPathException e) {
+			return null;
+		}
 	}
 	
 	private double[] readDoubleArray(String[] bits) {
@@ -295,19 +348,8 @@ public class PamguardXMLReader {
 		if (arrayClass.charAt(0) != '[') {
 			return null;
 		}
-		String type = arrayClass.substring(1,2);
-		switch (type) {
-		case "D":
-			return ClassUtils.getClass("double");
-		case "I":
-			return ClassUtils.getClass("int");
-		case "Z":
-			return ClassUtils.getClass("boolean");
-		case "L":
-			String subString = type.substring(1, type.length()-2);
-			return ClassUtils.getClass(subString);
-		}
-		return null;
+		// e.g. [D, [F, [Ljava.lang.String;
+		return Class.forName(arrayClass).getComponentType();
 	}
 
 	private Object readObject(Object dataObj, PamParameterData pamParam, Node fieldNode, Class fieldClass) {

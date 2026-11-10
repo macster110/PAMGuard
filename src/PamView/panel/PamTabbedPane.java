@@ -200,6 +200,10 @@ public class PamTabbedPane extends JTabbedPane implements ColorManaged {
 				}
 			}
 		};
+		if (java.awt.GraphicsEnvironment.isHeadless()) {
+			// no drag and drop without a display, e.g. viewer mode run with -nogui on a server.
+			return;
+		}
 		new DropTarget(glassPane, DnDConstants.ACTION_COPY_OR_MOVE, new CDropTargetListener(), true);
 		new DragSource().createDefaultDragGestureRecognizer(this, DnDConstants.ACTION_COPY_OR_MOVE, dgl);
 	}

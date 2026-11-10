@@ -80,6 +80,11 @@ import NMEA.NMEAControl;
 import rawDeepLearningClassifier.DLControl;
 import networkTransfer.send.NetSendCommandParam;
 import PamUtils.PlatformInfo.OSType;
+import pamguard.cli.CommandLineException;
+import pamguard.cli.CommandLineOptions;
+import pamguard.cli.ExitCode;
+import pamguard.cli.RunSummary;
+import pamguard.cli.StartupState;
 
 /**
  * Pamguard main class. 
@@ -112,6 +117,14 @@ public class Pamguard {
 	public static void main(String[] args) {
 		
 		CommandLine.create(args);
+		
+		/*
+		 * -help and -version print and exit before anything else is written to the 
+		 * console, so that their output (particularly the JSON versions) is clean.
+		 */
+		if (CommandLineOptions.handleInfoOptions(args)) {
+			System.exit(ExitCode.OK.getCode());
+		}
 		
 		Debug.setPrintDebug(false); // make sure the class instantiates static members. 
 
@@ -171,7 +184,6 @@ public class Pamguard {
 		 */
 		PamLookAndFeel.recordStartupLookAndFeel();
 
-		int runMode = PamController.RUN_NORMAL;
 		String InputPsf = "NULL";
 
 		// set up the system to output to both a log file and the console window.  Also
@@ -205,239 +217,28 @@ public class Pamguard {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		boolean showSplash = true;
-		boolean showStartupDialog = false;
-		File openFile = null;
-		if (args != null) {
-			int nArgs = args.length;
-			int iArg = 0;
-			String anArg;
-			while (iArg < nArgs) {
-				anArg = args[iArg++];
-				
-				if (anArg.equalsIgnoreCase("-c")) {
-					/*
-					 * The user chooses the run mode and the settings file or database
-					 * in the start up dialog. It's shown once all the other arguments
-					 * have been read, so that it knows which GUI is being used. 
-					 */
-					showStartupDialog = true;
-					continue;
-				}
-				
-				if (anArg.equalsIgnoreCase(MacOSIntegration.OPENFILE)) {
-					/*
-					 * Open a settings file (normal mode) or database (viewer mode), e.g.
-					 * when a new instance is launched for a file opened in the macOS Finder.
-					 */
-					if (iArg < nArgs) {
-						openFile = new File(args[iArg++]);
-					}
-					continue;
-				}
-
-				if (anArg.equalsIgnoreCase("-v")) {
-					runMode = PamController.RUN_PAMVIEW;
-					System.out.println("PAMGUARD Viewer");
-				}
-				else if (anArg.equalsIgnoreCase("-m")) {
-					runMode = PamController.RUN_MIXEDMODE;
-					System.out.println("PAMGUARD Offline mixed mode");
-				}				
-				else if (anArg.equalsIgnoreCase(GlobalArguments.BATCHVIEW)) {
-					/**
-					 * Used with batch processor when it launches the configuration to make it clear that
-					 * it's really working in viewer mode, and viewer mode settings should be available, but
-					 * settings will be read and written using psfx files, not the databsae. 
-					 */
-					GlobalArguments.setParam(GlobalArguments.BATCHVIEW, "true");
-//					runMode = PamController.RUN_PAMVIEW;
-				}
-				else if (anArg.equalsIgnoreCase("-nr")) {
-					runMode = PamController.RUN_NETWORKRECEIVER;
-					System.out.println("PAMGUARD Network Reciever Mode");
-				}
-				else if (anArg.equalsIgnoreCase("-nosplash")) {
-					showSplash = false;
-				}
-				else if (anArg.equalsIgnoreCase(GlobalArguments.BATCHFLAG)) {
-					// flag to say we're in batch processing mode. Can be used
-					// to avoid one or two dialogs that pop up in Viewer mode. 
-					GlobalArguments.setParam(GlobalArguments.BATCHFLAG, Boolean.TRUE.toString());
-				}
-
-				//	removed SEICHE switch when the two SEICHE modules were converted to plugins				
-				//				else if (anArg.equalsIgnoreCase("-seiche")) {
-				//					SEICHEEnable.setEnable(true);
-				//					System.out.println("Enabling Seiche modules.");
-				//				}
-				else if (anArg.equalsIgnoreCase("-smru")) {
-					SMRUEnable.setEnable(true);
-					System.out.println("Enabling SMRU modules.");
-				}
-
-				else if (anArg.equalsIgnoreCase("-fullscreen")) {
-					FullScreen.setGoFullScreen(true);
-					System.out.println("Setting full screen view");
-				}
-				else if (anArg.equalsIgnoreCase("-decimus")) {
-					SMRUEnable.setEnableDecimus(true);
-					System.out.println("Enabling DECIMUS modules.");
-				}
-				else if (anArg.equalsIgnoreCase("-meygen17")) {
-					SMRUEnable.setMeygen17(true);
-					System.out.println("Enabling Meygen Turbine 2017 fudges.");
-				}
-				else if (anArg.equalsIgnoreCase("-jamie")) {
-					JamieDev.setEnabled(true);
-					System.out.println("Enabling Jamie Macaulay modifications.");
-				}
-				else if (anArg.equalsIgnoreCase("-smrudev")) {
-					SMRUEnable.setDevEnable(true);
-					System.out.println("Enabling Jamie Macaulay modifications.");
-				}
-				else if (anArg.equalsIgnoreCase("-rocca")) {
-					RoccaDev.setEnabled(true);
-					System.out.println("Enabling Rocca development mode");
-				}
-				else if (anArg.equalsIgnoreCase(Debug.flag)) {
-					Debug.setPrintDebug(true);
-					Debug.out.println("Enabling debug terminal output.");
-				}
-				else if (anArg.equalsIgnoreCase("-r")) {
-					runMode = PamController.RUN_REMOTE;
-					System.out.println("remote non gui operation.");
-				}
-				//set up the GUI
-				else if (anArg.equalsIgnoreCase("-swing")) {
-					PamGUIManager.setType(PamGUIManager.SWING);
-				}
-				else if (anArg.equalsIgnoreCase("-fx")) {
-					PamGUIManager.setType(PamGUIManager.FX);
-				}
-				else if (anArg.equalsIgnoreCase("-nogui")) {
-					PamGUIManager.setType(PamGUIManager.NOGUI);
-					System.out.println("no gui operation.");
-				}
-				else if (anArg.equalsIgnoreCase("-psf") || anArg.equalsIgnoreCase("-psfx")) {
-					String autoPsf = args[iArg++];
-					PamSettingManager.remote_psf = autoPsf;
-					System.out.println("Running using settings from " + autoPsf);
-				}
-				else if (anArg.equalsIgnoreCase("-port")) {
-					// port id to open a udp port to receive commands
-					String port = args[iArg++];
-					pamBuoyGlobals.setNetworkControlPort(Integer.parseInt(port));
-					System.out.println("Setting UDP control port " + port);
-				}else if (anArg.equalsIgnoreCase("-udpResilient")) {
-					pamBuoyGlobals.setNetworkControlResilient();
-					System.out.println("Setting UDP control to be fault resilient");
-				}
-				else if (anArg.equalsIgnoreCase("-multicast") || anArg.equalsIgnoreCase("-mport")) {
-					// multicast control (for multiple PAMGuards) 
-					String mAddr = args[iArg++];
-					int mPort = Integer.parseInt(args[iArg++]);
-					pamBuoyGlobals.setMultiportConfig(mAddr, mPort);
-					System.out.printf("Setting multicast control addr %s port %d\n", mAddr, mPort);
-				}
-				else if (anArg.equalsIgnoreCase(OfflineTaskManager.commandFlag)) {
-					String taskName = args[iArg++];
-					OfflineTaskManager.getManager().addCommandLineTask(taskName);
-				}
-				else if (anArg.equalsIgnoreCase("-nolog")) {
-					System.out.println("Disabling log file from command line switch...");
-					ProxyPrintStream.disableLogFile();
-				}
-				else if (anArg.equalsIgnoreCase(BinaryStore.GlobalFolderArg)) {
-					// output folder for binary files. 
-					String binFolder = args[iArg++];
-					GlobalArguments.setParam(BinaryStore.GlobalFolderArg, binFolder);
-					System.out.println("Setting output folder for binary files to " + binFolder);
-				}
-				else if (anArg.equalsIgnoreCase(NMEAControl.GlobalPortFlag)) {
-					// output folder for binary files. 
-					String serialPort = args[iArg++];
-					GlobalArguments.setParam(NMEAControl.GlobalPortFlag, serialPort);
-					System.out.println("Setting nmea serial port to " + serialPort);
-				}
-				else if (anArg.equalsIgnoreCase(DBControl.GlobalDatabaseNameArg)) {
-					// database file name
-					String dbName = args[iArg++];
-					GlobalArguments.setParam(DBControl.GlobalDatabaseNameArg, dbName);
-					System.out.println("Setting output database file to " + dbName);
-				}
-				else if (anArg.equalsIgnoreCase(FolderInputSystem.GlobalWavFolderArg)) {
-					// source folder for wav files (or other supported sound files)
-					String wavFolder = args[iArg++];
-					GlobalArguments.setParam(FolderInputSystem.GlobalWavFolderArg, wavFolder);
-					System.out.println("Setting input wav file folder to " + wavFolder);
-				}
-				else if (anArg.equalsIgnoreCase(FolderInputSystem.GlobalWavPrefixArg)) {
-					// source folder for wav files (or other supported sound files)
-					String wavPrefix = args[iArg++];
-					GlobalArguments.setParam(FolderInputSystem.GlobalWavPrefixArg, wavPrefix);
-				}else if (anArg.equalsIgnoreCase(RecorderControl.GlobalWavPrefixArg2)) {
-					// source folder for wav files (or other supported sound files)
-					String wavPrefix = args[iArg++];
-					GlobalArguments.setParam(RecorderControl.GlobalWavPrefixArg2, wavPrefix);
-					System.out.println("Setting recording prefix to " + wavPrefix);
-				}
-				else if (anArg.equalsIgnoreCase(PamController.AUTOSTART)) {
-					// auto start processing. 
-					GlobalArguments.setParam(PamController.AUTOSTART, PamController.AUTOSTART);
-					System.out.println("Setting autostart ON");
-				}
-				else if (anArg.equalsIgnoreCase(PamController.AUTOEXIT)) {
-					// auto exit at end of processing. 
-					GlobalArguments.setParam(PamController.AUTOEXIT, PamController.AUTOEXIT);
-					System.out.println("Setting autoexit ON");
-				}
-				else if (NetSendCommandParam.isArgRegistered(anArg)) {
-					GlobalArguments.setParam(anArg, args[iArg++]);
-				}
-				else if(anArg.equalsIgnoreCase(ArrayManager.FIRST_IDX_SENS)){
-					GlobalArguments.setParam(ArrayManager.FIRST_IDX_SENS, args[iArg++]);
-				}
-				else if(anArg.equals(DLControl.MODELPATH)) {
-					GlobalArguments.setParam(DLControl.MODELPATH, args[iArg++]);
-				}
-				else if (anArg.equalsIgnoreCase(SoundCardSystem.SETDEVNAME)) {
-					// sound card name
-					GlobalArguments.setParam(SoundCardSystem.SETDEVNAME, args[iArg++]);
-				}
-				else if (anArg.equalsIgnoreCase(SoundCardSystem.SETDEVNUMBER)) {
-//					soundcard number
-					GlobalArguments.setParam(SoundCardSystem.SETDEVNUMBER, args[iArg++]);
-				}
-				// replace this with the commandline class. Need really to do all of them at some point. 
-//				else if (anArg.equalsIgnoreCase(NMEAControl.NMEACOMCOMMAND)) {
-//					// NMEA COM Port
-//					GlobalArguments.setParam(NMEAControl.NMEACOMCOMMAND, args[iArg++]);
-//				}
-				else if (anArg.equalsIgnoreCase(ReprocessStoreChoice.paramName)) {
-					String arg = args[iArg++];
-					ReprocessStoreChoice choice = ReprocessStoreChoice.valueOf(arg);
-					if (choice == null) {
-						String warn = String.format("Reprocessing storage input parameter %s value \"%s\" is not a recognised value", ReprocessStoreChoice.paramName, arg);
-						WarnOnce.showWarning("Invalid input parameter", warn, WarnOnce.WARNING_MESSAGE);
-					}
-					GlobalArguments.setParam(ReprocessStoreChoice.paramName, arg);
-				}
-				else if (anArg.equalsIgnoreCase("-help")) {
-					System.out.println("--PamGuard Help");
-					System.out.println("\n--For standard GUI deployment run without any options.\n");
-					System.out.println("\n--For command line deployment the following options are valid.\n");
-					System.out.println("  -r                           : run as a non GUI application");
-					System.out.println("  -psf <filename>              : use psf settings from filename");
-					System.out.println("  -port  <value>               : UDP connection port.");
-					System.out.println("  -devDebug  <str>             : Debug String - Used to activate debug messages.");
-					System.out.println("\n--Example command lines.\n");
-					System.out.println("java -Djava.library.path=./lib -jar pamGuardGui.jar -r -psf ../experimentalData/opNiTestVisualFft.psf");
-					System.out.println("\n");
-					System.exit(0);
-				}
-			}
+		/*
+		 * Read the command line. Every option is described in pamguard.cli.BuiltInOptions
+		 * and the help (-help, -help json) is generated from the same list.
+		 */
+		StartupState startupState = new StartupState();
+		try {
+			CommandLineOptions.parse(args, startupState);
 		}
+		catch (CommandLineException e) {
+			System.out.println("Error: " + e.getMessage());
+			System.out.println("Run with -help for a list of options");
+			RunSummary.getInstance().addError(e.getMessage());
+			RunSummary.getInstance().exit(ExitCode.BAD_ARGUMENTS);
+		}
+		if (startupState.exitNow) {
+			System.exit(ExitCode.OK.getCode());
+		}
+		int runMode = startupState.runMode;
+		boolean showSplash = startupState.showSplash;
+		boolean showStartupDialog = startupState.showStartupDialog;
+		File openFile = startupState.openFile;
+		RunSummary.getInstance().setStartInfo(args, runMode);
 		boolean guiStartup = runMode != PamController.RUN_REMOTE && PamGUIManager.getGUIType() != PamGUIManager.NOGUI;
 		
 		if (guiStartup && MacOSIntegration.isMac()) {
