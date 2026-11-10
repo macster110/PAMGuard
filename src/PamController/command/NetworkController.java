@@ -38,7 +38,7 @@ public class NetworkController extends CommandManager {
 	
 	private boolean initialisationComplete = false;
 	
-	static private final int MAX_COMMAND_LENGTH = 4096;
+	static private final int MAX_COMMAND_LENGTH = 65507; // largest UDP packet, so setxmlsettings can send large XML
 	
 	private byte[] byteBuffer = new byte[MAX_COMMAND_LENGTH];
 	
@@ -126,7 +126,8 @@ public class NetworkController extends CommandManager {
 
 	@Override
 	public boolean sendData(ExtCommand extCommand, String dataString) {
-		DatagramPacket packet = new DatagramPacket(dataString.getBytes(), dataString.length());
+		byte[] bytes = dataString.getBytes();
+		DatagramPacket packet = new DatagramPacket(bytes, bytes.length);
 		packet.setAddress(udpPacket.getAddress());
 		packet.setPort(udpPacket.getPort());
 		try {

@@ -39,7 +39,13 @@ public abstract class PrivatePamParameterData extends PamParameterData {
 		 */
 //		return false;
 		Object convData = convertStringType(data);
-		getField().set(this, convData);
+		/*
+		 * Set the field in the parent object (this used to try to set it in this 
+		 * PrivatePamParameterData object, which always failed, so private fields were 
+		 * never read back from XML). 
+		 */
+		getField().setAccessible(true);
+		getField().set(getParentObject(), convData);
 		
 		return true;
 	}

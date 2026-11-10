@@ -382,7 +382,8 @@ public class BinaryOutputStream {
 	}
 
 	public synchronized boolean closeFile() {
-		if(PamGUIManager.getGUIType()==PamGUIManager.NOGUI) {
+		if(PamGUIManager.getGUIType()==PamGUIManager.NOGUI && outputFile != null) {
+			// outputFile is null when only an index file is being rewritten, e.g. in viewer mode.
 			deleteLock(outputFile);
 		}
 		boolean ok = true;

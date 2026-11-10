@@ -48,6 +48,11 @@ public abstract class CommandManager extends PamControlledUnit {
 		commandsList.add(new BufferCommand());
 		commandsList.add(new FindGUICommand());
 		commandsList.add(new GeneralUptimeCommand());
+		// commands for scripts and AI assistants (see pamguard.cli and the mcp folder)
+		commandsList.add(new DescribeCommand());
+		commandsList.add(new SetParamCommand());
+		commandsList.add(new ListTasksCommand());
+		commandsList.add(new RunSummaryCommand());
 //		commandsList.add(new SetSerializedSettingsCommand());
 		
 	}

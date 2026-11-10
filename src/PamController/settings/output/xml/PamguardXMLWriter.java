@@ -500,7 +500,8 @@ public class PamguardXMLWriter implements PamSettings {
 		Element settings = doc.createElement("SETTINGS");
 		settings.setAttribute("Type", unitSettings.getUnitType());
 		settings.setAttribute("Name", unitSettings.getUnitName());
-		settings.setAttribute("Class", unitSettings.getOwnerClassName());
+		// the class of the settings object, as in writeSettings(Document, PamSettings, ...), since the reader creates objects of this class. 
+		settings.setAttribute("Class", unitSettings.getSettings() != null ? unitSettings.getSettings().getClass().getName() : unitSettings.getOwnerClassName());
 		settings.setAttribute("Version", String.format("%d",unitSettings.getVersionNo()));
 		config.appendChild(settings);
 	

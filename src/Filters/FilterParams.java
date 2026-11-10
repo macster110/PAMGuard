@@ -226,11 +226,14 @@ public class FilterParams implements Serializable, Cloneable, ManagedParameters 
 	
 	/**
 	 * This method only included so that centreFreq gets automatically
-	 * added to PamParameterSet in getParameterSet method
-	 * @return
+	 * added to PamParameterSet in getParameterSet method. It returns the 
+	 * stored value, which is 0 when the centre frequency is worked out from the
+	 * high and low pass frequencies (see getCenterFreq()), so that writing settings
+	 * to XML and reading them back doesn't fix the centre frequency.  
+	 * @return the stored centre frequency, 0 if not set. 
 	 */
 	public double getCentreFreq() {
-		return getCenterFreq();
+		return centreFreq;
 	}
 
 	public void setCentreFreq(double d) {
