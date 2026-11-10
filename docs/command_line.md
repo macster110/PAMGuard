@@ -49,8 +49,8 @@ pamguard -nogui -psf survey.psfx -set "Click Detector.dbThreshold=12" \
 ```
 
 The key is the `setKey` from `-describe` (normally the module name), a dot, and the
-parameter name. Dots step into nested settings and `[n]` picks an array element
-(`Array Manager.hydrophonesList[0]...`). Values are converted to the parameter's type:
+parameter name. Dots step into nested settings and `[n]` picks an array or list element
+(`Array Manager.hydrophoneArray[0]...`). Values are converted to the parameter's type:
 numbers, `true`/`false`, enum names (any case), and comma separated lists for arrays.
 If a name or value is wrong, PAMGuard says what the choices are and exits with code 3.
 
@@ -58,6 +58,11 @@ If a name or value is wrong, PAMGuard says what the choices are and exits with c
 settings export or the `getxmlsettings` network command. Only the fields in the file
 are changed, so a file can hold just the settings you want to change. This is the way
 to change settings that `-describe` marks `"settable": false`.
+
+The XML holds everything that's saved in a psfx, including lists, maps, arrays of
+objects (e.g. hydrophones) and fields which have no getter, so every module's settings
+can be written to XML and read back unchanged (`src/test/cli/AllModulesXMLTest.java`
+checks this for every module type).
 
 Both are applied as soon as the settings are loaded and before any module is created,
 so modules start with the new settings exactly as though they were in the psfx. The
@@ -73,6 +78,37 @@ pamguard -nogui -psf survey.psfx -wavfilefolder /data/wav -binaryfolder /data/ou
 `-nogui` runs without any windows, so it also works on a server. `-autostart` starts
 processing once everything is loaded and `-autoexit` exits when the last file is done.
 Warnings that would normally pop up as dialogs are printed and recorded in the summary.
+
+### Progress display in a terminal
+
+When `-nogui` runs in an interactive terminal, PAMGuard shows a progress display
+instead of scrolling the log, a bit like the status bar at the bottom of the GUI:
+
+```
+PAMGuard 2.03.00   Running   elapsed 00:03:12            [l] log  [s] progress  [:] command
+Settings: survey.psfx
+
+Sound Acquisition: Audio file folder or multiple files 96.0kHz, 2 channels, 16 bit
+  Folder [###########-------------------------------]  37/120 files   30.8%
+  File   [##########################----------------]                 64.0%
+  20260131_143205.wav
+  Data time 2026-01-31 14:33:16 UTC   12.4 x real time
+
+Detections
+  Click Detector, Clicks                  12,345
+  Whistle and Moan Detector, Contours        678
+
+Last message: ...
+```
+
+When acquiring in real time it shows the sound level on each channel instead of file
+progress. Press `l` to see the log, `s` to go back to the progress display, and `:` to
+type a command (the same commands as the network commands below, e.g. `:status` or
+`:stop`). Output printed while the progress display is showing appears when you switch
+to the log.
+
+The display only starts when the output is a terminal, so scripts, pipes and the MCP
+server still get the plain log. `-progress on` or `-progress off` overrides this.
 
 ## 4. Check what happened
 

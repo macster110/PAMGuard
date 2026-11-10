@@ -12,8 +12,18 @@ public class TerminalController extends CommandManager {
 
 	private static String unitName = "Terminal Controller";
 	
+	private static TerminalController instance;
+
 	public TerminalController(PamController pamController) {
 		super(pamController, unitName);
+		instance = this;
+	}
+
+	/**
+	 * @return the controller for commands typed in the terminal (may be null). 
+	 */
+	public static TerminalController getInstance() {
+		return instance;
 	}
 
 	@Override
@@ -26,13 +36,19 @@ public class TerminalController extends CommandManager {
 	public void pamClose() {
 		super.pamClose();
 		try {
-			reader.close();
+			if (reader != null) {
+				reader.close();
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
 	public void getTerminalCommands() {
+		if (pamguard.cli.TerminalDisplay.isActive()) {
+			// the terminal display reads the keyboard, and passes on commands typed after ':' 
+			return;
+		}
 		Thread t = new Thread(new TerminalTread());
 		t.setDaemon(true); // don't stop the JVM from exiting at the end of batch processing
 		t.start();

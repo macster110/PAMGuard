@@ -201,7 +201,9 @@ public class DbHtParameters implements Serializable, Cloneable, ManagedParameter
 		}
 		try {
 			PamParameterData param = ps.findParameterData("lastImportFile");
-			param.setShortName(lastImportFile.getAbsolutePath());	// add in the actual filename
+			if (lastImportFile != null) {
+				param.setShortName(lastImportFile.getAbsolutePath());	// add in the actual filename
+			}
 		}
 		catch (FieldNotFoundException e) {
 			e.printStackTrace();

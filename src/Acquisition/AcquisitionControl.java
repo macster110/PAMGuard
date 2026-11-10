@@ -497,6 +497,37 @@ public class AcquisitionControl extends RawInputControlledUnit implements PamSet
 	}
 
 	/**
+	 * Peak amplitude on each channel since getRecentPeakLevels was last called, for the
+	 * level meters in the terminal display (-nogui). 
+	 */
+	private double[] recentPeaks = new double[0];
+
+	/**
+	 * Record the peak amplitude of a block of raw data. 
+	 * @param channel channel number
+	 * @param peakValue peak amplitude, as a fraction of full scale. 
+	 */
+	public synchronized void recordChannelLevel(int channel, double peakValue) {
+		if (channel < 0 || channel > 255) {
+			return;
+		}
+		if (channel >= recentPeaks.length) {
+			recentPeaks = java.util.Arrays.copyOf(recentPeaks, channel+1);
+		}
+		recentPeaks[channel] = Math.max(recentPeaks[channel], peakValue);
+	}
+
+	/**
+	 * Get the peak amplitude on each channel since this was last called, and start again.
+	 * @return peak amplitudes as a fraction of full scale, indexed by channel number.
+	 */
+	public synchronized double[] getRecentPeakLevels() {
+		double[] peaks = recentPeaks.clone();
+		java.util.Arrays.fill(recentPeaks, 0);
+		return peaks;
+	}
+
+	/**
 	 * Sets a level meter on the status bar
 	 * @param peakValue Maximum amplitude fom AcquisitionProcess
 	 */

@@ -88,8 +88,20 @@ public class SettingsPath {
 				fa.set(newVal);
 				return current;
 			}
+			if (current instanceof List) {
+				List list = (List) current;
+				if (index < 0 || index >= list.size()) {
+					throw new SettingsPathException(String.format("Index %d is out of range for %s (size %d)", index, fieldName, list.size()));
+				}
+				Object old = list.get(index);
+				if (old == null) {
+					throw new SettingsPathException(String.format("%s[%d] is null, so its type isn't known", fieldName, index));
+				}
+				list.set(index, convert(textValue, old.getClass(), old));
+				return old;
+			}
 			if (current == null || !current.getClass().isArray()) {
-				throw new SettingsPathException(String.format("%s is not an array in %s", fieldName, path));
+				throw new SettingsPathException(String.format("%s is not an array or list in %s", fieldName, path));
 			}
 			if (index < 0 || index >= Array.getLength(current)) {
 				throw new SettingsPathException(String.format("Index %d is out of range for %s (length %d)", index, fieldName, Array.getLength(current)));
@@ -293,9 +305,16 @@ public class SettingsPath {
 			index = parseIndex(seg, path);
 		}
 		Object val = findField(obj, fieldName, path).get();
+		if (index != null && val instanceof List) {
+			List list = (List) val;
+			if (index < 0 || index >= list.size()) {
+				throw new SettingsPathException(String.format("Index %d is out of range for %s (size %d)", index, fieldName, list.size()));
+			}
+			return list.get(index);
+		}
 		if (index != null) {
 			if (val == null || !val.getClass().isArray()) {
-				throw new SettingsPathException(String.format("%s is not an array in %s", fieldName, path));
+				throw new SettingsPathException(String.format("%s is not an array or list in %s", fieldName, path));
 			}
 			if (index < 0 || index >= Array.getLength(val)) {
 				throw new SettingsPathException(String.format("Index %d is out of range for %s (length %d)", index, fieldName, Array.getLength(val)));

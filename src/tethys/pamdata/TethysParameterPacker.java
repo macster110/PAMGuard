@@ -131,7 +131,7 @@ public class TethysParameterPacker {
 					 * Is there a data filter ? If so, write it's 
 					 * XML parameters out here. 
 					 */
-					Element pEl = xmlWriter.writeObjectData(docf, elf, filterParams, null);
+					Element pEl = xmlWriter.writeObjectData(docf, elf, filterParams, null, false);
 				}
 			}
 		}
@@ -192,7 +192,7 @@ public class TethysParameterPacker {
 			e1.printStackTrace();
 		}  
 		Element el = doc.getDocumentElement();
-		Element pEl = xmlWriter.writeObjectData(doc, el, data, null);
+		Element pEl = xmlWriter.writeObjectData(doc, el, data, null, false);
 		return pEl;
 	}
 

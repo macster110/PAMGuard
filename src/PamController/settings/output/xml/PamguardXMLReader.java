@@ -4,7 +4,10 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Array;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -127,32 +130,12 @@ public class PamguardXMLReader {
 	 * @return
 	 */
 	Object createObject(String className) {
-		Class moduleClass;
-		try {
-			moduleClass = Class.forName(className);
-			Class<?>[] params = new Class<?>[0];
-			Constructor<?> constructor = moduleClass.getConstructor(params);
-			Object newObject = constructor.newInstance();
-			return newObject;
-		} catch (ClassNotFoundException | NoSuchMethodException | SecurityException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InstantiationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IllegalAccessException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IllegalArgumentException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InvocationTargetException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (Exception e) {
-			e.printStackTrace();
+		Class<?> cls = loadClass(className);
+		if (cls == null) {
+			System.out.println("PamguardXMLReader: unknown class " + className);
+			return null;
 		}
-		return null;
+		return XMLValueTypes.newInstance(cls);
 	}
 
 	/**
@@ -170,11 +153,37 @@ public class PamguardXMLReader {
 			int exclusions = Modifier.STATIC | Modifier.FINAL;
 			parameterSet = PamParameterSet.autoGenerate(dataObj, exclusions);
 		}
-		int missing = 0;
-		if (parameterSet == null) {
-			return -1;
+		java.util.Collection<PamParameterData> params = parameterSet == null ? new ArrayList<>() : parameterSet.getParameterCollection();
+		int nStack = readStack.size();
+		readStack.add(dataObj);
+		try {
+			return unpackFields(settingsNode, dataObj, params);
 		}
-		for (PamParameterData pamParam:parameterSet.getParameterCollection()) {
+		finally {
+			while (readStack.size() > nStack) {
+				readStack.remove(readStack.size()-1);
+			}
+		}
+	}
+
+	/**
+	 * Objects currently being read, to resolve references to them. 
+	 */
+	private ArrayList<Object> readStack = new ArrayList<>();
+
+	private int unpackFields(Node settingsNode, Object dataObj, java.util.Collection<PamParameterData> params) {
+		int missing = 0;
+		java.util.Set<String> done = new java.util.HashSet<>();
+		// objects described by the parameter set, which may not be dataObj itself. 
+		int nStack = readStack.size();
+		for (PamParameterData pamParam : params) {
+			Object parent = pamParam.getParentObject();
+			if (parent != null && readStack.stream().noneMatch(o -> o == parent)) {
+				readStack.add(parent);
+			}
+		}
+		for (PamParameterData pamParam:params) {
+			done.add(pamParam.getFieldName());
 			String fieldName = pamParam.getFieldName();
 			//			fieldNode = findNodesByType(settingsNode, fieldName, null);
 			Node fieldNode = findNode(settingsNode, fieldName);
@@ -183,24 +192,26 @@ public class PamguardXMLReader {
 //				System.out.printf("Unable to find node for field %s\n", fieldName);
 				continue;
 			}
-			String fieldClassName = getAttrString(fieldNode.getAttributes(), "Class");
-			Class fieldClass = null;
+			Object existing = null;
 			try {
-				fieldClass = ClassUtils.getClass(fieldClassName);
-				//				fieldClass = Class.forName(fieldClassName);
-			} catch (ClassNotFoundException e) {
-				e.printStackTrace();
-				missing++;
-				continue;
+				existing = pamParam.getData();
 			}
-
-			Object obj = readNodeData(dataObj, pamParam, fieldNode, fieldClass);
-//			System.out.printf("Node for %s is %s Class %s, Value %s\n", pamParam.getFieldName(), fieldNode, fieldClass, obj);
+			catch (Exception e) {
+			}
+			Class<?> declared = null;
+			java.lang.reflect.Type generic = null;
+			try {
+				declared = pamParam.getDataClass();
+				generic = pamParam.getField().getGenericType();
+			}
+			catch (Exception e) {
+			}
+			Object obj = readValue(fieldNode, declared, generic, existing);
 			if (obj == null) {
 				/*
-				 * The value couldn't be read (e.g. a list, which isn't supported yet). Leave
-				 * the existing value alone rather than setting it to null, so that unpacking 
-				 * into an existing settings object only changes what's in the XML.  
+				 * The value couldn't be read. Leave the existing value alone rather than 
+				 * setting it to null, so that unpacking into an existing settings object 
+				 * only changes what's in the XML.  
 				 */
 				missing++;
 				continue;
@@ -211,88 +222,339 @@ public class PamguardXMLReader {
 				e.printStackTrace();
 			}
 		}
+		while (readStack.size() > nStack) {
+			readStack.remove(readStack.size()-1);
+		}
+		/*
+		 * Then the fields which aren't in the parameter set, which PamguardXMLWriter also 
+		 * writes, so that everything that's in a psfx can be read from XML. 
+		 */
+		for (java.lang.reflect.Field field : XMLValueTypes.storedFields(dataObj.getClass())) {
+			if (done.contains(field.getName())) {
+				continue;
+			}
+			done.add(field.getName());
+			Node fieldNode = findNode(settingsNode, field.getName());
+			if (fieldNode == null) {
+				continue;
+			}
+			try {
+				field.setAccessible(true);
+				Object obj = readValue(fieldNode, field.getType(), field.getGenericType(), field.get(dataObj));
+				if (obj != null) {
+					field.set(dataObj, obj);
+				}
+				else {
+					missing++;
+				}
+			}
+			catch (Exception | LinkageError e) {
+				System.out.printf("PamguardXMLReader: can't set %s.%s: %s\n", dataObj.getClass().getName(), field.getName(), e.getMessage());
+				missing++;
+			}
+		}
 		return missing;
 	}
-	private Object readNodeData(Object dataObj, PamParameterData pamParam, Node fieldNode, Class fieldClass) {
-
-		String stringValue = getAttrString(fieldNode.getAttributes(), "Value");
-
-		boolean ok = false;
-		if (fieldClass.isPrimitive()) {
-			return readPrimitive(fieldClass, stringValue);
+	/**
+	 * Read a value from an XML element written by PamguardXMLWriter.  
+	 * @param node element holding the value
+	 * @param declared the declared type of the field or item (may be null) 
+	 * @param generic the generic type of the field, used for list and map items (may be null) 
+	 * @param existing the current value, which objects are read into if it's the right class (may be null)
+	 * @return value or null if it can't be read. 
+	 */
+	private Object readValue(Node node, Class<?> declared, Type generic, Object existing) {
+		Class<?> cls = loadClass(getAttrString(node.getAttributes(), "Class"));
+		if (getAttrString(node.getAttributes(), "Reference") != null) {
+			/*
+			 * a reference to an object further up the hierarchy (e.g. a Streamer's PamArray), 
+			 * which isn't written again, so use the nearest object of that class being read. 
+			 */
+			for (int i = readStack.size()-1; i >= 0; i--) {
+				if (readStack.get(i).getClass() == cls) {
+					return readStack.get(i);
+				}
+			}
+			return existing;
 		}
-		if (fieldClass == String.class) {
-			return stringValue;
+		if (cls == null || (declared != null && !declared.isPrimitive() && !ClassUtils.isAssignable(cls, declared, true))) {
+			cls = declared;
 		}
-		else if (stringValue != null && (Number.class.isAssignableFrom(fieldClass) || fieldClass == Boolean.class 
-				|| fieldClass == Character.class)) {
-			// boxed primitives, e.g. Integer, Double
+		if (cls == null) {
+			return null;
+		}
+		String value = getAttrString(node.getAttributes(), "Value");
+		if (cls.isPrimitive() || cls == String.class || ClassUtils.isPrimitiveWrapper(cls)) {
+			if (value == null) {
+				return null;
+			}
+			if (cls.isPrimitive()) {
+				return readPrimitive(cls, value);
+			}
+			return convertText(value, cls);
+		}
+		if (cls.isEnum()) {
+			return readEnum(cls, value);
+		}
+		if (XMLValueTypes.isValueType(cls)) {
+			return XMLValueTypes.fromString(cls, value);
+		}
+		if (cls.isArray()) {
+			return readArrayValue(node, cls, existing);
+		}
+		if (List.class.isAssignableFrom(cls)) {
+			return readListValue(node, cls, generic, existing);
+		}
+		if (Map.class.isAssignableFrom(cls)) {
+			return readMapValue(node, cls, generic, existing);
+		}
+		if (value != null) {
+			// some other simple type, e.g. a primitive written into an object list
+			return convertText(value, cls);
+		}
+		// an object, read field by field
+		Object obj = existing;
+		if (obj == null || obj.getClass() != cls) {
+			obj = XMLValueTypes.newInstance(cls);
+		}
+		if (obj == null) {
+			System.out.println("PamguardXMLReader: can't create an object of class " + cls.getName());
+			return null;
+		}
+		unpackSettingsNode(node, obj);
+		return obj;
+	}
+
+	private Class<?> loadClass(String className) {
+		if (className == null) {
+			return null;
+		}
+		try {
+			return ClassUtils.getClass(className);
+		} catch (ClassNotFoundException | LinkageError e) {
+			return null;
+		}
+	}
+
+	private Object convertText(String text, Class<?> cls) {
+		if (text == null || (text.equals("null") && cls != String.class)) {
+			return null;
+		}
+		if (cls == String.class) {
+			return text;
+		}
+		if (cls == Object.class) {
+			return text;
+		}
+		if (cls.isEnum()) {
+			return readEnum(cls, text);
+		}
+		if (XMLValueTypes.isValueType(cls)) {
+			return XMLValueTypes.fromString(cls, text);
+		}
+		try {
+			return pamguard.cli.SettingsPath.convert(text, cls, null);
+		} catch (pamguard.cli.SettingsPathException e) {
+			System.out.println("PamguardXMLReader: " + e.getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * The element nodes inside a node (ignoring text). 
+	 */
+	private ArrayList<Node> childElements(Node node) {
+		ArrayList<Node> list = new ArrayList<>();
+		NodeList children = node.getChildNodes();
+		for (int i = 0; i < children.getLength(); i++) {
+			if (children.item(i).getNodeType() == Node.ELEMENT_NODE) {
+				list.add(children.item(i));
+			}
+		}
+		return list;
+	}
+
+	/**
+	 * Read the items of an array or list, either from a comma separated Value or 
+	 * from child elements with Index attributes. 
+	 * @return items, or null if they can't be read. 
+	 */
+	private ArrayList<Object> readItems(Node node, Class<?> itemClass, Object[] existing) {
+		String value = getAttrString(node.getAttributes(), "Value");
+		ArrayList<Object> items = new ArrayList<>();
+		if (value != null) {
+			if (value.length() == 0) {
+				return items;
+			}
+			for (String bit : value.split(",", -1)) {
+				Object o = convertText(bit, itemClass);
+				if (o == null && !bit.equals("null")) {
+					return null;
+				}
+				items.add(o);
+			}
+			return items;
+		}
+		String lenStr = getAttrString(node.getAttributes(), "Length");
+		int len = 0;
+		if (lenStr != null) {
 			try {
-				return pamguard.cli.SettingsPath.convert(stringValue, fieldClass, null);
-			} catch (pamguard.cli.SettingsPathException e) {
-				System.out.println("PamguardXMLReader: " + e.getMessage());
+				len = Integer.valueOf(lenStr);
+			}
+			catch (NumberFormatException e) {
+			}
+		}
+		ArrayList<Node> children = childElements(node);
+		for (int i = 0; i < len; i++) {
+			items.add(null);
+		}
+		int next = 0;
+		for (Node child : children) {
+			int index = next;
+			String indStr = getAttrString(child.getAttributes(), "Index");
+			if (indStr != null) {
+				try {
+					index = Integer.valueOf(indStr);
+				}
+				catch (NumberFormatException e) {
+				}
+			}
+			next = index+1;
+			while (items.size() <= index) {
+				items.add(null);
+			}
+			Object old = (existing != null && index < existing.length) ? existing[index] : null;
+			items.set(index, readValue(child, itemClass, null, old));
+		}
+		return items;
+	}
+
+	private Object readArrayValue(Node node, Class<?> arrayClass, Object existing) {
+		Class<?> component = arrayClass.getComponentType();
+		Object[] old = null;
+		if (existing != null && existing.getClass().isArray() && !existing.getClass().getComponentType().isPrimitive()) {
+			old = (Object[]) existing;
+		}
+		Class<?> itemClass = loadClass(getAttrString(node.getAttributes(), "ElementClass"));
+		if (itemClass == null || !component.isAssignableFrom(itemClass)) {
+			itemClass = component;
+		}
+		ArrayList<Object> items = readItems(node, itemClass, old);
+		if (items == null) {
+			return null;
+		}
+		Object array = Array.newInstance(component, items.size());
+		for (int i = 0; i < items.size(); i++) {
+			Object o = items.get(i);
+			if (o == null && component.isPrimitive()) {
+				return null;
+			}
+			try {
+				Array.set(array, i, o);
+			}
+			catch (IllegalArgumentException e) {
+				System.out.printf("PamguardXMLReader: can't put %s in %s array\n", o, component.getName());
 				return null;
 			}
 		}
-		else if (fieldClass.isEnum()) {
-			return readEnum(fieldClass, stringValue);
-		}
-		else if (fieldClass.isArray()) {
-			return readArray(dataObj, pamParam, fieldNode, fieldClass);
-		}
-		else if (List.class.isAssignableFrom(fieldClass)) {
-			System.out.println("Read list not yet implemented in PamguardXMLReader");
-		}
-		else if (Map.class.isAssignableFrom(fieldClass)) {
-			System.out.println("Read map not yet implemented in PamguardXMLReader");
-		}
-		else if (File.class.isAssignableFrom(fieldClass)) {
-			File file = new File(stringValue);
-			return file;
-		}
-		else if (stringValue == null) {
-			return readObject(dataObj, pamParam, fieldNode, fieldClass);
-		}
+		return array;
+	}
 
-
+	/**
+	 * The class of a generic type argument, e.g. Integer for List&lt;Integer&gt;
+	 */
+	private Class<?> typeArgument(Type generic, int i) {
+		if (generic instanceof ParameterizedType) {
+			Type[] args = ((ParameterizedType) generic).getActualTypeArguments();
+			if (args.length > i) {
+				Type t = args[i];
+				if (t instanceof ParameterizedType) {
+					t = ((ParameterizedType) t).getRawType();
+				}
+				if (t instanceof Class) {
+					return (Class<?>) t;
+				}
+			}
+		}
 		return null;
 	}
 
-	private Object readArray(Object dataObj, PamParameterData pamParam, Node fieldNode, Class fieldClass) {
-		// TODO Auto-generated method stub
-		String className = getAttrString(fieldNode.getAttributes(), "Class");
-		Class arrayClass = null;
-		try {
-			arrayClass = getArrayTypeClass(className);
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+	private Object readListValue(Node node, Class<?> listClass, Type generic, Object existing) {
+		Class<?> itemClass = loadClass(getAttrString(node.getAttributes(), "ElementClass"));
+		if (itemClass == null) {
+			itemClass = typeArgument(generic, 0);
+		}
+		Object[] old = null;
+		if (existing instanceof List) {
+			old = ((List) existing).toArray();
+			if (itemClass == null) {
+				for (Object o : old) {
+					if (o != null) {
+						itemClass = o.getClass();
+						break;
+					}
+				}
+			}
+		}
+		if (itemClass == null) {
+			itemClass = Object.class;
+		}
+		ArrayList<Object> items = readItems(node, itemClass, old);
+		if (items == null) {
 			return null;
 		}
-//		System.out.printf("Class for array %s is %s\n", className, arrayClass);
-		String value = getAttrString(fieldNode.getAttributes(), "Value");
-		if (value == null) {
-			return null;
+		Object list = XMLValueTypes.newInstance(listClass);
+		if (!(list instanceof List) || listClass.getName().startsWith("java.util.Collections") 
+				|| listClass.getName().startsWith("java.util.Arrays") || listClass.getName().startsWith("java.util.ImmutableCollections")) {
+			list = new ArrayList<Object>();
 		}
-		String[] bits = value.split(",");
-		switch (arrayClass.getName()) {
-		case "int":
-		  return readIntArray(bits);
-		case "double":
-			return readDoubleArray(bits);
-		case "boolean":
-			return readBooleanArray(bits);
-		case "java.lang.String":
-		return bits;
-		}
-		// other arrays of simple types, e.g. float[], long[]
-		try {
-			return pamguard.cli.SettingsPath.convert(value, java.lang.reflect.Array.newInstance(arrayClass, 0).getClass(), null);
-		} catch (pamguard.cli.SettingsPathException e) {
-			return null;
-		}
+		((List) list).clear();
+		((List) list).addAll(items);
+		return list;
 	}
-	
+
+	private Object readMapValue(Node node, Class<?> mapClass, Type generic, Object existing) {
+		Map map = null;
+		Object newMap = XMLValueTypes.newInstance(mapClass);
+		if (newMap instanceof Map) {
+			map = (Map) newMap;
+		}
+		else {
+			map = new java.util.HashMap();
+		}
+		map.clear();
+		Class<?> keyType = typeArgument(generic, 0);
+		Class<?> valueType = typeArgument(generic, 1);
+		Map oldMap = existing instanceof Map ? (Map) existing : null;
+		for (Node entry : childElements(node)) {
+			String keyStr = getAttrString(entry.getAttributes(), "Key");
+			Class<?> keyClass = loadClass(getAttrString(entry.getAttributes(), "KeyClass"));
+			if (keyClass == null) {
+				keyClass = keyType != null ? keyType : String.class;
+			}
+			Object key = convertText(keyStr, keyClass);
+			if (key == null) {
+				continue;
+			}
+			Object old = oldMap != null ? oldMap.get(key) : null;
+			Object val;
+			if (getAttrString(entry.getAttributes(), "Class") == null && getAttrString(entry.getAttributes(), "Value") == null 
+					&& old == null) {
+				// written by an older PAMGuard, without the value's class. 
+				continue;
+			}
+			val = readValue(entry, valueType != null ? valueType : Object.class, null, old);
+			if (val != null) {
+				try {
+					map.put(key, val);
+				}
+				catch (Exception e) {
+				}
+			}
+		}
+		return map;
+	}
+
 	private double[] readDoubleArray(String[] bits) {
 		double data[] = new double[bits.length];
 		try {
@@ -352,32 +614,6 @@ public class PamguardXMLReader {
 		return Class.forName(arrayClass).getComponentType();
 	}
 
-	private Object readObject(Object dataObj, PamParameterData pamParam, Node fieldNode, Class fieldClass) {
-		/*
-		 *  we're trying to read an object in dataObj; 
-		 *  Hopefully, an instance already exists, OR we can construct one from nothing. 
-		 */
-		Object subObj = null;
-		
-		try {
-			subObj = pamParam.getData();
-		} catch (IllegalArgumentException e) {
-			e.printStackTrace();
-		} catch (IllegalAccessException e) {
-			e.printStackTrace();
-		}
-		if (subObj != null) {
-			// unpack into existing sub object. 
-			unpackSettingsNode(fieldNode, subObj);
-		}
-		else {
-			// create new sub object.
-			subObj = unpackSettingsNode(fieldNode);
-		}
-
-		return subObj;
-	}
-
 	//	private boolean setEnum(Object dataObj, Class fieldClass, PamParameterData pamParam, String stringValue) {
 	//		Enum val = readEnum(dataObj, fieldClass, pamParam, stringValue);
 	//		try {
@@ -399,6 +635,11 @@ public class PamguardXMLReader {
 			Enum[] list = (Enum[]) ans;
 			for (int i = 0; i < list.length; i++) {
 				if (list[i].toString().equals(stringValue)) {
+					return list[i];
+				}
+			}
+			for (int i = 0; i < list.length; i++) {
+				if (list[i].name().equals(stringValue)) {
 					return list[i];
 				}
 			}

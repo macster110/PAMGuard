@@ -711,6 +711,7 @@ public class AcquisitionProcess extends PamProcess {
 			}
 			newDataUnit.setRawData(threadDataUnit.getRawData(), true);
 			acquisitionControl.setStatusBarLevel(newDataUnit.getMeasuredAmplitude());
+			acquisitionControl.recordChannelLevel(channel, newDataUnit.getMeasuredAmplitude());
 			// can also here convert the measured amplitude (which was
 			// calculated in the call to setRawData, to dB.
 			newDataUnit.setCalculatedAmlitudeDB(rawAmplitude2dB(newDataUnit.getMeasuredAmplitude(),

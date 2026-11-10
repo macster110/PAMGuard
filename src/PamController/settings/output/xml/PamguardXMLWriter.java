@@ -66,6 +66,11 @@ public class PamguardXMLWriter implements PamSettings {
 	
 	private XMLWriterSettings writerSettings = new XMLWriterSettings();
 	private boolean excludeDisplaySettings;
+	/**
+	 * Write fields which aren't in an object's parameter set as well as those that are, 
+	 * so that the XML is a complete copy of the settings. 
+	 */
+	private boolean writeHiddenFields = true;
 //	private String xmlNameSpace;
 	
 	private static PamguardXMLWriter singleInstance;
@@ -642,15 +647,43 @@ public class PamguardXMLWriter implements PamSettings {
 		if (objectHierarchy == null) {
 			return false;
 		}
+		/*
+		 * objectHierarchy holds the objects currently being written (this one's parents),
+		 * so finding the same object means there's a loop. Uses identity rather than equals,
+		 * since two equal objects (e.g. two identical hydrophones) are both settings. 
+		 */
 		for (Object o : objectHierarchy) {
-			if (object.getClass() != o.getClass()) {
-				return false;
-			}
-			if (o.equals(object)) {
+			if (o == object) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Maximum depth of objects within objects, as a safeguard. 
+	 */
+	private static final int MAXOBJECTDEPTH = 30;
+
+	/**
+	 * Write the data of an object into an element.  
+	 * @param doc document
+	 * @param el element to write into 
+	 * @param data object
+	 * @param objectHierarchy objects already being written (can be null) 
+	 * @param hiddenFields also write fields which aren't in the object's parameter set (e.g.
+	 * private fields with no getter). Settings written this way can be read back completely. 
+	 * @return element
+	 */
+	public Element writeObjectData(Document doc, Element el, Object data, ArrayList<Object> objectHierarchy, boolean hiddenFields) {
+		boolean was = writeHiddenFields;
+		writeHiddenFields = hiddenFields;
+		try {
+			return writeObjectData(doc, el, data, objectHierarchy);
+		}
+		finally {
+			writeHiddenFields = was;
+		}
 	}
 
 	public Element writeObjectData(Document doc, Element el, Object data, ArrayList<Object> objectHierarchy) {
@@ -662,10 +695,8 @@ public class PamguardXMLWriter implements PamSettings {
 		}
 		if (hasData(objectHierarchy, data)) {
 			// just write the reference, but nothing else or we'll end up in an infinite loop of objects. 
-			Element e = doc.createElement("Object");
-			e.setAttribute("Class", data.getClass().getName());
-			e.setAttribute("Reference", String.format("%d", System.identityHashCode(data)));
-			return e;
+			el.setAttribute("Reference", "true");
+			return el;
 		}
 		PamParameterSet parameterSet;
 		if (data instanceof ManagedParameters) {
@@ -678,14 +709,42 @@ public class PamguardXMLWriter implements PamSettings {
 			}
 			parameterSet = PamParameterSet.autoGenerate(data, exclusions);
 		}
-		if (parameterSet == null) {
+		if (parameterSet == null && !writeHiddenFields) {
 			return null;
 		}
 		
-		if (objectHierarchy != null) {
-			objectHierarchy.add(data);
+		if (objectHierarchy.size() >= MAXOBJECTDEPTH) {
+			return el;
 		}
-		for (PamParameterData pamParam:parameterSet.getParameterCollection()) {
+		int nHierarchy = objectHierarchy.size();
+		objectHierarchy.add(data);
+		try {
+			writeObjectFields(doc, el, data, parameterSet, objectHierarchy);
+		}
+		finally {
+			while (objectHierarchy.size() > nHierarchy) {
+				objectHierarchy.remove(objectHierarchy.size()-1);
+			}
+		}
+		return el;
+	}
+
+	private void writeObjectFields(Document doc, Element el, Object data, PamParameterSet parameterSet, ArrayList<Object> objectHierarchy) {
+		java.util.Set<String> written = new HashSet<>();
+		java.util.Collection<PamParameterData> params = parameterSet == null ? new ArrayList<>() : parameterSet.getParameterCollection();
+		/*
+		 * A parameter set can describe a different object (e.g. ArrayParameters gives the 
+		 * parameters of its current PamArray), so that object is being written too.  
+		 */
+		int nHierarchy = objectHierarchy.size();
+		for (PamParameterData pamParam : params) {
+			Object parent = pamParam.getParentObject();
+			if (parent != null && !hasData(objectHierarchy, parent)) {
+				objectHierarchy.add(parent);
+			}
+		}
+		for (PamParameterData pamParam:params) {
+			written.add(pamParam.getFieldName());
 			try {
 				Object paramData = pamParam.getData();
 				writeField(doc, el, paramData, pamParam, objectHierarchy);
@@ -694,8 +753,36 @@ public class PamguardXMLWriter implements PamSettings {
 			}
 
 		}
-
-		return el;
+		while (objectHierarchy.size() > nHierarchy) {
+			objectHierarchy.remove(objectHierarchy.size()-1);
+		}
+		if (writeHiddenFields) {
+			/*
+			 * Also write the fields which aren't in the parameter set (usually private 
+			 * fields with no getter), so that the XML holds everything that's saved in a 
+			 * psfx and settings can be read back from it completely. 
+			 */
+			for (Field field : XMLValueTypes.storedFields(data.getClass())) {
+				if (written.contains(field.getName())) {
+					continue;
+				}
+				written.add(field.getName());
+				try {
+					field.setAccessible(true);
+					Object value = field.get(data);
+					if (value == null) {
+						continue;
+					}
+					Class<?> elClass = field.getType().isPrimitive() ? field.getType() : value.getClass();
+					Element e = makeElement(doc, field.getName(), elClass.getName());
+					el.appendChild(e);
+					writeValue(doc, e, value, objectHierarchy);
+				}
+				catch (Exception | LinkageError e) {
+					// e.g. a field which can't be accessed.
+				}
+			}
+		}
 	}
 
 	private Element writeField(Document doc, Element el, Object data, PamParameterData pamParam, ArrayList<Object> objectHierarchy) {
@@ -703,36 +790,154 @@ public class PamguardXMLWriter implements PamSettings {
 		if (data == null) {
 			return null;
 		}
-		Class javaClass = data.getClass();
-
 		if (wantField(pamParam) == false) {
 			return null;
 		}
-		if (isWritableType(javaClass)) {
-			return writePrimitive(doc, el, data, pamParam);
+		Class<?> declared = null;
+		try {
+			declared = pamParam.getDataClass();
 		}
-		if (javaClass.isArray()) {
-			return writeArray(doc, el, data, pamParam, objectHierarchy);
+		catch (Exception e) {
 		}
-		if (List.class.isAssignableFrom(javaClass)){
-			return writeList(doc, el, data, pamParam, objectHierarchy);
-		}
-		if (Map.class.isAssignableFrom(javaClass)){
-			return writeMap(doc, el, data, pamParam, objectHierarchy);
-		}
-		if (File.class.isAssignableFrom(javaClass)) {
-			return writeFile(doc, el, data, pamParam);
-		}
-		
-		else {
-			Element e = makeElement(doc, pamParam.getFieldName(), data.getClass().getName());
-			el.appendChild(e);
-			writeObjectData(doc, e, data, objectHierarchy);
-			return e;
-		}
-		//		System.out.println("Unknown class: " + javaClass.toString());
+		/*
+		 * Primitive fields keep their declared class (e.g. double) and everything else
+		 * gets the class of the object, so that the reader can create the right type. 
+		 */
+		Class<?> elClass = (declared != null && declared.isPrimitive()) ? declared : data.getClass();
+		Element e = makeElement(doc, pamParam);
+		e.setAttribute("Class", elClass.getName());
+		el.appendChild(e);
+		writeValue(doc, e, data, objectHierarchy);
+		return e;
+	}
 
-		//		return false;
+	/**
+	 * Write any value into an element which has already been created and named. Simple
+	 * values go in a Value attribute; lists and arrays of simple values go in Value as 
+	 * a comma separated list; other arrays and lists are written as one child element 
+	 * per item, with an Index attribute; maps as one child element per entry, with Key 
+	 * and KeyClass attributes; and other objects field by field. 
+	 * @param doc document
+	 * @param e element for the value, which already has its name and Class attribute. 
+	 * @param data value
+	 * @param objectHierarchy objects already being written, to avoid loops. 
+	 */
+	private void writeValue(Document doc, Element e, Object data, ArrayList<Object> objectHierarchy) {
+		Class<?> javaClass = data.getClass();
+		if (isWritableType(javaClass)) {
+			e.setAttribute("Value", data.toString());
+		}
+		else if (XMLValueTypes.isValueType(javaClass)) {
+			e.setAttribute("Value", XMLValueTypes.toString(data));
+		}
+		else if (javaClass.isArray()) {
+			writeArrayValue(doc, e, data, objectHierarchy);
+		}
+		else if (List.class.isAssignableFrom(javaClass)){
+			writeArrayValue(doc, e, ((List) data).toArray(), objectHierarchy);
+		}
+		else if (Map.class.isAssignableFrom(javaClass)){
+			writeMapValue(doc, e, (Map) data, objectHierarchy);
+		}
+		else {
+			writeObjectData(doc, e, data, objectHierarchy);
+		}
+	}
+
+	private void writeMapValue(Document doc, Element e, Map map, ArrayList<Object> objectHierarchy) {
+		// sort the entries by key, so the same settings always give the same XML. 
+		ArrayList<Entry> entries = new ArrayList<>(map.entrySet());
+		entries.sort((a, b) -> String.valueOf(a.getKey()).compareTo(String.valueOf(b.getKey())));
+		Iterator<Entry> mapit = entries.iterator();
+		int iEnt = 0;
+		while (mapit.hasNext()) {
+			Entry mapVal = mapit.next();
+			try {
+				Element mapEl = doc.createElement(String.format("Element%d",iEnt));
+				Object key = mapVal.getKey();
+				Object mapObj = mapVal.getValue();
+				mapEl.setAttribute("Key", key == null ? "null" : key.toString());
+				if (key != null) {
+					mapEl.setAttribute("KeyClass", key.getClass().getName());
+				}
+				if (mapObj != null) {
+					mapEl.setAttribute("Class", mapObj.getClass().getName());
+					writeValue(doc, mapEl, mapObj, objectHierarchy);
+				}
+				e.appendChild(mapEl);
+			}
+			catch (Exception ex) {
+				System.out.println("Error writing map entry " + mapVal.getKey() + ": " + ex.getMessage());
+			}
+			iEnt++;
+		}
+	}
+
+	private void writeArrayValue(Document doc, Element e, Object array, ArrayList<Object> objectHierarchy) {
+		int len = Array.getLength(array);
+		boolean simple = true;
+		Class<?> itemClass = null;
+		boolean sameClass = true;
+		for (int i = 0; i < len; i++) {
+			Object o = Array.get(array, i);
+			if (o == null) {
+				continue;
+			}
+			if (isWritableType(o.getClass()) == false || (o instanceof String && ((String) o).contains(","))) {
+				// objects, or strings which can't go in a comma separated list
+				simple = false;
+			}
+			if (itemClass == null) {
+				itemClass = o.getClass();
+			}
+			else if (itemClass != o.getClass()) {
+				sameClass = false;
+			}
+		}
+		if (!sameClass && array.getClass().getComponentType() != String.class) {
+			// mixed types (e.g. Integer and Double in a Number[]), so write each with its class. 
+			simple = false;
+		}
+		if (simple) {
+			StringBuilder output = new StringBuilder();
+			for (int i = 0; i < len; i++) {
+				Object o = Array.get(array, i);
+				output.append(o == null ? "null" : o.toString());
+				if (i < len-1) {
+					output.append(",");
+				}
+			}
+			e.setAttribute("Value", output.toString());
+			Class<?> component = array.getClass().getComponentType();
+			if (itemClass != null && !component.isPrimitive() && itemClass != component) {
+				// e.g. from a list or a Number[], so say what the items are. 
+				e.setAttribute("ElementClass", itemClass.getName());
+			}
+			return;
+		}
+		e.setAttribute("Length", String.format("%d", len));
+		for (int i = 0; i < len; i++) {
+			Object o = Array.get(array, i);
+			if (o == null) {
+				continue;
+			}
+			Element itemEl = makeElement(doc, e.getNodeName(), o.getClass().getName());
+			itemEl.setAttribute("Index", String.format("%d", i));
+			writeValue(doc, itemEl, o, objectHierarchy);
+			e.appendChild(itemEl);
+		}
+	}
+
+	private boolean wantField(PamParameterData pamParam) {
+		if (pamParam == null) {
+			return true;
+		}
+		try {
+			return wantField(pamParam.getField());
+		}
+		catch (Exception e) {
+			return true;
+		}
 	}
 
 	private boolean wantField(Field field) {
@@ -766,65 +971,6 @@ public class PamguardXMLWriter implements PamSettings {
 		return true;
 	}
 
-	private Element writeMap(Document doc, Element el, Object fieldData, PamParameterData pamParam, ArrayList<Object> objectHierarchy) {
-		Map map = (Map) fieldData;
-		Element e = makeElement(doc, pamParam);
-		el.appendChild(e);
-		Collection<Map.Entry> mapValues = map.entrySet();
-		Iterator<Entry> mapit = mapValues.iterator();
-		int iEnt = 0;
-		while (mapit.hasNext()) {
-			Entry mapVal = mapit.next();
-			try {
-				Element mapEl = doc.createElement(String.format("Element%d",iEnt));
-				mapEl.setAttribute("Key", mapVal.getKey().toString());
-				Object mapObj = mapVal.getValue();
-				if (isWritableType(mapObj.getClass())) {
-					mapEl.setAttribute("Value", mapObj.toString());
-				}
-				else {
-					writeObjectData(doc, mapEl, mapObj, objectHierarchy);
-				}
-				e.appendChild(mapEl);
-			}
-			catch (Exception ex) {
-				System.out.println("Error writing object " + fieldData.toString() + ": " + mapVal.getKey().toString());
-				System.out.println(ex.getMessage());
-			}
-			iEnt++;
-		}
-
-		return e;
-	}
-	
-	private Element writeList(Document doc, Element el, Object fieldData, PamParameterData pamParam, ArrayList<Object> objectHierarchy) {
-		List list = (List) fieldData;
-		return writeArray(doc, el, list.toArray(), pamParam, objectHierarchy);
-	}
-	
-	private Element writeArray(Document doc, Element el, Object fieldData, PamParameterData pamParam, ArrayList<Object> objectHierarchy) {
-		try {
-			boolean isPrimative = true;
-			int len = Array.getLength(fieldData);
-			for (int i = 0; i < len; i++) {
-				Object o = Array.get(fieldData, i);
-				if (o != null && isWritableType(o.getClass()) == false) {
-					isPrimative = false;
-				}
-			}
-			if (isPrimative) {
-				return writePrimitiveArray(doc, el, fieldData, pamParam);
-			}
-			else {
-				return writeObjectArray(doc, el, fieldData, pamParam, objectHierarchy);
-			}
-		}
-		catch (Exception e) {
-			System.out.println("Error in PamguardXMLWriter.writeArray: " + e.getMessage());
-		}
-		return null;
-	}
-
 	//	private Element makeElement(Document doc, Class<?> clazz) {
 	//		return makeElement(doc, clazz.)
 	//	}
@@ -845,53 +991,6 @@ public class PamguardXMLWriter implements PamSettings {
 			e.setAttribute("Class", type);
 		}
 		return e;
-	}
-
-	private Element writeObjectArray(Document doc, Element el, Object fieldData, PamParameterData pamParam, ArrayList<Object> objectHierarchy) {		
-		try {
-			Element e = makeElement(doc, pamParam);
-			int len = Array.getLength(fieldData);
-			for (int i = 0; i < len; i++) {
-				Object o = Array.get(fieldData, i);
-				if (o != null) {
-					Element fE = writeField(doc, e, o, pamParam, objectHierarchy);
-					fE.setAttribute("Index", new Integer(i).toString());
-				}
-			}
-			el.appendChild(e);
-			return e;
-		}
-		catch (Exception e) {
-			System.out.println("Error in PamguardXMLWriter.writeObjectArray: " + e.getMessage());
-
-			e.printStackTrace();
-		}
-		return null;
-	}
-	private Element writePrimitiveArray(Document doc, Element el, Object fieldData, PamParameterData pamParam) {
-		try {
-			//			Element e = makeElement(doc, field);
-			int len = Array.getLength(fieldData);
-			String output = "";
-			for (int i = 0; i < len; i++) {
-				Object o = Array.get(fieldData, i);
-				if (o == null) {
-					output += "null";
-				}
-				else {
-					output += o.toString(); 
-				}
-				if (i < len-1) {
-					output += ",";
-				}
-			}
-			return writePrimitive(doc, el, output, pamParam);
-			//			el.appendChild(e);
-		}
-		catch (Exception e) {
-			System.out.println("Error in PamguardXMLWriter.writePrimativeArray: " + e.getMessage());
-		}
-		return null;
 	}
 
 	private Element writePrimitive(Document doc, Element el, Object fieldData, PamParameterData pamParam) {

@@ -63,7 +63,11 @@ public class TethysExportParams implements Serializable, Cloneable {
 	private String getDefaultDatasetName() {
 		// get the database name. It must exist in viewer mode !
 		DBControlUnit dbControl = DBControlUnit.findDatabaseControl();
-		String dbName = dbControl.getDatabaseName();
+		String dbName = dbControl == null ? null : dbControl.getDatabaseName();
+		if (dbName == null) {
+			// no database yet (e.g. while a configuration is being set up)
+			return null;
+		}
 		// strip off trailing file type. 
 		int dPos = dbName.lastIndexOf('.');
 		if (dPos > 0) {

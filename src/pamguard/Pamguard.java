@@ -234,6 +234,8 @@ public class Pamguard {
 		if (startupState.exitNow) {
 			System.exit(ExitCode.OK.getCode());
 		}
+		// without a GUI in a terminal, show a progress display (l for the log, s for progress)
+		pamguard.cli.TerminalDisplay.startIfWanted();
 		int runMode = startupState.runMode;
 		boolean showSplash = startupState.showSplash;
 		boolean showStartupDialog = startupState.showStartupDialog;

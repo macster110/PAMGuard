@@ -190,6 +190,10 @@ public class PamParameterSet {
 			int fieldInd = name.indexOf(fieldNameLower);
 			int methodLen = name.length();
 			int fieldLen = fieldNameLower.length();
+			if (!sameType(method.getReturnType(), field.getType())) {
+				// e.g. int getCount() for a field int[] count isn't the field's getter. 
+				continue;
+			}
 			if (name.startsWith("is") && fieldInd == 2 && methodLen == fieldLen+2) {
 				return method;
 			}
@@ -235,11 +239,20 @@ public class PamParameterSet {
 			int methodLen = name.length();
 			int fieldLen = fieldNameLower.length();
 			
-			if (name.startsWith("set") && fieldInd == 3 && methodLen == fieldLen+3) {
+			if (name.startsWith("set") && fieldInd == 3 && methodLen == fieldLen+3 && sameType(params[0], field.getType())) {
 				return method;
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * @return true if a getter or setter type matches a field type, allowing for boxing, 
+	 * and for subclasses or superclasses (e.g. List and ArrayList). 
+	 */
+	private static boolean sameType(Class<?> methodType, Class<?> fieldType) {
+		return org.apache.commons.lang3.ClassUtils.isAssignable(methodType, fieldType, true) 
+				|| org.apache.commons.lang3.ClassUtils.isAssignable(fieldType, methodType, true);
 	}
 
 	public static PamParameterSet checkSpecials(Object parentObject, int excludedModifiers) {

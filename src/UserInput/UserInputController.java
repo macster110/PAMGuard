@@ -26,6 +26,7 @@ import javax.swing.JMenuBar;
 
 import PamController.PamControlledUnit;
 import PamController.PamControllerInterface;
+import PamController.PamGUIManager;
 import PamView.PamGui;
 import PamguardMVC.PamDataBlock;
 
@@ -42,8 +43,11 @@ public class UserInputController extends PamControlledUnit {
 		addPamProcess(userInputProcess = new UserInputProcess(this,
 				(PamDataBlock) null));
 
-		setTabPanel(userInputPanel = new UserInputPanel(this));
-		setSidePanel(userInputSidePanel = new UserInputSidePanel(this));
+		if (PamGUIManager.getGUIType() != PamGUIManager.NOGUI) {
+			// no windows without a GUI (-nogui), where there's nobody to type anything. 
+			setTabPanel(userInputPanel = new UserInputPanel(this));
+			setSidePanel(userInputSidePanel = new UserInputSidePanel(this));
+		}
 	}
 
 	public UserInputProcess getUserInputProcess() {
@@ -77,7 +81,9 @@ public class UserInputController extends PamControlledUnit {
 	public void notifyModelChanged(int changeType) {
 		switch (changeType) {
 		case PamControllerInterface.OFFLINE_DATA_LOADED:
-			userInputPanel.refillHistory();
+			if (userInputPanel != null) {
+				userInputPanel.refillHistory();
+			}
 		}
 	}
 	

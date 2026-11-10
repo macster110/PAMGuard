@@ -339,6 +339,7 @@ public class BuiltInOptions {
 
 		// viewer mode options are in their own class
 		ViewerCommandLine.registerOptions();
+		TerminalDisplay.registerOptions();
 	}
 
 	private static int parseInt(CommandLineOption opt, String value) throws CommandLineException {

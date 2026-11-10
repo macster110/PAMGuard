@@ -31,6 +31,7 @@ Options are not case sensitive. See [command_line.md](command_line.md) for how t
 | `-fx` | Use the JavaFX GUI. |
 | `-nosplash` | Don't show the splash screen. |
 | `-fullscreen` | Start with the main window full screen. |
+| `-progress <auto/on/off>` | With -nogui in a terminal, show a progress display (file and folder progress, or sound levels in real time, and detection counts) instead of the log. Press l for the log and s for progress. auto (the default) shows it only when the output is an interactive terminal, so scripts get the plain log. Example: `-progress off` |
 
 ## Settings
 

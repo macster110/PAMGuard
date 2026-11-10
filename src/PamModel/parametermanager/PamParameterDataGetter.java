@@ -57,7 +57,8 @@ public class PamParameterDataGetter extends PrivatePamParameterData {
 	@Override
 	public boolean setData(Object data) throws IllegalArgumentException, IllegalAccessException {
 		if (setter == null) {
-			return false;
+			// no setter (or one with a different name), so set the field directly. 
+			return super.setData(data);
 		}
 		// need to convert the type
 		Object convObj = convertStringType(data);

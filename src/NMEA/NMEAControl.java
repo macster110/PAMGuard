@@ -116,9 +116,13 @@ public class NMEAControl extends PamControlledUnit implements PamSettings {
 
 	private void checkGlobalArguments() {
 		// try the new command line way of getting these things ...
-		String globArg = CommandLine.getCommandLine().getCommandParameter(NMEACOMCOMMAND); // dougs way
-		if (globArg == null) {
-			globArg = CommandLine.getCommandLine().getCommandParameter(NMEAControl.GlobalPortFlag); // Sam's way
+		CommandLine commandLine = CommandLine.getCommandLine();
+		String globArg = null;
+		if (commandLine != null) { // null when PAMGuard isn't started from main(), e.g. in tests
+			globArg = commandLine.getCommandParameter(NMEACOMCOMMAND); // dougs way
+			if (globArg == null) {
+				globArg = commandLine.getCommandParameter(NMEAControl.GlobalPortFlag); // Sam's way
+			}
 		}
 		if (globArg == null) {
 			globArg = GlobalArguments.getParam(NMEACOMCOMMAND); // old way !

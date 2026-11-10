@@ -44,7 +44,7 @@ public class ArrayParameters implements Serializable, ManagedParameters {
 	 */
 	@Override
 	public PamParameterSet getParameterSet() {
-		if (arrayList == null || arrayList.size() < 1) {
+		if (arrayList == null || arrayList.size() < 1 || arrayList.get(0) == null) {
 			return null;
 		}
 		return arrayList.get(0).getParameterSet();

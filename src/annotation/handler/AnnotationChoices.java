@@ -26,7 +26,11 @@ public class AnnotationChoices implements Serializable, ManagedParameters {
 
 	private Hashtable<String, AnnotationOptions> annotationOptions = new Hashtable<>();
 	
-	private boolean allowMany = true;
+	/*
+	 * Not used: isAllowMany() always returns true. Transient so it isn't saved or 
+	 * written to XML with a value which doesn't do anything. 
+	 */
+	private transient boolean allowMany = true;
 
 	/**
 	 * Names of the annotation types shown in the list the user selects from, for handlers

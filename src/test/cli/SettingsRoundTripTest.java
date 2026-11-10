@@ -86,7 +86,7 @@ public class SettingsRoundTripTest {
 		return list;
 	}
 
-	private static byte[] serialise(Object obj) throws Exception {
+	static byte[] serialise(Object obj) throws Exception {
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
 		ObjectOutputStream oos = new ObjectOutputStream(bos);
 		oos.writeObject(obj);
@@ -151,7 +151,7 @@ public class SettingsRoundTripTest {
 	 * Compare two objects field by field, recording differences. A field which was 
 	 * null before may change, since reading XML can replace a null with a default. 
 	 */
-	private static void deepDiff(String path, Object a, Object b, IdentityHashMap<Object, Boolean> seen, int depth, List<String> diffs) {
+	static void deepDiff(String path, Object a, Object b, IdentityHashMap<Object, Boolean> seen, int depth, List<String> diffs) {
 		if (depth > 10 || a == null) {
 			return;
 		}
@@ -191,8 +191,15 @@ public class SettingsRoundTripTest {
 			return;
 		}
 		if (a instanceof Map) {
-			deepDiff(path + ".keys", ((Map<?,?>) a).keySet().toArray(), ((Map<?,?>) b).keySet().toArray(), seen, depth, diffs);
-			deepDiff(path + ".values", ((Map<?,?>) a).values().toArray(), ((Map<?,?>) b).values().toArray(), seen, depth, diffs);
+			// compare entries by key, since the order of a hash map can change. 
+			Map<?,?> ma = (Map<?,?>) a, mb = (Map<?,?>) b;
+			if (!ma.keySet().equals(mb.keySet())) {
+				diffs.add(path + ".keys: " + ma.keySet() + " -> " + mb.keySet());
+				return;
+			}
+			for (Object k : ma.keySet()) {
+				deepDiff(path + "[" + k + "]", ma.get(k), mb.get(k), seen, depth+1, diffs);
+			}
 			return;
 		}
 		for (Class<?> k = c; k != null && k != Object.class; k = k.getSuperclass()) {
@@ -210,7 +217,7 @@ public class SettingsRoundTripTest {
 		}
 	}
 
-	private static void applyXML(Document doc, Object target) {
+	static void applyXML(Document doc, Object target) {
 		PamguardXMLReader reader = new PamguardXMLReader(doc);
 		for (ModuleNode mn : reader.getModuleNodes()) {
 			for (Node sn : reader.getSettingsNodes(mn)) {
@@ -221,9 +228,8 @@ public class SettingsRoundTripTest {
 
 	/**
 	 * Settings written to XML and read into a newly created object should give the
-	 * same XML again. Classes which can't do this yet (mostly because they hold lists
-	 * or maps, which the XML reader can't read yet) are listed rather than failing the
-	 * test, but at least half must work, so a general break in the reader is caught.
+	 * same XML again, including lists, maps, arrays of objects and fields without 
+	 * getters. See also AllModulesXMLTest, which does this for every module type.
 	 */
 	@Test
 	public void xmlRoundTripsToNewObject() throws Exception {
@@ -253,22 +259,64 @@ public class SettingsRoundTripTest {
 						reader.unpackSettingsNodeInto(sn, fresh);
 					}
 				}
+				/*
+				 * A field that's null in the original (e.g. one added to the class after the 
+				 * psfx was saved) isn't in the XML, so the new object keeps its default. 
+				 */
+				copyNulls(original, fresh, 0);
 				String xml1 = settingsXML(writer, pcus, original);
 				String xml2 = settingsXML(writer, pcus, fresh);
 				if (!xml1.equals(xml2)) {
-					notRoundTripping.add(className);
+					notRoundTripping.add(className + ": " + firstDifference(xml1, xml2));
+					String dump = System.getProperty("roundtrip.dump");
+					if (dump != null) {
+						java.nio.file.Files.writeString(new File(dump, className + ".1.xml").toPath(), xml1);
+						java.nio.file.Files.writeString(new File(dump, className + ".2.xml").toPath(), xml2);
+					}
 				}
 			}
 		}
 		System.out.printf("XML round trip: %d of %d settings classes work\n", tested.size() - notRoundTripping.size(), tested.size());
 		for (String c : notRoundTripping) {
-			System.out.println("  doesn't round trip yet: " + c);
+			System.out.println("  doesn't round trip: " + c);
 		}
 		assertTrue(tested.size() > 0);
-		assertTrue(notRoundTripping.size() * 2 <= tested.size(), "Most settings classes no longer round trip through XML");
+		assertEquals(new ArrayList<String>(), notRoundTripping, "Settings classes which don't round trip through XML");
 	}
 
-	private static String settingsXML(PamguardXMLWriter writer, PamControlledUnitSettings pcus, Object settings) {
+	static void copyNulls(Object from, Object to, int depth) throws Exception {
+		if (from == null || to == null || from.getClass() != to.getClass() || depth > 5) {
+			return;
+		}
+		for (java.lang.reflect.Field f : PamController.settings.output.xml.XMLValueTypes.storedFields(from.getClass())) {
+			f.setAccessible(true);
+			Object a = f.get(from);
+			if (a == null) {
+				f.set(to, null);
+			}
+			else if (!f.getType().isPrimitive()) {
+				copyNulls(a, f.get(to), depth+1);
+			}
+		}
+	}
+
+	/**
+	 * The first line which differs between two XML strings, to say why a class
+	 * doesn't round trip.
+	 */
+	static String firstDifference(String a, String b) {
+		String[] la = a.split("\\R"), lb = b.split("\\R");
+		for (int i = 0; i < Math.max(la.length, lb.length); i++) {
+			String x = i < la.length ? la[i].trim() : "<end>";
+			String y = i < lb.length ? lb[i].trim() : "<end>";
+			if (!x.equals(y)) {
+				return "line " + (i+1) + ": " + x + "  ->  " + y;
+			}
+		}
+		return "";
+	}
+
+	static String settingsXML(PamguardXMLWriter writer, PamControlledUnitSettings pcus, Object settings) {
 		PamControlledUnitSettings p = new PamControlledUnitSettings(pcus.getUnitType(), pcus.getUnitName(),
 				pcus.getOwnerClassName(), pcus.getVersionNo(), settings);
 		String xml = writer.getAsString(writer.writeSettings(p));
