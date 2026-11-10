@@ -240,6 +240,7 @@ public class CommandLineOptions {
 				o.put("aliases", opt.getAliases());
 			}
 			o.put("category", opt.getCategory().name().toLowerCase());
+			o.put("categoryTitle", opt.getCategory().getTitle());
 			List<String> vals = new ArrayList<>();
 			for (String v : opt.getValueNames()) {
 				vals.add(v);

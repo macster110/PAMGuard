@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pamguard-mcp"
+version = "0.1.0"
+description = "MCP server that lets AI assistants drive PAMGuard: describe configurations, change settings, process sound files, run viewer tasks and exports"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "GPL-3.0-or-later"}
+dependencies = ["mcp>=1.2"]  # works with mcp 1.x (FastMCP) and 2.x (MCPServer)
+
+[project.scripts]
+pamguard-mcp = "pamguard_mcp.server:main"
+
+[tool.setuptools]
+packages = ["pamguard_mcp"]

@@ -109,12 +109,17 @@ public class SettingsRoundTripTest {
 		for (File psfx : psfxFiles) {
 			for (PamControlledUnitSettings pcus : loadSettings(psfx)) {
 				Object original = pcus.getSettings();
+				/*
+				 * Write the XML first: some getters replace an unset value with its default
+				 * (e.g. 0 with 10), and the module sees that default too, so compare
+				 * against the settings as they are once they've been read.
+				 */
+				Document doc = writer.writeSettings(pcus);
 				Object copy = SettingsOverrides.deepCopy(original);
 				if (copy == null) {
 					continue; // not serialisable, so can't be in a psfx anyway
 				}
 				Object before = SettingsOverrides.deepCopy(copy);
-				Document doc = writer.writeSettings(pcus);
 				applyXML(doc, copy);
 				nTested++;
 				List<String> diffs = new ArrayList<>();

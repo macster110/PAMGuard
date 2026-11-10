@@ -160,7 +160,7 @@ public class BuiltInOptions {
 		CommandLineOptions.register(new CommandLineOption(SET, SETTINGS,
 				"Change one setting once the configuration has loaded. The key is the module name, then a dot, then the "
 				+ "parameter name; dots step into nested objects and [n] picks an array element. Use -describe to find names. "
-				+ "Changes apply to this run and are saved with the settings at the end of the run.")
+				+ "Changes apply to this run only and are made before any module is created; the settings file is not changed.")
 				.values("module.parameter=value").repeatable()
 				.example("-set \"Click Detector.dbThreshold=12\"")
 				.handler((opt, values, state) -> SettingsOverrides.addSet(values[0])));

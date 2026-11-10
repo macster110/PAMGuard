@@ -1,0 +1,34 @@
+# PAMGuard
+
+> PAMGuard is open source (GPL) passive acoustic monitoring software for detecting, classifying and localising sounds, mostly from marine mammals, in real time or from recordings. It is modular: a configuration (.psfx settings file) chains modules such as Sound Acquisition, FFT, Click Detector, Whistle and Moan Detector and the Deep Learning Classifier, and results go to PAMGuard binary files (.pgdf) and an SQLite database. Viewer mode reopens processed data for checking, reprocessing and export.
+
+PAMGuard can be driven entirely from the command line, without its GUI, which is how scripts and AI assistants should use it. Run `java -jar Pamguard.jar -help json` for every option. The main steps are:
+
+- `-nogui -psf config.psfx -describe out.json`: JSON listing every module, data stream, settings parameter (name, type, value, description), offline task and available module type.
+- `-set "Module name.parameter=value"` (repeatable) and `-settings file.xml`: change settings for one run, applied before modules are created.
+- `-nogui -psf config.psfx -wavfilefolder W -binaryfolder B -databasefile D.sqlite3 -summary run.json -autostart -autoexit`: process sound files headless.
+- `-summary run.json`: JSON summary at exit (files processed, units per data stream, settings changes, warnings, errors, exit code). Exit codes: 0 OK, 1 error, 2 bad arguments, 3 settings error, 4 prepare failed, 5 task or export failed.
+- `-v -nogui -databasefile D -binaryfolder B -offlinetask "<type>:<name>:<task>" -autostart -export folder -exportformat MATLAB -autoexit`: reprocess and export in viewer mode.
+- `-v -databasefile D -viewtime "2026-01-31 14:32:05" -viewspan 120`: open the viewer at a time for a person to check detections.
+- `-port 8000`: control a running PAMGuard over UDP (`describe`, `setparam`, `getxmlsettings`, `setxmlsettings`, `start`, `stop`, `status`, `runsummary`, `exit`).
+
+## Docs
+
+- [Command line guide](docs/command_line.md): the workflow above in detail.
+- [Command line options](docs/command_line_options.md): every option, generated from `-help json`.
+- [Modules](docs/modules.md): every module type, what data it needs and its Java class.
+- [MCP server](mcp/README.md): tools for AI assistants (Claude etc.) to describe configurations, process files, run viewer tasks and open the viewer.
+- [Shipped configurations](configurations/README.md): ready made configurations and how they are described.
+- [PAMGuard website and tutorials](https://www.pamguard.org)
+
+## Reading results
+
+- Database: SQLite (sqlite3, pandas).
+- Binary files: pypamguard (Python, `pip install pypamguard`), PamBinaries and PAMpal (R), PAMGuard MATLAB library.
+
+## Source
+
+- Command line and automation code: `src/pamguard/cli/` (options, run summary, settings changes, describe, viewer automation).
+- Network commands: `src/PamController/command/`.
+- Settings XML: `src/PamController/settings/output/xml/`.
+- Main class: `src/pamguard/Pamguard.java`; controller: `src/PamController/PamController.java`.

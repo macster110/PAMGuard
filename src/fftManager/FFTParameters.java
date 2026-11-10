@@ -95,7 +95,10 @@ public class FFTParameters implements Serializable, ManagedParameters, Cloneable
 		try {
 			PamParameterData param = pps.findParameterData("fftLength");
 			param.setShortName("FFT Length");
-			param.setToolTip("Detector detection threshold in dB");
+			param.setToolTip("FFT length in samples (a power of 2)");
+			param = pps.findParameterData("fftHop");
+			param.setShortName("FFT Hop");
+			param.setToolTip("Number of samples between the starts of successive FFTs");
 		}
 		catch (FieldNotFoundException e) {
 			e.printStackTrace();

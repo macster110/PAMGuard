@@ -75,6 +75,14 @@ PAMGuard allows users to run their own deep learning models using the deep learn
 ### Metadata standard and Tethys compatibility
 PAMGuard Integrates with Tethys database. Users can export processed PAMGuard data to a Tethys database seamlessly; this feature is great for large scale projects or organisations with long term datasets. 
 
+## Automation, scripting and AI assistants
+PAMGuard can be run entirely from the command line without its GUI, so scripts, batch jobs and AI assistants such as Claude can describe a configuration, change settings, process sound files, reprocess and export results, and open the viewer at a time of interest for a person to check. See:
+
+* [docs/command_line.md](docs/command_line.md): the command line workflow.
+* [docs/command_line_options.md](docs/command_line_options.md): every option (also `-help` or `-help json`).
+* [mcp/README.md](mcp/README.md): an MCP server so AI assistants can drive PAMGuard.
+* [llms.txt](llms.txt): a short overview for LLMs.
+
 ## Feature roadmap
 There's lots of features we would like to add to PAMGuard. If you want to add a feature you can either code it up yourself in Java and submit a pull request or get in touch with us to discuss how to it might be integrated. Some smaller features might be in our roadmap anyway but larger features usually require funding. Some features we are thinking about (but do not necessarily have time for yet) are;
 

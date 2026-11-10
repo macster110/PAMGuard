@@ -221,7 +221,7 @@ public class SettingsOverrides {
 			}
 		}
 		throw new SettingsPathException(String.format("No module or settings called \"%s\". Available names are: %s",
-				key.contains(".") ? key.substring(0, key.indexOf('.')) : key, String.join(", ", names)));
+				key.contains(".") ? key.substring(0, key.indexOf('.')) : key, String.join("; ", names)));
 	}
 
 	/**
