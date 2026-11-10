@@ -376,6 +376,16 @@
 										files used for unit tests -->
 									</excludes>
 								</filter>
+								<!-- netcdfAll bundles an old (2019) copy of JNA whose
+								native library is Intel only. Leave it out so that
+								the JNA dependency above is the only one, otherwise
+								JNA fails to load on Apple silicon Macs. -->
+								<filter>
+									<artifact>edu.ucar:netcdfAll</artifact>
+									<excludes>
+										<exclude>com/sun/jna/**</exclude>
+									</excludes>
+								</filter>
 							</filters>
 						</configuration>
 

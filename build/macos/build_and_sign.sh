@@ -96,6 +96,24 @@ fi
 
 echo ""
 
+# 0c. REMOVE STALE COPIES OF JNA
+# Some dependencies (netcdfAll) bundle an old copy of JNA whose macOS native
+# library is Intel only. netcdfAll comes before the real JNA jar on the class
+# path, so its old JNA classes get loaded and JNA fails on Apple silicon (this
+# broke the App Nap fix in MacOSIntegration). Keep JNA only in the jna jars.
+echo "--- Removing stale JNA copies from other jars ---"
+while IFS= read -r JAR; do
+    case "$(basename "$JAR")" in
+        jna-*.jar|jna-platform-*.jar) continue ;;
+    esac
+    if unzip -l "$JAR" 2>/dev/null | grep -q " com/sun/jna/"; then
+        zip -q -d "$JAR" "com/sun/jna/*" >/dev/null 2>&1
+        echo "✅ Removed JNA classes from $(basename "$JAR")"
+    fi
+done < <(find "$APP_PATH/Contents/Java" -name "*.jar" -type f)
+
+echo ""
+
 # Function to process and sign a native library
 process_native_lib() {
     local LIB="$1"

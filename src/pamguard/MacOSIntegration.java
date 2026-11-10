@@ -352,6 +352,13 @@ public class MacOSIntegration {
 		}
 		catch (Throwable e) {
 			System.out.println("macOS App Nap: unable to disable App Nap: " + e.getMessage());
+			try {
+				// a stale copy of JNA earlier on the class path is the usual cause
+				System.out.println("macOS App Nap: JNA loaded from "
+						+ com.sun.jna.Native.class.getProtectionDomain().getCodeSource().getLocation());
+			}
+			catch (Throwable e2) {
+			}
 		}
 		// fallback for the next launch in case the activity didn't work.
 		Thread t = new Thread(() -> setAppSleepDisabledDefault(), "macOS App Nap default");
