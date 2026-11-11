@@ -416,7 +416,36 @@ public class UserDisplayControl extends PamControlledUnit implements
 		}
 		return null;
 	}
-	
+
+	/**
+	 * Add a user display from a specific provider and return the created component.
+	 * Use this rather than {@link #addUserDisplay(Class)} when several providers
+	 * share a component class, e.g. one per instance of a module.
+	 *
+	 * @param provider the display provider.
+	 * @return the created display component, or null if the provider can't make one.
+	 */
+	public UserDisplayComponent addUserDisplay(UserDisplayProvider provider) {
+		if (provider == null) {
+			return null;
+		}
+		return tabPanelControl.addUserDisplay(provider, null);
+	}
+
+	/**
+	 * Tile displays side by side, left to right in the order given, filling the
+	 * whole tab. If the tab hasn't been laid out yet (it has no size) the tiling is
+	 * done the first time it's given a size. Must be called on the Swing thread.
+	 *
+	 * @param widthFractions fraction of the tab width for each display. Normalised,
+	 *                       so needn't add up to 1. Must be the same length as
+	 *                       components.
+	 * @param components     the displays to tile, all in this module's tab.
+	 */
+	public void tileSideBySide(double[] widthFractions, UserDisplayComponent... components) {
+		tabPanelControl.tileSideBySide(widthFractions, components);
+	}
+
 	/**
 	 * Remove a reference to a list of user display provider
 	 * @param userDisplayProvider reference to a provider of user displays. 

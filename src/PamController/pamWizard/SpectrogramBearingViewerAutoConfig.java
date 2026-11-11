@@ -2,6 +2,8 @@ package PamController.pamWizard;
 
 import java.util.Set;
 
+import javax.swing.SwingUtilities;
+
 import PamController.PamControlledUnit;
 import PamController.PamController;
 import PamController.PamControllerInterface;
@@ -16,6 +18,8 @@ import PamguardMVC.PamRawDataBlock;
 import bearinglocaliser.BearingLocaliserControl;
 import bearinglocaliser.BearingLocaliserParams;
 import bearinglocaliser.algorithms.BearingAlgorithmProvider;
+import userDisplay.UserDisplayComponent;
+import userDisplay.UserDisplayControl;
 
 /**
  * Auto-configuration (viewer mode) for multi-channel sound files: the spectrogram
@@ -34,6 +38,9 @@ public class SpectrogramBearingViewerAutoConfig implements PamAutoConfig {
 
 	/** Bearing algorithm used for each channel group (time delay based). */
 	public static final String BEARING_ALGORITHM = "TDOA Localiser";
+
+	/** Fraction of the User Display tab width given to the spectrogram, left of the bearing display. */
+	private static final double SPECTROGRAM_WIDTH = 0.65;
 
 	private SpectrogramOptions spectrogramOptions;
 
@@ -55,14 +62,16 @@ public class SpectrogramBearingViewerAutoConfig implements PamAutoConfig {
 
 	/**
 	 * Add a Bearing Localiser using the annotations as its detections, and the raw
-	 * audio from Sound Acquisition (all channels, as one group) to localise them.
-	 * The raw audio is used rather than the spectrogram FFT data since it's at the
-	 * full sample rate even if the spectrogram is decimated, which matters for time
-	 * delays, and it can be read back from file for any annotation.
+	 * audio the spectrogram is made from (all channels, as one group) to localise
+	 * them - the decimator output if the user chose to decimate, otherwise the Sound
+	 * Acquisition data. Using the same data as the spectrogram means the bearings
+	 * are worked out over the band the user is looking at, and either can be read
+	 * back from file for any annotation.
 	 */
 	private void addBearingLocaliser(SpectrogramConfigBuilder builder) {
 		PamDataBlock annotationBlock = PamAutoConfigUtils.getOutputDataBlock(builder.getAnnotationControl());
-		if (annotationBlock == null || builder.getAcquisitionControl() == null) {
+		PamRawDataBlock rawData = builder.getSpectrogramRawData();
+		if (annotationBlock == null || rawData == null) {
 			System.err.println("SpectrogramBearingViewerAutoConfig: annotation or acquisition module missing - no bearing localiser added");
 			return;
 		}
@@ -72,7 +81,6 @@ public class SpectrogramBearingViewerAutoConfig implements PamAutoConfig {
 			return;
 		}
 		BearingLocaliserControl bearingControl = (BearingLocaliserControl) unit;
-		PamRawDataBlock rawData = builder.getAcquisitionControl().getAcquisitionProcess().getRawDataBlock();
 
 		BearingLocaliserParams params = bearingControl.getBearingLocaliserParams();
 		params.detectionSource = annotationBlock.getLongDataName();
@@ -90,6 +98,31 @@ public class SpectrogramBearingViewerAutoConfig implements PamAutoConfig {
 		bearingControl.setBearingLocaliserParams(params);
 
 		PamController.getInstance().notifyModelChanged(PamControllerInterface.CHANGED_PROCESS_SETTINGS);
+
+		addBearingDisplay(builder, bearingControl);
+	}
+
+	/**
+	 * Add the Bearing Localiser's display to the User Display tab holding the
+	 * spectrogram, and tile the two side by side. The bearing display is built from
+	 * the localiser's algorithm groups, so this must follow setting its parameters.
+	 * Swing GUI only - in the FX GUI the time display is its own module and there's
+	 * no User Display to put the bearing display in.
+	 */
+	private void addBearingDisplay(SpectrogramConfigBuilder builder, BearingLocaliserControl bearingControl) {
+		UserDisplayControl userDisplay = builder.getUserDisplayControl();
+		if (userDisplay == null) {
+			System.out.println("SpectrogramBearingViewerAutoConfig: no User Display (FX GUI?) - bearing display not added");
+			return;
+		}
+		UserDisplayComponent bearingDisplay = userDisplay.addUserDisplay(bearingControl.getBearingDisplayProvider());
+		if (bearingDisplay == null) {
+			System.err.println("SpectrogramBearingViewerAutoConfig: bearing display could not be added");
+			return;
+		}
+		UserDisplayComponent spectrogram = builder.getTimeDisplayComponent();
+		SwingUtilities.invokeLater(() -> userDisplay.tileSideBySide(
+				new double[] { SPECTROGRAM_WIDTH, 1 - SPECTROGRAM_WIDTH }, spectrogram, bearingDisplay));
 	}
 
 	@Override
@@ -104,7 +137,9 @@ public class SpectrogramBearingViewerAutoConfig implements PamAutoConfig {
 				+ "Sets up the same spectrogram and annotation modules as \"View a spectrogram\", "
 				+ "plus a Bearing Localiser. Every annotation drawn on the spectrogram gets a "
 				+ "bearing from the time delays between channels, which is updated whenever the "
-				+ "annotation is moved or resized. Check the hydrophone positions in the array "
+				+ "annotation is moved or resized, and the Bearing Localiser's display is shown "
+				+ "alongside the spectrogram. If the data are decimated, the bearings are calculated from "
+				+ "the decimated data. Check the hydrophone positions in the array "
 				+ "manager, since the bearings depend on them.";
 	}
 

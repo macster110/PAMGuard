@@ -274,6 +274,12 @@
                     <exclude>test/resources/**</exclude>
                   </excludes>
                 </filter>
+                <filter>
+                  <artifact>edu.ucar:netcdfAll</artifact>
+                  <excludes>
+                    <exclude>com/sun/jna/**</exclude>
+                  </excludes>
+                </filter>
               </filters>
             </configuration>
           </plugin>

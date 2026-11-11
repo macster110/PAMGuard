@@ -20,7 +20,11 @@
  */
 package userDisplay;
 
+import java.awt.Dimension;
 import java.awt.Frame;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.beans.PropertyVetoException;
 import java.io.Serializable;
 import java.util.ArrayList;
 
@@ -254,5 +258,79 @@ public class UserDisplayTabPanelControl implements PamTabPanel {
 	 */
 	public void removeAllDisplays() {
 		userDisplayTabPanel.removeAll();
+	}
+
+	/**
+	 * Tile displays side by side, left to right in the order given, filling the
+	 * tab. If the tab has no size yet (it hasn't been laid out) the tiling waits
+	 * until it first gets one.
+	 *
+	 * @param widthFractions fraction of the width for each display (normalised).
+	 * @param components     the displays to tile.
+	 */
+	void tileSideBySide(double[] widthFractions, UserDisplayComponent... components) {
+		if (components == null || widthFractions == null || widthFractions.length != components.length) {
+			return;
+		}
+		Dimension d = userDisplayTabPanel.getSize();
+		if (d.width > 0 && d.height > 0) {
+			doTileSideBySide(widthFractions, components);
+			return;
+		}
+		userDisplayTabPanel.addComponentListener(new ComponentAdapter() {
+			@Override
+			public void componentResized(ComponentEvent e) {
+				Dimension size = userDisplayTabPanel.getSize();
+				if (size.width > 0 && size.height > 0) {
+					userDisplayTabPanel.removeComponentListener(this);
+					doTileSideBySide(widthFractions, components);
+				}
+			}
+		});
+	}
+
+	private void doTileSideBySide(double[] widthFractions, UserDisplayComponent[] components) {
+		double total = 0;
+		for (double f : widthFractions) {
+			total += Math.max(0, f);
+		}
+		if (total <= 0) {
+			return;
+		}
+		Dimension d = userDisplayTabPanel.getSize();
+		int x = 0;
+		for (int i = 0; i < components.length; i++) {
+			UserDisplayFrame frame = findFrame(components[i]);
+			if (frame == null) {
+				continue;
+			}
+			int width = (i == components.length - 1) ? d.width - x
+					: (int) Math.round(d.width * Math.max(0, widthFractions[i]) / total);
+			try {
+				frame.setMaximum(false);
+				frame.setIcon(false);
+			}
+			catch (PropertyVetoException e) {
+				// leave it as it is.
+			}
+			frame.setBounds(x, 0, width, d.height);
+			x += width;
+		}
+	}
+
+	/**
+	 * Find the frame holding a display component, or null.
+	 */
+	private UserDisplayFrame findFrame(UserDisplayComponent component) {
+		if (component == null) {
+			return null;
+		}
+		for (JInternalFrame frame : userDisplayTabPanel.getAllFrames()) {
+			if (frame instanceof UserDisplayFrame
+					&& ((UserDisplayFrame) frame).getUserDisplayComponent() == component) {
+				return (UserDisplayFrame) frame;
+			}
+		}
+		return null;
 	}
 }

@@ -1,5 +1,6 @@
 package PamController.pamWizard;
 
+import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -70,6 +71,23 @@ public class PamAutoConfigUtils {
 	 * @return a supplier of the time display. Never null.
 	 */
 	public static Supplier<TDDisplayFX> addTimeDisplay(String moduleName) {
+		return addTimeDisplay(moduleName, null);
+	}
+
+	/**
+	 * Add an FX time display as {@link #addTimeDisplay(String)}, and say which User
+	 * Display module and component it went into in the Swing GUI, so more displays
+	 * can be added alongside it.
+	 *
+	 * @param moduleName       the name to give the display module.
+	 * @param userDisplayAdded called (straight away, on this thread) with the User
+	 *                         Display module and the time display's component in
+	 *                         it. Not called in the FX GUI, or if the display
+	 *                         couldn't be added. May be null.
+	 * @return a supplier of the time display. Never null.
+	 */
+	public static Supplier<TDDisplayFX> addTimeDisplay(String moduleName,
+			BiConsumer<UserDisplayControl, UserDisplayComponent> userDisplayAdded) {
 		if (PamGUIManager.isFX()) {
 			TDDisplayController controller = (TDDisplayController) addModule(TD_DISPLAY_CLASS, moduleName);
 			return () -> (controller == null) ? null : controller.getMainDisplay();
@@ -81,6 +99,9 @@ public class PamAutoConfigUtils {
 		UserDisplayComponent component = userDisplay.addUserDisplay(TDControlAWT.class);
 		if (component instanceof TDControlAWT) {
 			TDControlAWT tdControl = (TDControlAWT) component;
+			if (userDisplayAdded != null) {
+				userDisplayAdded.accept(userDisplay, component);
+			}
 			return tdControl::getMainDisplay;
 		}
 		return () -> null;

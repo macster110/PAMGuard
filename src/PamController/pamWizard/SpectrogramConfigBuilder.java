@@ -32,6 +32,8 @@ import dataPlotsFX.TDDisplayController;
 import dataPlotsFX.layout.TDDisplayFX;
 import dataPlotsFX.layout.TDGraphFX;
 import soundPlayback.PlaybackControl;
+import userDisplay.UserDisplayComponent;
+import userDisplay.UserDisplayControl;
 import soundPlayback.PlaybackParameters;
 import soundPlayback.PlaybackSystem;
 
@@ -70,6 +72,12 @@ public class SpectrogramConfigBuilder {
 	private PamControlledUnit annotationControl;
 	private PlaybackControl playbackControl;
 
+	/** User Display module holding the time display (Swing GUI only, else null). */
+	private UserDisplayControl userDisplayControl;
+
+	/** The time display's component in {@link #userDisplayControl} (Swing GUI only). */
+	private UserDisplayComponent timeDisplayComponent;
+
 	/**
 	 * Build the spectrogram configuration.
 	 *
@@ -104,7 +112,11 @@ public class SpectrogramConfigBuilder {
 					DECIMATOR_NAME);
 		}
 		fftControl = PamAutoConfigUtils.addModule(FFT_CLASS, "FFT Engine");
-		Supplier<TDDisplayFX> displaySupplier = PamAutoConfigUtils.addTimeDisplay("Spectrogram");
+		Supplier<TDDisplayFX> displaySupplier = PamAutoConfigUtils.addTimeDisplay("Spectrogram",
+				(userDisplay, component) -> {
+					userDisplayControl = userDisplay;
+					timeDisplayComponent = component;
+				});
 		playbackControl = findOrAddSoundOutput();
 		if (viewer) {
 			// Spectrogram Annotation module provides manual annotation marks over the
@@ -164,6 +176,46 @@ public class SpectrogramConfigBuilder {
 	}
 
 	/**
+	 * @return the User Display module holding the spectrogram time display, or null
+	 *         in the FX GUI (where the time display is its own module).
+	 */
+	public UserDisplayControl getUserDisplayControl() {
+		return userDisplayControl;
+	}
+
+	/**
+	 * @return the spectrogram time display's component within
+	 *         {@link #getUserDisplayControl()}, or null in the FX GUI.
+	 */
+	public UserDisplayComponent getTimeDisplayComponent() {
+		return timeDisplayComponent;
+	}
+
+	/**
+	 * @return the Decimator module added by {@link #build} if decimation was chosen,
+	 *         otherwise null.
+	 */
+	public DecimatorControl getDecimatorControl() {
+		return decimatorControl;
+	}
+
+	/**
+	 * Get the raw data used to make the spectrogram - the decimator output if there
+	 * is a decimator, otherwise the Sound Acquisition data.
+	 *
+	 * @return the spectrogram's raw data source, or null before {@link #build}.
+	 */
+	public PamRawDataBlock getSpectrogramRawData() {
+		if (decimatorControl != null) {
+			return decimatorControl.getDecimatorProcess().getOutputDataBlock();
+		}
+		if (acquisitionControl != null) {
+			return acquisitionControl.getAcquisitionProcess().getRawDataBlock();
+		}
+		return null;
+	}
+
+	/**
 	 * @return the annotation module added by a viewer {@link #build}, or null.
 	 */
 	public PamControlledUnit getAnnotationControl() {
@@ -220,13 +272,7 @@ public class SpectrogramConfigBuilder {
 			return;
 		}
 		PamFFTControl pamFFTControl = (PamFFTControl) fftControl;
-		PamRawDataBlock sourceData;
-		if (decimatorControl != null) {
-			sourceData = decimatorControl.getDecimatorProcess().getOutputDataBlock();
-		}
-		else {
-			sourceData = acquisitionControl.getAcquisitionProcess().getRawDataBlock();
-		}
+		PamRawDataBlock sourceData = getSpectrogramRawData();
 		FFTParameters params = pamFFTControl.getFftParameters().clone();
 		params.fftLength = options.getFftLength();
 		params.fftHop = options.getFftHop();

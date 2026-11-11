@@ -92,6 +92,14 @@ public class BearingLocaliserControl extends PamControlledUnit implements PamSet
 	/* (non-Javadoc)
 	 * @see PamController.PamControlledUnit#removeUnit()
 	 */
+	/**
+	 * @return the provider of this module's bearing display in the User Display
+	 *         (Swing GUI).
+	 */
+	public BearingDisplayProvider getBearingDisplayProvider() {
+		return bearingDisplayProvider;
+	}
+
 	@Override
 	public boolean removeUnit() {
 		UserDisplayControl.removeDisplayProvider(bearingDisplayProvider);
