@@ -84,9 +84,17 @@ public class FilterDialog extends PamDialog {
 			singleInstance = new FilterDialog(ownerFrame, true);
 		}
 		singleInstance.filterDialogPanel.setSampleRate(sampleRate);
-		singleInstance.filterParams2 = filterParams2;
-		singleInstance.setParams(filterParams2);
+		/*
+		 * Work on a (deep) copy so that nothing the dialog does touches the
+		 * live module settings unless OK is pressed.
+		 */
+		singleInstance.filterParams2 = filterParams2.clone();
+		singleInstance.setParams(singleInstance.filterParams2);
 		singleInstance.setVisible(true);
+		if (singleInstance.filterParams2 == null) {
+			// dialog was cancelled.
+			return null;
+		}
 		singleInstance.filterParams2.filterParams = singleInstance.filterDialogPanel.getFilterParams();
 		return singleInstance.filterParams2;
 	}
@@ -127,6 +135,7 @@ public class FilterDialog extends PamDialog {
 
 	@Override
 	public void cancelButtonPressed() {
+		filterParams2 = null;
 		filterDialogPanel.cancelButtonPressed();
 	}
 
