@@ -104,7 +104,7 @@ public class DeepWhistleControl extends  MaskedFFTControl {
 			SettingsPane<MaskedFFTParamters> setPane = (SettingsPane<MaskedFFTParamters>) getSettingsPane();
 			//setPane.setParams(this.rawDLParmas);
 			settingsDialog = new PamDialogFX2AWT<MaskedFFTParamters>(parentFrame, setPane, false);
-			settingsDialog.setHelpPoint("classifiers.rawDeepLearningHelp.docs.rawDeepLearning");
+			settingsDialog.setHelpPoint("detectors.deepWhistleHelp.docs.deepWhistle");
 			settingsDialog.setResizable(true);
 		}
 		MaskedFFTParamters newParams = settingsDialog.showDialog(parameters); 

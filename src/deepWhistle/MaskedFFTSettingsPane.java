@@ -32,7 +32,9 @@ import pamViewFX.fxNodes.utilityPanes.FreqResolutionPane;
 import pamViewFX.fxNodes.utilityPanes.SourcePaneFX;
 import pamViewFX.fxSettingsPanes.DynamicSettingsPane;
 
+import PamController.PamControlledUnit;
 import PamController.PamController;
+import PamguardMVC.PamProcess;
 import PamguardMVC.PamDataBlock;
 import fftManager.FFTDataBlock;
 import fftManager.FFTDataUnit;
@@ -113,8 +115,15 @@ public class MaskedFFTSettingsPane extends DynamicSettingsPane<MaskedFFTParamter
 	 */
 	private boolean downloadInProgress = false;
 
+    /**
+     * The module which owns this pane. Used to exclude the module's own output
+     * (masked FFT) data blocks from the list of possible sources.
+     */
+    private Object owner;
+
     public MaskedFFTSettingsPane(Object owner) {
         super(owner);
+        this.owner = owner;
         createContent();
     }
 
@@ -128,14 +137,7 @@ public class MaskedFFTSettingsPane extends DynamicSettingsPane<MaskedFFTParamter
 
 		resolutionPane=new FreqResolutionPane();
 
-		sourcePane.addSelectionListener((obsVal, newVal, oldVal) -> {
-			//update the frequency resolution pane.
-			resolutionPane.setParams((FFTDataBlock) sourcePane.getSource());
-			//let the mask pane re-validate against the new source.
-			if (currentMaskPane != null) {
-				currentMaskPane.setFFTSource(getSelectedFFTSource());
-			}
-		});
+		sourcePane.addSelectionListener((obsVal, oldVal, newVal) -> sourceSelectionChanged());
 
 		vBox.getChildren().add(sourcePane);
 
@@ -228,6 +230,36 @@ public class MaskedFFTSettingsPane extends DynamicSettingsPane<MaskedFFTParamter
     	maskBox.getChildren().addAll(titleLabel, selectBox, statusHolder, maskPaneHolder);
 
     	return maskBox;
+    }
+
+    /**
+     * Called when the selected FFT source changes (or is set programmatically).
+     * Updates the frequency resolution information and lets the mask pane
+     * re-validate against the new source.
+     */
+    private void sourceSelectionChanged() {
+    	resolutionPane.setParams(getSelectedFFTSource());
+    	if (currentMaskPane != null) {
+    		currentMaskPane.setFFTSource(getSelectedFFTSource());
+    	}
+    }
+
+    /**
+     * Exclude the owning module's own output data blocks from the source list -
+     * the masked FFT output is itself an FFT data block so would otherwise be
+     * offered as a source for the module.
+     */
+    private void excludeOwnOutputBlocks() {
+    	if (!(owner instanceof PamControlledUnit)) {
+    		return;
+    	}
+    	PamControlledUnit unit = (PamControlledUnit) owner;
+    	for (int i = 0; i < unit.getNumPamProcesses(); i++) {
+    		PamProcess process = unit.getPamProcess(i);
+    		for (int j = 0; j < process.getNumOutputDataBlocks(); j++) {
+    			sourcePane.excludeDataBlock(process.getOutputDataBlock(j), true);
+    		}
+    	}
     }
 
     /**
@@ -514,8 +546,16 @@ public class MaskedFFTSettingsPane extends DynamicSettingsPane<MaskedFFTParamter
 		PamDataBlock  datablock = PamController.getInstance().getFFTDataBlock(params.dataSourceName);
 //		System.out.println("Data block to set for FFT source: "+datablock.getDataName() + " FFT PARAMS: "+fftParameters.dataSourceName);
 		//fft settings
+		//refresh the source list (sources may have been added / removed since the
+		//pane was created) without offering this module's own output as a source.
+		excludeOwnOutputBlocks();
+		sourcePane.setSourceList();
 		sourcePane.setSource(datablock);
 		sourcePane.setChannelList(params.channelMap); //set selected channels
+
+		//setSource only fires the selection listener if the selection actually changes,
+		//so explicitly update the resolution info for the current source.
+		resolutionPane.setParams(getSelectedFFTSource());
 
 		//the currently downloaded model path
 		currentModelPath = params.modelPath;

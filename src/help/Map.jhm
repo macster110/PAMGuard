@@ -950,4 +950,6 @@
 
 <mapID target="sensors.soundtrapSensor.docs.soundtrapSensor" url="sensors/soundtrapSensor/docs/soundtrapSensor.html"/>
 
+<mapID target="detectors.deepWhistleHelp.docs.deepWhistle" url="detectors/deepWhistleHelp/docs/deepWhistle.html"/>
+
 </map>

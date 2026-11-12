@@ -258,6 +258,8 @@
 
  <indexitem text="Decimator " target="sound_processing.decimatorHelp.docs.decimator_decimator"/>
 
+ <indexitem text="Deep Whistle " target="detectors.deepWhistleHelp.docs.deepWhistle"/>
+
  <indexitem text="Detectors " target="overview.PamMasterHelp.docs.modules_detectors"/>
 
  <indexitem text="Difar " target="localisation.difar.difarLocalisation.docs.difar_UsingSpectrogram"/>
