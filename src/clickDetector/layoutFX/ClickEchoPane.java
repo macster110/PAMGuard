@@ -41,8 +41,11 @@ public class ClickEchoPane extends SettingsPane<ClickParameters> {
 	 */
 	private PamBorderPane mainPane; 
 	
+	private ClickControl clickControl;
+
 	public ClickEchoPane(ClickControl clickControl){
 		super(null);
+		this.clickControl = clickControl;
 		mainPane = new PamBorderPane();
 		mainPane.setCenter(createEchoPane());
 	}
@@ -59,9 +62,10 @@ public class ClickEchoPane extends SettingsPane<ClickParameters> {
 		PamGuiManagerFX.titleFont2style(echoLable1);
 		vBox.getChildren().add(echoLable1);
 		
-		vBox.getChildren().add(runEchoCheckBox=new CheckBox("Run Echo Detector"));
+		vBox.getChildren().add(runEchoCheckBox=new CheckBox("Run Echo Detector online"));
 		runEchoCheckBox.setOnAction((action)->{
 			discardEchoCheckBox.setDisable(!runEchoCheckBox.isSelected());
+			if (!runEchoCheckBox.isSelected()) discardEchoCheckBox.setSelected(false);
 		});
 		vBox.getChildren().add(discardEchoCheckBox=new CheckBox("Discard Echoes"));
 
@@ -74,9 +78,11 @@ public class ClickEchoPane extends SettingsPane<ClickParameters> {
 		PamHBox intervalBox=new PamHBox(); 
 		intervalBox.setSpacing(5);
 		
-		echoIntervalSpinner=new PamSpinner<Double>(0.00000, 100, 0.1, 0.05);
+		echoIntervalSpinner=new PamSpinner<Double>(0.00000, 100, 0.1, 0.0001);
 		echoIntervalSpinner.setEditable(true);
-//		echoIntervalSpinner.getValueFactory().setConverter(new DecimalConverter());
+		echoIntervalSpinner.getValueFactory().setConverter(PamSpinner.createStringConverter(5));
+		echoIntervalSpinner.setPrefWidth(130);
+		echoIntervalSpinner.setTooltip(new javafx.scene.control.Tooltip("The maximum interval between a click and its echo"));
 		echoIntervalSpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
 		
 		intervalBox.getChildren().addAll(new Label("Max Interval"),echoIntervalSpinner,new Label("seconds") ); 
@@ -86,16 +92,45 @@ public class ClickEchoPane extends SettingsPane<ClickParameters> {
 		return vBox; 
 	} 
 	
+	/**
+	 * Get the parameters of the simple echo detector, if it is being used. 
+	 * @return the echo parameters or null. 
+	 */
+	private clickDetector.echoDetection.SimpleEchoParams getEchoParams() {
+		if (clickControl == null || !(clickControl.getEchoDetectionSystem() instanceof PamController.PamSettings)) return null; 
+		java.io.Serializable ref = ((PamController.PamSettings) clickControl.getEchoDetectionSystem()).getSettingsReference(); 
+		if (ref instanceof clickDetector.echoDetection.SimpleEchoParams) {
+			return (clickDetector.echoDetection.SimpleEchoParams) ref; 
+		}
+		return null; 
+	}
+	
 	@Override
 	public ClickParameters getParams(ClickParameters clickParameters) {
-		// TODO Auto-generated method stub
+		clickParameters.runEchoOnline = runEchoCheckBox.isSelected(); 
+		clickParameters.discardEchoes = discardEchoCheckBox.isSelected(); 
+		clickDetector.echoDetection.SimpleEchoParams echoParams = getEchoParams(); 
+		if (echoParams != null) {
+			Double val = echoIntervalSpinner.getValue(); 
+			if (val == null || val < 0) {
+				pamViewFX.fxNodes.pamDialogFX.PamDialogFX.showWarning("Invalid echo delay value");
+				return null; 
+			}
+			echoParams.maxIntervalSeconds = val; 
+		}
 		return clickParameters;
 	}
 	
 	@Override
 	public void setParams(ClickParameters clickParameters) {
-		// TODO Auto-generated method stub
-		
+		runEchoCheckBox.setSelected(clickParameters.runEchoOnline);
+		discardEchoCheckBox.setSelected(clickParameters.discardEchoes);
+		discardEchoCheckBox.setDisable(!runEchoCheckBox.isSelected());
+		clickDetector.echoDetection.SimpleEchoParams echoParams = getEchoParams(); 
+		echoIntervalSpinner.setDisable(echoParams == null);
+		if (echoParams != null) {
+			echoIntervalSpinner.getValueFactory().setValue(echoParams.maxIntervalSeconds);
+		}
 	}
 
 	@Override

@@ -15,6 +15,8 @@ import whistlesAndMoans.WhistleToneParameters;
 import javafx.geometry.HPos;
 import javafx.scene.Node;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.Tab;
@@ -32,6 +34,11 @@ public class WhistleMoanSettingsPaneFX extends SettingsPane<WhistleToneParameter
 	 * The source pane for the whistle and moan detector. 
 	 */
 	private GroupedSourcePaneFX sourcePane;
+
+	/**
+	 * Remove small stubs from whistle shapes. 
+	 */
+	private CheckBox removeStubs;
 
 	/**
 	 * Reference to whistle and moan detector. 
@@ -140,7 +147,7 @@ public class WhistleMoanSettingsPaneFX extends SettingsPane<WhistleToneParameter
 		gridPane.add(connectTypeBox, 1, 2);
 		GridPane.setColumnSpan(connectTypeBox, 4);
 		
-		gridPane.add(new Label("Minh Length"), 0, 3);		
+		gridPane.add(new Label("Min Length"), 0, 3);		
 		minLengthSpinner=new PamSpinner<Integer>(1,100,10,2);
 		minLengthSpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
 		minLengthSpinner.setEditable(true);
@@ -160,7 +167,13 @@ public class WhistleMoanSettingsPaneFX extends SettingsPane<WhistleToneParameter
         GridPane.setHalignment(pixelsLbl, HPos.LEFT);
 		gridPane.add(pixelsLbl, 2, 4);
 
-		gridPane.add(new Label("Crossing and Joining"), 0, 5);
+		gridPane.add(new Label("Shape 'stubs'"), 0, 5);
+		removeStubs = new CheckBox("Remove small stubs"); 
+		removeStubs.setTooltip(new Tooltip("Remove short bits of whistle shape sticking out from main contour: helps reduce whistle fragmentation"));
+		gridPane.add(removeStubs, 1, 5);
+		GridPane.setColumnSpan(removeStubs, 4);
+
+		gridPane.add(new Label("Crossing and Joining"), 0, 6);
 		fragmentationBox=new ComboBox<String>();
 		fragmentationBox.getItems().add("Leave branched regions intact");
 		fragmentationBox.getItems().add("Discard branched regions");
@@ -168,20 +181,20 @@ public class WhistleMoanSettingsPaneFX extends SettingsPane<WhistleToneParameter
 		fragmentationBox.getItems().add("Re-link across joins");
 		GridPane.setHgrow(fragmentationBox, Priority.ALWAYS);
 		fragmentationBox.setMaxWidth(Double.MAX_VALUE);
-		gridPane.add(fragmentationBox, 1, 5);
+		gridPane.add(fragmentationBox, 1, 6);
 		fragmentationBox.setOnAction((action)->{
 			enableControls();
 			
 		});
 		GridPane.setColumnSpan(fragmentationBox, 4);
 
-		gridPane.add(new Label("Max Cross Length"), 0, 6);		
+		gridPane.add(new Label("Max Cross Length"), 0, 7);		
 		maxCrossLengthSpinner=new PamSpinner<Integer>(1,100,5,2);
 		maxCrossLengthSpinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
 		maxCrossLengthSpinner.setEditable(true);
-		gridPane.add(maxCrossLengthSpinner, 1, 6);
+		gridPane.add(maxCrossLengthSpinner, 1, 7);
 		//highCut.setPrefColumnCount(6)
-		gridPane.add(new Label("time slices"), 2, 6);
+		gridPane.add(new Label("time slices"), 2, 7);
 
 		vBox.getChildren().add(gridPane);
 		
@@ -224,6 +237,7 @@ public class WhistleMoanSettingsPaneFX extends SettingsPane<WhistleToneParameter
 			whistleToneParams.setConnectType(4);
 		}
 		whistleToneParams.fragmentationMethod = fragmentationBox.getSelectionModel().getSelectedIndex();
+		whistleToneParams.keepShapeStubs = !removeStubs.isSelected();
 
 		boolean ok = checkMethods();
 		if (ok == false) {
@@ -279,6 +293,7 @@ public class WhistleMoanSettingsPaneFX extends SettingsPane<WhistleToneParameter
 		minPixelsSpinner.getValueFactory().setValue(wmdParams.minPixels);
 		
 		fragmentationBox.getSelectionModel().select(wmdParams.fragmentationMethod);
+		removeStubs.setSelected(!wmdParams.keepShapeStubs);
 		
 		maxCrossLengthSpinner.getValueFactory().setValue(wmdParams.maxCrossLength);
 		

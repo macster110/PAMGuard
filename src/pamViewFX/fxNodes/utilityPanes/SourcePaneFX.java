@@ -484,7 +484,22 @@ public class SourcePaneFX extends PamBorderPane {
 		 * Dialogs should always call this themselves each time they reopen. 
 		 */
 //		setSourceList();
-		
+
+		/*
+		 * If the block is not in the list then the list is probably out of date, e.g. a module
+		 * was added after the pane was created. Refresh the list but keep any data blocks
+		 * which were added dynamically.
+		 */
+		if (sourceBlock != null && !sourceList.getItems().contains(sourceBlock)) {
+			ArrayList<PamDataBlock> oldItems = new ArrayList<PamDataBlock>(sourceList.getItems());
+			setSourceList();
+			for (PamDataBlock oldItem : oldItems) {
+				if (!sourceList.getItems().contains(oldItem) && !excludedBlocks.contains(oldItem)) {
+					sourceList.getItems().add(oldItem);
+				}
+			}
+		}
+
 		/*
 		 * The direct way of doing this seems to have stopped working - very worrying !
 		 */

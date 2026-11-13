@@ -252,11 +252,7 @@ public class DecimatorSettingsPane extends SettingsPane<DecimatorParams> {
 			mainPane = holder;
 		}
 
-		//		
-		//		setHelpPoint("sound_processing.decimatorHelp.docs.decimator_decimator");
-		//		filterButton.setToolTipText("Manual adjustment of filter settings");
-		//		defaultFilterButton.setToolTipText("Set a default filter (6th order Butterworth low pass at Decimator Nyquist frequency)");
-		//		interpolator.setToolTipText("If Decimation / upsampling is not by an integer value, you should use interpolation to improve waveform reconstruction");
+		interpolator.setTooltip(new javafx.scene.control.Tooltip("If Decimation / upsampling is not by an integer value, you should use interpolation to improve waveform reconstruction"));
 
 		return mainPane;
 	}

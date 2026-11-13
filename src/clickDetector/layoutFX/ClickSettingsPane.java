@@ -34,6 +34,8 @@ import pamViewFX.fxNodes.PamGridPane;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamSpinner;
 import pamViewFX.fxNodes.PamVBox;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
+import javafx.scene.control.Tooltip;
 import pamViewFX.fxNodes.navigationDrawer.NavigationDrawer;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
 import pamViewFX.fxNodes.utilityPanes.FilterPaneFX;
@@ -203,6 +205,8 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 		detectionPane.getChildren().add(holder);
 
 		detectionPane.getChildren().add(createTriggerGraph()); 
+		
+		detectionPane.getChildren().add(createNoisePane()); 
 
 		//add everything to tabs.
 		Tab clickDetectionTabe =new Tab("Click Detection", detectionPane);
@@ -213,7 +217,19 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 		
 		clickDelayPane=createDelayPane();
 		((Region) clickDelayPane.getContentNode()).setPadding(new Insets(5,5,5,5));
-		tdoaTab=new Tab("TDOA and Echoes", clickDelayPane.getContentNode());
+		//echo detection settings, as in the Swing dialog. 
+		PamVBox tdoaHolder = new PamVBox(); 
+		tdoaHolder.setSpacing(5);
+		Label delayLabel = new Label("Time Delay Measurement");
+		PamGuiManagerFX.titleFont2style(delayLabel);
+		delayLabel.setPadding(new Insets(5,5,0,5));
+		tdoaHolder.getChildren().addAll(delayLabel, clickDelayPane.getContentNode()); 
+		if (clickControl.getEchoDetectionSystem() != null) {
+			echoDetection= new ClickEchoPane(clickControl); 
+			((Region) echoDetection.getContentNode()).setPadding(new Insets(5,5,5,5));
+			tdoaHolder.getChildren().add(echoDetection.getContentNode()); 
+		}
+		tdoaTab=new Tab("TDOA and Echoes", tdoaHolder);
 		tdoaTab.setGraphic(PamGlyphDude.createPamIcon("mdi2a-av-timer")); 
 		pamTabbedPane.getTabs().add(tdoaTab);
 		
@@ -387,6 +403,7 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 
 		PamVBox holder=new PamVBox();
 		holder.setSpacing(5);
+		fullWidthLabels(lengthPane);
 		holder.getChildren().addAll(triggerLabel, lengthPane);
 
 		return holder; 
@@ -436,6 +453,62 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 		sourcePane = new GroupedSourcePaneFX( "Raw Data Source for Clicks", RawDataUnit.class, true, true, true);
 
 		return sourcePane;
+	}
+
+	/**
+	 * The minimum number of channels which must trigger to detect a click. 
+	 */
+	private PamSpinner<Integer> minTriggerChannels;
+	
+	/**
+	 * Noise sampling controls. 
+	 */
+	private PamToggleSwitch sampleNoise, sampleBackground; 
+	
+	private PamSpinner<Double> noiseInterval, backgroundInterval; 
+	
+	/**
+	 * Create the pane for noise and background sampling. Same options as the
+	 * Noise tab of the Swing dialog. 
+	 * @return the noise pane. 
+	 */
+	private Pane createNoisePane() {
+		PamVBox noisePane = new PamVBox(); 
+		noisePane.setSpacing(5);
+		Label noiseLabel = new Label("Noise Sampling");
+		PamGuiManagerFX.titleFont2style(noiseLabel);
+		
+		PamGridPane grid = new PamGridPane(); 
+		grid.setHgap(5);
+		grid.setVgap(5);
+		
+		sampleNoise = new PamToggleSwitch("Create sample noise measurements"); 
+		sampleNoise.setTooltip(new Tooltip("Warning: Output RainbowClick files containing noise "
+				+ "samples will not be compatible with older versions of RainbowClick")); 
+		noiseInterval = new PamSpinner<Double>(0.1, 1000000., 10., 1.); 
+		noiseInterval.setEditable(true);
+		noiseInterval.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+		noiseInterval.setPrefWidth(PREF_SPINNER_WIDTH);
+		sampleNoise.selectedProperty().addListener((obs, oldV, newV)->noiseInterval.setDisable(!newV));
+		grid.add(sampleNoise, 0, 0);
+		grid.add(new Label("Interval"), 1, 0);
+		grid.add(noiseInterval, 2, 0);
+		grid.add(new Label("s"), 3, 0);
+		
+		sampleBackground = new PamToggleSwitch("Sample trigger background measurements"); 
+		sampleBackground.setTooltip(new Tooltip("Periodically store the background level of the trigger"));
+		backgroundInterval = new PamSpinner<Double>(0.1, 1000000., 10., 1.); 
+		backgroundInterval.setEditable(true);
+		backgroundInterval.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+		backgroundInterval.setPrefWidth(PREF_SPINNER_WIDTH);
+		sampleBackground.selectedProperty().addListener((obs, oldV, newV)->backgroundInterval.setDisable(!newV));
+		grid.add(sampleBackground, 0, 1);
+		grid.add(new Label("Interval"), 1, 1);
+		grid.add(backgroundInterval, 2, 1);
+		grid.add(new Label("s"), 3, 1);
+		
+		noisePane.getChildren().addAll(noiseLabel, grid); 
+		return noisePane; 
 	}
 
 	private Pane createClickTriggerPane(){
@@ -506,14 +579,35 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 
 		//forces the grid pane to be larger - grid panes can be a little funny. 
 		shortFilter.setMinWidth(PREF_SPINNER_WIDTH);
+		
+		triggerBox.add(new Label("Min channels"),0,4);
+		minTriggerChannels=new PamSpinner<Integer>(1, PamConstants.MAX_CHANNELS, 1, 1);
+		minTriggerChannels.setEditable(true);
+		minTriggerChannels.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+		minTriggerChannels.setPrefWidth(PREF_SPINNER_WIDTH);
+		minTriggerChannels.setTooltip(new Tooltip("Min number of channels to trigger a click (between 1 and the total number of channels in each group)"));
+		triggerBox.add(minTriggerChannels,1,4);
 
 		triggerPane.add(triggerBox,0,1);
+		fullWidthLabels(triggerBox);
 
 		//triggerPane.setGridLinesVisible(true);
 
 		return triggerPane; 
 	}
 
+
+	/**
+	 * Stop labels in a grid from being truncated when the dialog is narrow.
+	 * @param pane - the pane holding the labels.
+	 */
+	private void fullWidthLabels(Pane pane) {
+		for (Node n : pane.getChildren()) {
+			if (n instanceof Label) {
+				((Label) n).setMinWidth(Region.USE_PREF_SIZE);
+			}
+		}
+	}
 
 	private Pane createTriggerGraph() {
 		//trigger graph
@@ -703,6 +797,11 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 				clickParameters.longFilter = Double.valueOf(longFilter.getValue());
 				clickParameters.longFilter2 = Double.valueOf(longFilter2.getValue());
 				clickParameters.shortFilter = Double.valueOf(shortFilter.getValue());
+				clickParameters.minTriggerChannels = minTriggerChannels.getValue(); 
+				clickParameters.sampleNoise = sampleNoise.isSelected(); 
+				if (clickParameters.sampleNoise) clickParameters.noiseSampleInterval = noiseInterval.getValue(); 
+				clickParameters.storeBackground = sampleBackground.isSelected(); 
+				if (clickParameters.storeBackground) clickParameters.backgroundIntervalMillis = (int) (backgroundInterval.getValue()*1000.); 
 			} catch (Exception ex) {
 				PamDialogFX.showWarning("There is a problem in the click trigger settings"); 
 				return null;
@@ -724,6 +823,11 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 					clickParameters.triggerBitmap |= 1<<i;
 					boxSelected=true; 
 				}
+			}
+			int nTrigger = PamUtils.getNumChannels(clickParameters.triggerBitmap); 
+			if (boxSelected && (clickParameters.minTriggerChannels < 1 || clickParameters.minTriggerChannels > nTrigger)) {
+				PamDialogFX.showWarning(String.format("The minimum number of trigger channels must be between 1 and %d", nTrigger)); 
+				return null; 
 			}
 			if (!boxSelected){
 				PamDialogFX.showWarning("There are no channels which have the trigger set. Without at least one channel"
@@ -808,7 +912,24 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 		longFilter.getValueFactory().setValue(clickParameters.longFilter);
 		longFilter2.getValueFactory().setValue(clickParameters.longFilter2);
 		shortFilter.getValueFactory().setValue(clickParameters.shortFilter);
+		minTriggerChannels.getValueFactory().setValue(Math.max(1, clickParameters.minTriggerChannels));
 		updateTriggerGraph();
+		
+		//noise sampling
+		sampleNoise.setSelected(clickParameters.sampleNoise);
+		noiseInterval.getValueFactory().setValue(clickParameters.noiseSampleInterval);
+		noiseInterval.setDisable(!clickParameters.sampleNoise);
+		sampleBackground.setSelected(clickParameters.storeBackground);
+		backgroundInterval.getValueFactory().setValue(clickParameters.backgroundIntervalMillis/1000.);
+		backgroundInterval.setDisable(!clickParameters.storeBackground);
+		
+		//echo detection
+		if (echoDetection != null) {
+			echoDetection.setParams(clickParameters);
+		}
+
+		//time delay measurement - also updated when the tab is selected. 
+		clickDelayPane.setParams(clickParameters.clone());
 
 		//populate trigger box
 		for (int i = 0; i < Math.min(PamConstants.MAX_CHANNELS, triggerBoxes.length); i++) {

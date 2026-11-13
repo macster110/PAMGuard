@@ -280,10 +280,13 @@ public class FilterPaneFX extends SettingsPane<FilterParams> {
 		gridPaneFreq.add(lowPass, 1, 1);
 		gridPaneFreq.add(new Label("Hz"), 2, 1);
 
-		PamHBox filterSettings=new PamHBox(); //holds radio buttons and frquency text fields. 
+		filterSettings=new PamHBox(); //holds radio buttons and frquency text fields. 
 		filterSettings.getChildren().addAll(radioButtonBox, gridPaneFreq);
 		filterSettings.setSpacing(15);
 		controlPane.getChildren().add(filterSettings);
+		
+		//pane for arbitrary FIR filter shapes - same as the Swing dialog. 
+		controlPane.getChildren().add(arbPane = createArbPane());
 
 
 		//next create filter order settings
@@ -553,6 +556,8 @@ public class FilterPaneFX extends SettingsPane<FilterParams> {
 		linScale.setSelected(filterParams.scaleType == FilterParams.SCALE_LIN);
 
 		filterMethod = FilterMethod.createFilterMethod(sampleRate, filterParams);
+		
+		setArbTable(); 
 
 		//update control disable status
 		enableControls();
@@ -598,8 +603,109 @@ public class FilterPaneFX extends SettingsPane<FilterParams> {
 			break;
 		}
 		boolean isArb = filterType == 4;
-		//		normalPanel.setVisible(isArb == false);
-		//		arbPanel.setVisible(isArb);
+		filterSettings.setVisible(!isArb);
+		filterSettings.setManaged(!isArb);
+		arbPane.setVisible(isArb);
+		arbPane.setManaged(isArb);
+	}
+	
+	/**
+	 * Holds the frequency response controls. 
+	 */
+	private PamHBox filterSettings;
+	
+	/**
+	 * Shows the shape of an arbitrary FIR filter. 
+	 */
+	private PamVBox arbPane;
+	
+	/**
+	 * Table of frequency and gain for an arbitrary filter. 
+	 */
+	private javafx.scene.control.TableView<double[]> arbTable; 
+	
+	/**
+	 * Create the pane which shows and imports the shape of an arbitrary FIR filter. 
+	 * @return the arbitrary filter pane. 
+	 */
+	@SuppressWarnings("unchecked")
+	private PamVBox createArbPane() {
+		PamVBox pane = new PamVBox(); 
+		pane.setSpacing(5);
+		
+		Label label = new Label("Filter Shape"); 
+		PamGuiManagerFX.titleFont2style(label);
+		
+		arbTable = new javafx.scene.control.TableView<double[]>(); 
+		javafx.scene.control.TableColumn<double[], Number> freqCol = new javafx.scene.control.TableColumn<double[], Number>("Frequency (Hz)"); 
+		freqCol.setCellValueFactory(cell->new javafx.beans.property.SimpleDoubleProperty(cell.getValue()[0]));
+		javafx.scene.control.TableColumn<double[], Number> gainCol = new javafx.scene.control.TableColumn<double[], Number>("Gain (dB)"); 
+		gainCol.setCellValueFactory(cell->new javafx.beans.property.SimpleDoubleProperty(cell.getValue()[1]));
+		arbTable.getColumns().addAll(freqCol, gainCol); 
+		arbTable.setColumnResizePolicy(javafx.scene.control.TableView.CONSTRAINED_RESIZE_POLICY);
+		arbTable.setPrefHeight(150);
+		arbTable.setPlaceholder(new Label("Import a filter shape from a csv or text file"));
+		
+		javafx.scene.control.Button importButton = new javafx.scene.control.Button("Import..."); 
+		importButton.setTooltip(new javafx.scene.control.Tooltip("Import the filter shape from a csv or text file with columns of frequency (Hz) and gain (dB)"));
+		importButton.setOnAction((action)->importArbFilter());
+		
+		pane.getChildren().addAll(label, arbTable, importButton); 
+		return pane; 
+	}
+	
+	/**
+	 * Fill the arbitrary filter table from the filter parameters. 
+	 */
+	private void setArbTable() {
+		if (arbTable == null) return; 
+		arbTable.getItems().clear();
+		if (filterParams == null || filterParams.getArbFreqs() == null || filterParams.getArbGainsdB() == null) return;
+		double[] f = filterParams.getArbFreqs(); 
+		double[] g = filterParams.getArbGainsdB(); 
+		for (int i = 0; i < Math.min(f.length, g.length); i++) {
+			arbTable.getItems().add(new double[] {f[i], g[i]}); 
+		}
+	}
+	
+	/**
+	 * Import an arbitrary filter shape from a csv file. Same format as the Swing dialog. 
+	 */
+	private void importArbFilter() {
+		javafx.stage.FileChooser fileChooser = new javafx.stage.FileChooser(); 
+		fileChooser.setTitle("Import filter shape");
+		fileChooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("CSV / Text files", "*.csv", "*.txt"));
+		if (filterParams.lastImportFile != null && filterParams.lastImportFile.getParentFile() != null 
+				&& filterParams.lastImportFile.getParentFile().exists()) {
+			fileChooser.setInitialDirectory(filterParams.lastImportFile.getParentFile());
+		}
+		java.io.File file = fileChooser.showOpenDialog(mainPane.getScene() == null ? null : mainPane.getScene().getWindow()); 
+		if (file == null) return; 
+		java.util.List<String[]> readList;
+		try (com.opencsv.CSVReader reader = new com.opencsv.CSVReader(new java.io.FileReader(file))) {
+			readList = reader.readAll();
+		}
+		catch (Exception e) {
+			PamDialogFX.showWarning("Unable to read the filter file " + file.getName());
+			return; 
+		}
+		filterParams.lastImportFile = file;
+		double[] f = new double[readList.size()]; 
+		double[] t = new double[readList.size()]; 
+		int iOk = 0; 
+		for (String[] aRow : readList) {
+			try {
+				f[iOk] = Double.valueOf(aRow[0].trim());
+				t[iOk] = Double.valueOf(aRow[1].trim());
+				iOk++;
+			}
+			catch (Exception e) {
+				continue; 
+			}
+		}
+		filterParams.setArbFilterShape(java.util.Arrays.copyOf(f, iOk), java.util.Arrays.copyOf(t, iOk));
+		setArbTable(); 
+		updateBodeGraph(); 
 	}
 
 	@Override
