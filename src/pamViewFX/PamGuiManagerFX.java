@@ -282,7 +282,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		saveConfig.setOnAction(e -> PamSettingManager.getInstance().saveSettings(null));
 
 		MenuItem saveConfigAs = new MenuItem("Save Configuration As...");
-		saveConfigAs.setOnAction(e -> menuBarSaveSettingsAs());
+		saveConfigAs.setOnAction(e -> PamGuiActionsFX.saveSettingsAs(primaryStage));
 
 		MenuItem quit = new MenuItem("Quit PAMGuard");
 		quit.setOnAction(e -> primaryStage.close());
@@ -292,12 +292,10 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		// ── Settings menu ─────────────────────────────────────────────────────
 		Menu settingsMenu = new Menu("Settings");
 
-		MenuItem generalSettings = new MenuItem("General Settings...");
+		Menu generalSettings = new Menu("General Settings");
 		setMenuItemGraphic(generalSettings, PamSettingsMenuPane.ICON_GENERAL_SETTINGS);
 		// General settings opens via the first PamGuiFX if available
-		generalSettings.setOnAction(e -> {
-			// delegate to the first stage's settings if it exposes one
-		});
+		PamGuiActionsFX.createGeneralSettingsItems(generalSettings.getItems(), !IS_MACOS);
 
 		// Module Settings submenu — populated dynamically when the menu is shown
 		Menu moduleSettings = new Menu("Module Settings");
@@ -398,17 +396,19 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 
 		MenuItem checkUpdates = new MenuItem("Check for Updates");
 		setMenuItemGraphic(checkUpdates, PamSettingsMenuPane.ICON_UPDATES);
+		checkUpdates.setOnAction(e -> PamGuiActionsFX.checkForUpdates());
 
 		MenuItem websiteItem = new MenuItem("Website");
 		setMenuItemGraphic(websiteItem, PamSettingsMenuPane.ICON_WEBSITE);
+		websiteItem.setOnAction(e -> PamGuiActionsFX.openWebsite());
 
 		MenuItem bugItem = new MenuItem("Found a Bug?");
 		setMenuItemGraphic(bugItem, PamSettingsMenuPane.ICON_BUG);
+		bugItem.setOnAction(e -> PamGuiActionsFX.openContact());
 
 		MenuItem about = new MenuItem("About PAMGuard...");
 		setMenuItemGraphic(about, PamSettingsMenuPane.ICON_ABOUT);
-		about.setOnAction(e -> new PamUtils.Splash(30000,
-				PamController.getInstance() != null ? PamController.getInstance().getRunMode() : 0));
+		about.setOnAction(e -> PamGuiActionsFX.showAbout(primaryStage));
 
 		helpMenu.getItems().addAll(helpItem, checkUpdates, websiteItem, bugItem, new SeparatorMenuItem(), about);
 
@@ -453,32 +453,6 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		//notify stuff that process settings may have changed. 
 		PamController.getInstance().notifyModelChanged(PamControllerInterface.CHANGED_PROCESS_SETTINGS);
 		return ok;
-	}
-
-	/**
-	 * Save settings to a new psf file (used from the menu bar).
-	 */
-	private void menuBarSaveSettingsAs() {
-		File file = null;
-		String currentfileName = PamSettingManager.getInstance().getSettingsFileName();
-		if (currentfileName != null) file = new File(currentfileName);
-
-		FileChooser fileChooser = new FileChooser();
-		fileChooser.setTitle("Save Settings As");
-		fileChooser.getExtensionFilters().addAll(
-				new ExtensionFilter("PAMGuard settings files", "*.xml", "*.psfx"));
-		if (file != null && file.getParentFile() != null)
-			fileChooser.setInitialDirectory(file.getParentFile());
-
-		File selectedFile = fileChooser.showSaveDialog(primaryStage);
-		if (selectedFile == null) return;
-
-		selectedFile = PamFileFilter.checkFileEnd(selectedFile, PamSettingManager.getCurrentSettingsFileEnd(), true);
-		PamSettingManager.getInstance().setDefaultFile(selectedFile.getAbsolutePath());
-		if (PamSettingManager.remote_psf != null)
-			PamSettingManager.remote_psf = selectedFile.getAbsolutePath();
-		PamSettingManager.getInstance().saveSettings(PamSettingManager.SAVE_PSF);
-		PamController.getInstance().getGuiFrameManager().sortFrameTitles();
 	}
 
 	/**
@@ -857,6 +831,11 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 
 	@Override
 	public void notifyModelChanged(int changeType) {
+		//some notifications come from Swing dialogs, e.g. module ordering. 
+		if (!Platform.isFxApplicationThread()) {
+			Platform.runLater(() -> notifyModelChanged(changeType));
+			return;
+		}
 		// pass to data model
 		if (dataModelFX!=null) {
 			dataModelFX.notifyModelChanged(changeType);
@@ -896,9 +875,39 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	}
 
 
+	/**
+	 * Set the title of the main window from the run mode and the name of the 
+	 * configuration file or database. 
+	 */
 	public void sortFrameTitles() {
-		// TODO Auto-generated method stub
-
+		if (primaryStage == null) return;
+		PamController pamController = PamController.getInstance();
+		String tit = "PAMGuard";
+		switch (pamController.getRunMode()) {
+		case PamController.RUN_NETWORKRECEIVER:
+			tit += " Network Receiver";
+			break;
+		case PamController.RUN_MIXEDMODE:
+			tit += " Mixed Mode";
+			break;
+		case PamController.RUN_PAMVIEW:
+			tit += " Viewer";
+			break;
+		case PamController.RUN_REMOTE:
+			tit += " Remote";
+			break;
+		}
+		String ctrlName = pamController.getPSFName();
+		if (ctrlName != null) {
+			tit += " - " + ctrlName;
+		}
+		final String title = tit;
+		if (Platform.isFxApplicationThread()) {
+			primaryStage.setTitle(title);
+		}
+		else {
+			Platform.runLater(() -> primaryStage.setTitle(title));
+		}
 	}
 
 
@@ -1110,6 +1119,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		primaryStage.setFullScreen(pamGuiSettings.fullscreen);
 		primaryStage.setWidth(pamGuiSettings.width);
 		primaryStage.setHeight(pamGuiSettings.height);
+		sortFrameTitles();
 
 		primaryStage.show();
 

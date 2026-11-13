@@ -2142,7 +2142,7 @@ public class PamSettingManager {
 
 		saveSettings(SAVE_PSF);
 
-		PamController.getInstance().getGuiFrameManager().sortFrameTitles();
+		PamController.getInstance().sortFrameTitles();
 
 	}
 

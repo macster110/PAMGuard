@@ -130,7 +130,8 @@ public class ModuleIconFactory {
 			iconNode = getSVGIcon("/Resources/modules/decimator.svg"); 
 			break;
 		case CPOD:
-			iconNode = new Label("CPOD"); //TEMP
+			//CPOD and FPOD data are read from the loggers' SD cards. 
+			iconNode = PamGlyphDude.createModuleIcon("mdi2s-sd"); 
 			break;
 		case ISHMAEL_ENERGY:
 			iconNode = PamGlyphDude.createModuleIcon("mdi2s-sigma"); 
@@ -146,7 +147,6 @@ public class ModuleIconFactory {
 			break;
 		case TETHYS:
 			iconNode = PamGlyphDude.createModuleIcon("file-codemeta"); 
-			System.out.println("Get module Tethys " + iconNode);
 			break;
 		default:
 			break;

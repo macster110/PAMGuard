@@ -123,6 +123,8 @@ public class PamTabPaneSkin extends TabPaneSkin {
 			headerArea.layout();
 		});
 		addTabButton.getStyleClass().add("tab-button");
+		addTabButton.setGraphic(pamViewFX.fxGlyphs.PamGlyphDude.createPamIcon("mdi2p-plus", 14));
+		addTabButton.setTooltip(new javafx.scene.control.Tooltip("Add a new display tab"));
 	}
 
 	/**

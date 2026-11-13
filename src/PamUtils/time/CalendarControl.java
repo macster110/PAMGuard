@@ -53,7 +53,7 @@ public class CalendarControl implements PamSettings{
 		return timeDisplayParameters.timeZone;
 	}
 
-	protected void showTimeZoneDialog(Window window) {
+	public void showTimeZoneDialog(Window window) {
 		TimeDisplayParameters tzParams = TimeZoneDisplayDialog.showDialog(window, timeDisplayParameters);
 		if (tzParams != null) {
 			timeDisplayParameters = tzParams;

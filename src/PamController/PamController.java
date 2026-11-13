@@ -3242,7 +3242,12 @@ public class PamController implements PamControllerInterface, PamSettings {
 	}
 
 	public void sortFrameTitles() {
-		getGuiFrameManager().sortFrameTitles();
+		if (guiFrameManager instanceof GuiFrameManager) {
+			((GuiFrameManager) guiFrameManager).sortFrameTitles();
+		}
+		else if (guiFrameManager instanceof PamGuiManagerFX) {
+			((PamGuiManagerFX) guiFrameManager).sortFrameTitles();
+		}
 	}
 
 	/**** FX Gui *****/

@@ -90,7 +90,7 @@ public class PamSettingsMenuPane extends PamVBox {
 		
 		this.setSpacing(0);
 				
-		this.setPrefWidth(250);
+		this.setPrefWidth(270);
 		
 		this.setStyle("-fx-background-color: -fx-darkbackground");
 		
@@ -119,7 +119,7 @@ public class PamSettingsMenuPane extends PamVBox {
 		
 		//Air or water mode
 		ToggleButton toggleButton1 = new ToggleButton("Water");
-		toggleButton1.setPrefWidth(60);
+		toggleButton1.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
 		toggleButton1.setTooltip(new Tooltip(GlobalMedium.getToolTip(SoundMedium.Water))); 
 		toggleButton1.setOnAction((action)->{
 			if (PamController.getInstance().getGlobalMediumManager().getGlobalMediumParameters().currentMedium==SoundMedium.Water) return; //do nothing. 
@@ -128,7 +128,7 @@ public class PamSettingsMenuPane extends PamVBox {
 		
 
 	    ToggleButton toggleButton2 = new ToggleButton("Air");
-	    toggleButton2.setPrefWidth(60);
+	    toggleButton2.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
 	    toggleButton2.setTooltip(new Tooltip(GlobalMedium.getToolTip(SoundMedium.Air))); 
 	    toggleButton2.setOnAction((action)->{
 			if (PamController.getInstance().getGlobalMediumManager().getGlobalMediumParameters().currentMedium==SoundMedium.Air) return; //do nothing. 
@@ -142,6 +142,7 @@ public class PamSettingsMenuPane extends PamVBox {
 
 	    Label mediumLabel = new Label("Sound Medium"); 
 	    mediumLabel.setAlignment(Pos.CENTER_LEFT);
+	    mediumLabel.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
 	    mediumLabel.setPadding(new Insets(0,0,0,15));
 	    mediumLabel.setGraphic(PamGlyphDude.createPamIcon(ICON_SOUND_MEDIUM, PamGuiManagerFX.iconSize));
 		//styleButton(mediumLabel);
@@ -160,9 +161,17 @@ public class PamSettingsMenuPane extends PamVBox {
 	    mediumToggleBox.setPadding(new Insets(0,5,0,0));
 
 		
-		PamButton generalSettings=new PamButton("General Settings..."); 
+		MenuButton generalSettings=new MenuButton("General Settings"); 
+		generalSettings.setPopupSide(Side.RIGHT);
 		styleButton(generalSettings);
 		generalSettings.setGraphic(PamGlyphDude.createPamIcon(ICON_GENERAL_SETTINGS, PamGuiManagerFX.iconSize));
+		generalSettings.setTooltip(new Tooltip("Time, module ordering, import and export of settings, warnings and log files"));
+		generalSettings.setOnShowing((e)->{
+			generalSettings.getItems().clear();
+			PamGuiActionsFX.createGeneralSettingsItems(generalSettings.getItems(), true);
+		});
+		//populate once so the menu button shows the popup the first time it is pressed. 
+		PamGuiActionsFX.createGeneralSettingsItems(generalSettings.getItems(), true);
 		
 		MenuButton settings=new MenuButton("Module Settings"); 
 		settings.setPopupSide(Side.RIGHT);
@@ -255,18 +264,24 @@ public class PamSettingsMenuPane extends PamVBox {
 		
 		PamButton about=new PamButton("About..."); 
 		styleButton(about);
+		about.setOnAction(e -> PamGuiActionsFX.showAbout(getScene() == null ? null : getScene().getWindow()));
 		about.setGraphic(PamGlyphDude.createPamIcon(ICON_ABOUT, PamGuiManagerFX.iconSize));
 
 		PamButton website=new PamButton("Website"); 
 		styleButton(website);
+		website.setOnAction(e -> PamGuiActionsFX.openWebsite());
 		website.setGraphic(PamGlyphDude.createPamIcon(ICON_WEBSITE, PamGuiManagerFX.iconSize));
 		
 		PamButton contact=new PamButton("Found a bug?"); 
 		styleButton(contact);
+		contact.setTooltip(new Tooltip("Contact and support"));
+		contact.setOnAction(e -> PamGuiActionsFX.openContact());
 		contact.setGraphic(PamGlyphDude.createPamIcon(ICON_BUG, PamGuiManagerFX.iconSize));
 		
 		PamButton checkForUpdates=new PamButton("Check for updates"); 
 		styleButton(checkForUpdates);
+		checkForUpdates.setTooltip(new Tooltip("Open the PAMGuard releases page"));
+		checkForUpdates.setOnAction(e -> PamGuiActionsFX.checkForUpdates());
 		checkForUpdates.setGraphic(PamGlyphDude.createPamIcon(ICON_UPDATES, PamGuiManagerFX.iconSize));
 
 		// ---------- Dark mode toggle ----------
@@ -331,52 +346,9 @@ public class PamSettingsMenuPane extends PamVBox {
 	
 	/**
 	 * Save settings to a new psf file.
-	 * @param frame parent frame for dialog.
 	 */
 	public void saveSettingsAs() {
-		/*
-		 * get a new file name, set that as the current file
-		 * then write all settings to it.
-		 */
-		File file = null;
-		String currentfileName  = PamSettingManager.getInstance().getSettingsFileName();
-		if (currentfileName != null) {
-			file =new File(currentfileName);
-		}
-		
-		FileChooser fileChooser = new FileChooser();
-		 fileChooser.setTitle("Open Resource File");
-		 fileChooser.getExtensionFilters().addAll(
-		         new ExtensionFilter("PAMGuard settings files", "*.xml", "*.psfx"));
-		 if (currentfileName!=null) {
-			 fileChooser.setInitialDirectory(file);
-		 }
-		 
-		 File selectedFile = fileChooser.showOpenDialog(this.getScene().getWindow());
-		 
-		 if (selectedFile == null) {
-		    return;
-		 }
-		 
-		 selectedFile = PamFileFilter.checkFileEnd(selectedFile, PamSettingManager.getCurrentSettingsFileEnd(), true);
-
-
-		System.out.println("Saving settings to file " + selectedFile.getAbsolutePath());
-
-		// Insert the new file into the top of the recent psf file list.  Also check
-		// if we are running remotely, which probably means the user double-clicked on
-		// a psf to start Pamguard.  In that case, change the remotePSF pointer to
-		// the new file as well
-		PamSettingManager.getInstance().setDefaultFile(selectedFile.getAbsolutePath());
-		
-		if (PamSettingManager.remote_psf != null) {
-			PamSettingManager.remote_psf = selectedFile.getAbsolutePath();
-		}
-
-		PamSettingManager.getInstance().saveSettings(PamSettingManager.SAVE_PSF);
-
-		PamController.getInstance().getGuiFrameManager().sortFrameTitles();
-
+		PamGuiActionsFX.saveSettingsAs(this.getScene() == null ? null : this.getScene().getWindow());
 	}
 	
 }
