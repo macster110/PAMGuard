@@ -159,6 +159,22 @@ public class MapParameters implements Serializable, Cloneable, ManagedParameters
 		this.trackShowTime = trackShowTime;
 	}
 
+	public boolean isHideShip() {
+		return hideShip;
+	}
+
+	public void setHideShip(boolean hideShip) {
+		this.hideShip = hideShip;
+	}
+
+	/**
+	 * Public copy of the parameters.
+	 * @return a clone of the parameters.
+	 */
+	public MapParameters copy() {
+		return clone();
+	}
+
 	public int getDataKeepTime() {
 		return dataKeepTime;
 	}

@@ -1473,7 +1473,7 @@ public class MapPanel extends JPanelWithPamKey implements PamObserver, ColorMana
 		// }
 	}
 
-	protected void updateObservers() {
+	public void updateObservers() {
 
 		ArrayList<PamDataBlock> detectorDataBlocks = simpleMapRef.mapDetectionsManager.plottableBlocks;
 		for (int i = 0; i < detectorDataBlocks.size(); i++) {

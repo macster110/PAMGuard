@@ -77,14 +77,14 @@ public class GridbaseControl extends PamControlledUnit implements PamSettings {
 	/**
 	 * @return the gridbaseParameters
 	 */
-	protected GridbaseParameters getGridbaseParameters() {
+	public GridbaseParameters getGridbaseParameters() {
 		return gridbaseParameters;
 	}
 
 	/**
 	 * @param gridbaseParameters the gridbaseParameters to set
 	 */
-	protected void setGridbaseParameters(GridbaseParameters gridbaseParameters) {
+	public void setGridbaseParameters(GridbaseParameters gridbaseParameters) {
 		this.gridbaseParameters = gridbaseParameters;
 		loadMapData();
 	}

@@ -1352,7 +1352,7 @@ public class SimpleMap extends JPanel implements PamObserver, PamScrollObserver,
 	/**
 	 * @return the gpsDataBlock
 	 */
-	protected GPSDataBlock getGpsDataBlock() {
+	public GPSDataBlock getGpsDataBlock() {
 		return gpsDataBlock;
 	}
 
@@ -1446,7 +1446,7 @@ public class SimpleMap extends JPanel implements PamObserver, PamScrollObserver,
 	/**
 	 * @return the gridBaseControl
 	 */
-	protected GridbaseControl getGridBaseControl() {
+	public GridbaseControl getGridBaseControl() {
 		return gridBaseControl;
 	}
 
@@ -1457,6 +1457,39 @@ public class SimpleMap extends JPanel implements PamObserver, PamScrollObserver,
 
 	public JPanel getViewerControls() {
 		return viewerControls;
+	}
+
+	/**
+	 * @return the manager for the contour (Gebco) map file.
+	 */
+	public MapFileManager getMapFileManager() {
+		return mapFileManager;
+	}
+
+	/**
+	 * @return the data block used to colour the track by effort. May be null.
+	 */
+	public PamDataBlock getEffortDataBlock() {
+		return effortDataBlock;
+	}
+
+	/**
+	 * Set new map parameters and update the map. This does the same as
+	 * closing the map options dialog with OK and is used by the JavaFX GUI.
+	 * @param newParameters - the new map parameters.
+	 */
+	public void setMapParameters(MapParameters newParameters) {
+		if (newParameters == null) {
+			return;
+		}
+		mapParameters = newParameters.clone();
+		this.mapCanScroll(!mapParameters.lockMap);
+		mapPanel.repaint(true);
+		mapPanel.createKey();
+		checkViewerData();
+		if (hiddenSlider != null) {
+			hiddenSlider.setMaxTimeSeconds(mapParameters.dataShowTime);
+		}
 	}
 
 	public MapOverlayMarker getMapMarker() {

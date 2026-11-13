@@ -21,6 +21,9 @@ import PamUtils.LatLong;
 import PamUtils.MapContourValues;
 import PamView.PamGui;
 import userDisplay.UserDisplayControl;
+import Map.layoutFX.MapGUIFX;
+import PamController.PamControlledUnitGUI;
+import PamController.PamGUIManager;
 
 
 public class MapController extends PamControlledUnit implements PamSettings {
@@ -182,6 +185,26 @@ public class MapController extends PamControlledUnit implements PamSettings {
 			aMap.notifyModelChanged(changeType);
 		}
 		
+		if (mapGUIFX != null) {
+			mapGUIFX.notifyGUIChange(changeType);
+		}
+		
+	}
+
+	/**
+	 * The JavaFX GUI for the map.
+	 */
+	private MapGUIFX mapGUIFX;
+
+	@Override
+	public PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamGUIManager.FX) {
+			if (mapGUIFX == null) {
+				mapGUIFX = new MapGUIFX(this);
+			}
+			return mapGUIFX;
+		}
+		return super.getGUI(flag);
 	}
 
 	public int getMaxInterpolationTime() {

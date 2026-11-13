@@ -165,6 +165,13 @@ public class MapDetectionsManager implements PamSettings {
 		mapDetectionsParameters.mapDetectionDatas.add(mapDetectionData);
 	}
 	
+	/**
+	 * @return the list of data blocks which can be plotted on the map.
+	 */
+	public ArrayList<PamDataBlock> getPlottableBlocks() {
+		return plottableBlocks;
+	}
+
 	public ArrayList<MapDetectionData> getMapDetectionDatas() {
 		return mapDetectionsParameters.mapDetectionDatas;
 	}
