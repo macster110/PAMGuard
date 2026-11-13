@@ -14,6 +14,7 @@ import PamController.PamControlledUnitSettings;
 import PamController.PamController;
 import PamController.PamControllerInterface;
 import PamController.PamGUIManager;
+import PamController.SettingsPane;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamController.StorageOptions;
@@ -419,17 +420,39 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	 * Open the settings dialog for a controlled unit (used from the menu bar).
 	 */
 	private void menuBarOpenSettingsDialog(PamControlledUnit controlledUnit) {
-		if (controlledUnit == null) return;
-		if (controlledUnit.getGUI(PamGUIManager.FX) != null) {
-			PamControlledGUIFX pamControlledUnit = (PamControlledGUIFX) controlledUnit.getGUI(PamGUIManager.FX);
-			SettingsDialog<?> newDialog = new SettingsDialog<>(pamControlledUnit.getSettingsPane());
-			newDialog.setResizable(true);
-			newDialog.setOnShown(value -> pamControlledUnit.getSettingsPane().paneInitialized());
-			newDialog.showAndWait().ifPresent(response -> {
-				if (response != null) pamControlledUnit.updateParams();
-			});
-			PamController.getInstance().notifyModelChanged(PamControllerInterface.CHANGED_PROCESS_SETTINGS);
+		showModuleSettings(controlledUnit);
+	}
+
+	/**
+	 * Open the JavaFX settings dialog for a module and apply the settings if the user presses OK. 
+	 * This is the one place module settings dialogs are opened from in the JavaFX GUI.
+	 * @param controlledUnit - the module.
+	 * @return true if new settings were applied. 
+	 */
+	public static boolean showModuleSettings(PamControlledUnit controlledUnit) {
+		if (controlledUnit == null) return false;
+		if (!(controlledUnit.getGUI(PamGUIManager.FX) instanceof PamControlledGUIFX)) {
+			PamDialogFX.showWarning("The module " + controlledUnit.getUnitName() + " has no JavaFX settings");
+			return false;
 		}
+		PamControlledGUIFX pamControlledUnit = (PamControlledGUIFX) controlledUnit.getGUI(PamGUIManager.FX);
+		SettingsPane<?> settingsPane = pamControlledUnit.getSettingsPane();
+		if (settingsPane == null) {
+			// some modules, e.g. displays, have no settings dialog. 
+			return false;
+		}
+		SettingsDialog<?> newDialog = new SettingsDialog<>(settingsPane);
+		newDialog.setTitle(controlledUnit.getUnitName() + " settings");
+		newDialog.setResizable(true);
+		newDialog.setOnShown(value -> settingsPane.paneInitialized());
+		Optional<?> response = newDialog.showAndWait();
+		boolean ok = response.isPresent() && response.get() != null;
+		if (ok) {
+			pamControlledUnit.updateParams();
+		}
+		//notify stuff that process settings may have changed. 
+		PamController.getInstance().notifyModelChanged(PamControllerInterface.CHANGED_PROCESS_SETTINGS);
+		return ok;
 	}
 
 	/**

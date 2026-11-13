@@ -44,7 +44,7 @@ public class PeakPickingPane extends SettingsPane<IshDetParams> {
 	 */
 	private PamSpinner<Double> minIDI; 
 	
-	public static final double INSET_RIGHT = 130; 
+	public static final double INSET_RIGHT = 170; 
 
 
 	public PeakPickingPane() {

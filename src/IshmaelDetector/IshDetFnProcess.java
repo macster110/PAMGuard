@@ -243,4 +243,11 @@ public abstract class IshDetFnProcess extends PamProcess
 	public PamDataBlock getOutputDataBlock() {
 		return outputDataBlock;
 	}
+	@Override
+	public java.util.ArrayList getCompatibleDataUnits() {
+		java.util.ArrayList<Class<?>> list = new java.util.ArrayList<Class<?>>();
+		if (inputDataClass() != null) list.add(inputDataClass());
+		return list;
+	}
+
 }

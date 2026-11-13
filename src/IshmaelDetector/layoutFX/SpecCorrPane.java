@@ -52,7 +52,7 @@ public class SpecCorrPane extends SettingsPane<IshDetParams> {
     	this.specIshDetControl=specIshDetControl;
 
          root = new VBox(10);
-        root.setPadding(new Insets(10));
+        root.setPadding(new Insets(10, 0, 0, 0));
 
         // Stop Enter from leaking out of this pane. Without this, pressing Enter
         // in a table cell (or anywhere else in this pane) bubbles up to the
@@ -70,21 +70,22 @@ public class SpecCorrPane extends SettingsPane<IshDetParams> {
         TableColumn<SegmentRow, Double> t0Col = new TableColumn<>("t0");
         t0Col.setCellValueFactory(cellData -> cellData.getValue().t0Property().asObject());
         t0Col.setCellFactory(TextFieldTableCell.forTableColumn(new javafx.util.converter.DoubleStringConverter()));
-        t0Col.setOnEditCommit(event -> event.getRowValue().t0Property().set(event.getNewValue()));
+        t0Col.setOnEditCommit(event -> {event.getRowValue().t0Property().set(event.getNewValue()); updateChart();});
         TableColumn<SegmentRow, Double> f0Col = new TableColumn<>("f0");
         f0Col.setCellValueFactory(cellData -> cellData.getValue().f0Property().asObject());
         f0Col.setCellFactory(TextFieldTableCell.forTableColumn(new javafx.util.converter.DoubleStringConverter()));
-        f0Col.setOnEditCommit(event -> event.getRowValue().f0Property().set(event.getNewValue()));
+        f0Col.setOnEditCommit(event -> {event.getRowValue().f0Property().set(event.getNewValue()); updateChart();});
         TableColumn<SegmentRow, Double> t1Col = new TableColumn<>("t1");
         t1Col.setCellValueFactory(cellData -> cellData.getValue().t1Property().asObject());
         t1Col.setCellFactory(TextFieldTableCell.forTableColumn(new javafx.util.converter.DoubleStringConverter()));
-        t1Col.setOnEditCommit(event -> event.getRowValue().t1Property().set(event.getNewValue()));
+        t1Col.setOnEditCommit(event -> {event.getRowValue().t1Property().set(event.getNewValue()); updateChart();});
         TableColumn<SegmentRow, Double> f1Col = new TableColumn<>("f1");
         f1Col.setCellValueFactory(cellData -> cellData.getValue().f1Property().asObject());
         f1Col.setCellFactory(TextFieldTableCell.forTableColumn(new javafx.util.converter.DoubleStringConverter()));
-        f1Col.setOnEditCommit(event -> event.getRowValue().f1Property().set(event.getNewValue()));
+        f1Col.setOnEditCommit(event -> {event.getRowValue().f1Property().set(event.getNewValue()); updateChart();});
         tableView.getColumns().addAll(t0Col, f0Col, t1Col, f1Col);
         tableView.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        tableView.setPrefHeight(150);
 
         // Controls for adding/removing rows
         HBox rowControls = new HBox(10);
@@ -106,12 +107,13 @@ public class SpecCorrPane extends SettingsPane<IshDetParams> {
 
         // Chart for contour
         NumberAxis xAxis = new NumberAxis();
-        xAxis.setLabel("Time");
+        xAxis.setLabel("Time (s)");
         NumberAxis yAxis = new NumberAxis();
-        yAxis.setLabel("Frequency");
+        yAxis.setLabel("Frequency (Hz)");
         contourChart = new LineChart<>(xAxis, yAxis);
         contourChart.setTitle("Time-Frequency Contour");
-        contourChart.setPrefHeight(250);
+        contourChart.setPrefHeight(170);
+        contourChart.setLegendVisible(false);
         contourChart.setAnimated(false);
 
         // Update chart when table changes
@@ -169,12 +171,13 @@ public class SpecCorrPane extends SettingsPane<IshDetParams> {
 
     private void updateChart() {
         contourChart.getData().clear();
-        XYChart.Series<Number, Number> series = new XYChart.Series<>();
+        // each segment is drawn as its own line so that separate segments are not joined. 
         for (SegmentRow row : tableView.getItems()) {
+            XYChart.Series<Number, Number> series = new XYChart.Series<>();
             series.getData().add(new XYChart.Data<>(row.getT0(), row.getF0()));
             series.getData().add(new XYChart.Data<>(row.getT1(), row.getF1()));
+            contourChart.getData().add(series);
         }
-        contourChart.getData().add(series);
     }
 
     private void pasteFromClipboard() {
@@ -225,7 +228,7 @@ public class SpecCorrPane extends SettingsPane<IshDetParams> {
 		// this.params before handing it back. Without this call, edits made
 		// in the table (typed or pasted) are only ever reflected in the UI
 		// and never reach the saved parameters.
-		applyParams();
+		if (!applyParams()) return null;
 		return this.params;
 	}
 

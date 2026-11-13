@@ -37,6 +37,30 @@ public class MatchFiltParams extends IshDetParams implements Serializable, Clone
 	public String getKernelFilename() {
 		return (kernelFilenameList.size() > 0) ? kernelFilenameList.get(0) : "";
 	}
+
+	/**
+	 * Get the list of recently used kernel files. The first entry is the one in use.
+	 * @return the list of kernel file names.
+	 */
+	public ArrayList<String> getKernelFilenameList() {
+		if (kernelFilenameList == null) kernelFilenameList = new ArrayList<String>(0);
+		return kernelFilenameList;
+	}
+
+	/**
+	 * Make a file the current kernel file, moving it to the top of the recent file list
+	 * and trimming the list to {@link #MAX_FILENAME_LIST_SIZE}.
+	 * @param fileName - the kernel file name.
+	 */
+	public void setKernelFilename(String fileName) {
+		if (fileName == null) return;
+		ArrayList<String> list = getKernelFilenameList();
+		list.remove(fileName);
+		list.add(0, fileName);
+		while (list.size() > MAX_FILENAME_LIST_SIZE) {
+			list.remove(list.size() - 1);
+		}
+	}
 	
 	@Override
 	public PamParameterSet getParameterSet() {

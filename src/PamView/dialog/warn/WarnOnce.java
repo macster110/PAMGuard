@@ -460,6 +460,25 @@ public class WarnOnce implements PamSettings {
 	 */
 	private int showWarningDialogFX(javafx.stage.Window parent, String title, String message, AlertType messageType, String helpPoint, 
 			Throwable error, String okButtonText, String cancelButtonText, boolean disableCheckBoxes) {
+		/*
+		 * JavaFX dialogs must be created on the FX application thread, but warnings are often
+		 * raised from processing threads. Warnings that need an answer wait for it; plain
+		 * warnings are shown without blocking the calling thread. 
+		 */
+		if (!javafx.application.Platform.isFxApplicationThread()) {
+			java.util.concurrent.FutureTask<Integer> task = new java.util.concurrent.FutureTask<Integer>(()->
+				showWarningDialogFX(parent, title, message, messageType, helpPoint, error, okButtonText, cancelButtonText, disableCheckBoxes));
+			javafx.application.Platform.runLater(task);
+			if (messageType != AlertType.CONFIRMATION) {
+				return OK_OPTION;
+			}
+			try {
+				return task.get();
+			} catch (Exception e) {
+				e.printStackTrace();
+				return CANCEL_OPTION;
+			}
+		}
 
 		// check if we should show the warning again this session
 		Boolean showAgain = showThisSess.get(title+message);

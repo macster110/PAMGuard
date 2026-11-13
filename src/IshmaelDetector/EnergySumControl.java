@@ -3,6 +3,8 @@
  */
 package IshmaelDetector;
 
+import IshmaelDetector.layoutFX.IshPaneFX;
+
 /**
  * 
  * @author Dave Mellinger and Hisham Qayum
@@ -151,4 +153,10 @@ public class EnergySumControl extends IshDetControl implements PamSettings {
 	String getHelpPoint() {
 		return "detectors.ishmael.docs.ishmael_energysum";
 	}
+
+	@Override
+	public IshPaneFX createSettingsPaneFX() {
+		return new IshEnergyPaneFX(this);
+	}
+
 }

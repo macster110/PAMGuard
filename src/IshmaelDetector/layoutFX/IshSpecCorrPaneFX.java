@@ -18,7 +18,7 @@ public class IshSpecCorrPaneFX extends IshPaneFX {
 	private SgramCorrControl specIshDetControl; 
 
 	public IshSpecCorrPaneFX(SgramCorrControl specIshDetControl) {
-		super(specIshDetControl);
+		super(specIshDetControl, fftManager.FFTDataUnit.class, "FFT Data Source");
 		this.specIshDetControl=specIshDetControl; 
 		// TODO Auto-generated constructor stub
 	}
@@ -32,5 +32,15 @@ public class IshSpecCorrPaneFX extends IshPaneFX {
 	}
 
 
+
+	@Override
+	public String getHelpPoint() {
+		return "detectors.ishmael.docs.ishmael_speccorrelation";
+	}
+
+	@Override
+	public String getName() {
+		return "Spectrogram Correlation Parameters";
+	}
 
 }

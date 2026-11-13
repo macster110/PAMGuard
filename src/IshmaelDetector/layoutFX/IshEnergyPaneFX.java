@@ -33,4 +33,9 @@ public class IshEnergyPaneFX extends IshPaneFX {
 		return energySumPane;
 	}
 
+	@Override
+	public String getName() {
+		return "Energy Sum Parameters";
+	}
+
 }

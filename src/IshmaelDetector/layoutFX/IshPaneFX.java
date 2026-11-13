@@ -45,10 +45,45 @@ public abstract class IshPaneFX extends SettingsPane<IshDetParams> {
 	 * @param ownerWindow - the ownder window
 	 */
 	public IshPaneFX(IshDetControl ishDetControl) {
+		this(ishDetControl, FFTDataUnit.class, "Raw Data Source for Ishmael Detector");
+	}
+
+	/**
+	 * Constructor for Ishmael pane which allows the input data type to be set. 
+	 * @param ishDetControl - the Ishmael detector control. 
+	 * @param sourceClass - the class of the input data units, e.g. FFTDataUnit or RawDataUnit.
+	 * @param sourceTitle - the title for the data source pane. 
+	 */
+	public IshPaneFX(IshDetControl ishDetControl, Class<?> sourceClass, String sourceTitle) {
 		super(null);
 		this.ishDetControl=ishDetControl; 
+		this.sourceClass = sourceClass; 
+		this.sourceTitle = sourceTitle; 
 		mainPane= createIshPane(); 
 		mainPane.setPadding(new Insets(5,5,5,5));
+	}
+
+	/**
+	 * The last parameters set in the pane. 
+	 */
+	private IshDetParams lastParams;
+
+	/**
+	 * The input data class. 
+	 */
+	private Class<?> sourceClass;
+
+	/**
+	 * The title of the source pane.
+	 */
+	private String sourceTitle; 
+
+	/**
+	 * Get the grouped source pane. 
+	 * @return the grouped source pane. 
+	 */
+	public GroupedSourcePaneFX getSourcePane() {
+		return groupedSourcePaneFX;
 	}
 
 	/****
@@ -57,7 +92,7 @@ public abstract class IshPaneFX extends SettingsPane<IshDetParams> {
 	 */
 	private Pane createIshPane() {
 
-		groupedSourcePaneFX = new GroupedSourcePaneFX("Raw Data Source for Ishmael Detector", FFTDataUnit.class, true, true, true);
+		groupedSourcePaneFX = new GroupedSourcePaneFX(sourceTitle, sourceClass, true, true, true);
 		
 		peakPickingPane = new PeakPickingPane(); 
 
@@ -78,10 +113,16 @@ public abstract class IshPaneFX extends SettingsPane<IshDetParams> {
 	@Override
 	public IshDetParams getParams(IshDetParams currParams) {
 		
+		//the dialog calls getParams(null) to validate the pane. 
+		if (currParams == null) currParams = lastParams; 
+		if (currParams == null) return null; 
+		
 		//sets params inside function
 		groupedSourcePaneFX.getParams(currParams.groupedSourceParmas);
 
 		currParams = getDetectorPane().getParams(currParams); 
+		
+		if (currParams == null) return null; 
 
 		currParams = peakPickingPane.getParams(currParams);
 
@@ -90,6 +131,7 @@ public abstract class IshPaneFX extends SettingsPane<IshDetParams> {
 
 	@Override
 	public void setParams(IshDetParams input) {
+		lastParams = input; 
 		groupedSourcePaneFX.setParams(input.groupedSourceParmas);
 		peakPickingPane.setParams(input);
 		getDetectorPane().setParams(input);

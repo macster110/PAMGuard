@@ -256,8 +256,10 @@ final public class PamModel implements PamSettings {
 		}
 
 		mi = PamModuleInfo.registerControlledUnit(Map.MapController.class.getName(), "Map");	
-		mi.addDependency(new PamDependency(GpsDataUnit.class, "GPS.GPSControl"));
+		// GPS has no JavaFX GUI yet, so in the JavaFX GUI the map works without it, e.g. for static arrays. 
+		if (!PamGUIManager.isFX()) mi.addDependency(new PamDependency(GpsDataUnit.class, "GPS.GPSControl"));
 		mi.setToolTipText("Displays a map of vessel position and detections");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 		mi.setModulesMenuGroup(mapsGroup);
 		mi.setMinNumber(0);
 		mi.setHelpPoint("mapping/NMEA/docs/ConfiguringGPS.html");
@@ -670,18 +672,21 @@ final public class PamModel implements PamSettings {
 		mi.setModulesMenuGroup(detectorsGroup);
 		mi.setToolTipText("Detects sounds with energy in a specific frequency band");
 		mi.setHelpPoint("detectors/ishmael/docs/ishmael_energysum.html");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 
 		mi = PamModuleInfo.registerControlledUnit(SgramCorrControl.class.getName(), "Ishmael spectrogram correlation");
 		mi.addDependency(new PamDependency(FFTDataUnit.class, "fftManager.PamFFTControl"));		
 		mi.setToolTipText("Detects sounds matching a user defined 'shape' on a spectrogram");
 		mi.setModulesMenuGroup(detectorsGroup);
 		mi.setHelpPoint("detectors/ishmael/docs/ishmael_speccorrelation.html");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 
 		mi = PamModuleInfo.registerControlledUnit(MatchFiltControl.class.getName(), "Ishmael matched filtering");	
 		mi.addDependency(new PamDependency(RawDataUnit.class, "Acquisition.AcquisitionControl"));
 		mi.setToolTipText("Detects sounds using a user defined matched filter");	
 		mi.setModulesMenuGroup(detectorsGroup);
 		mi.setHelpPoint("detectors/ishmael/docs/ishmael_matchedfilter.html");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 
 		mi = PamModuleInfo.registerControlledUnit(LikelihoodDetectionUnit.class.getName(), "Likelihood Detector" );
 		mi.addDependency( new PamDependency( RawDataUnit.class, "Acquisition.AcquisitionControl" ) );
@@ -779,6 +784,7 @@ final public class PamModel implements PamSettings {
 		mi = PamModuleInfo.registerControlledUnit(IshLocControl.class.getName(), "Ishmael Locator");	
 		mi.setModulesMenuGroup(localiserGroup);
 		mi.setToolTipText("Locates sounds extracted either from areas marked out on a spectrogram display or using output from a detector");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 
 		mi = PamModuleInfo.registerControlledUnit(TowedArray3DController.class.getName(), "Multipath 3D Localiser");
 		mi.addDependency(new PamDependency(ClickDetection.class, "clickDetector.ClickControl"));

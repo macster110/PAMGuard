@@ -90,7 +90,7 @@ public class EnergySumPane extends SettingsPane<IshDetParams> {
 	 */
 	private ControlField<Double> shortFilter;
 	
-	public static final double INSET_RIGHT = 130; 
+	public static final double INSET_RIGHT = 170; 
 
 	public EnergySumPane(EnergySumControl ishEnergyControl) {
 		super(null);
@@ -187,7 +187,7 @@ public class EnergySumPane extends SettingsPane<IshDetParams> {
 			enableControls();
 		});
 		
-		shortFilter = new ControlField<Double>("Short filter			", "", 0, Double.MAX_VALUE, 0.1); 
+		shortFilter = new ControlField<Double>("Short filter", "", 0, Double.MAX_VALUE, 0.1); 
 		shortFilter.getSpinner().getValueFactory().setConverter(PamSpinner.createStringConverter(9));
 		shortFilter.setTooltip(new Tooltip("The short filter which defines smoothing. Lower values mean the smoothing is greater"));
 		shortFilter.getLabel1().setPrefWidth(INSET_RIGHT);

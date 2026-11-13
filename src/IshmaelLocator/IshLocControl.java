@@ -6,6 +6,10 @@
  */
 package IshmaelLocator;
 
+import IshmaelLocator.layoutFX.IshLocGUIFX;
+import PamController.PamControlledUnitGUI;
+import PamController.PamGUIManager;
+
 import java.awt.Frame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -120,6 +124,48 @@ public class IshLocControl extends PamControlledUnit implements PamSettings {
 		}
 	}
 	
+	/**
+	 * Get the current locator parameters.
+	 * @return the locator parameters.
+	 */
+	public IshLocParams getIshLocParams() {
+		return ishLocParams;
+	}
+
+	/**
+	 * Set new locator parameters, e.g. from a settings pane, and set up the
+	 * processes to use them.
+	 * @param newParams - the new parameters.
+	 */
+	public void setIshLocParams(IshLocParams newParams) {
+		installNewParams(null, newParams);
+	}
+
+	/**
+	 * Get the output data block of the locator so it can be excluded from
+	 * its own list of possible inputs.
+	 * @return the output data block or null.
+	 */
+	public PamDataBlock getLocatorOutputDataBlock() {
+		return (ishLocProcessHy == null) ? null : ishLocProcessHy.outputDataBlock;
+	}
+
+	@Override
+	public PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamGUIManager.FX) {
+			if (ishLocGUIFX == null) {
+				ishLocGUIFX = new IshLocGUIFX(this);
+			}
+			return ishLocGUIFX;
+		}
+		return null;
+	}
+
+	/**
+	 * The JavaFX GUI.
+	 */
+	private IshLocGUIFX ishLocGUIFX;
+
 	@Override
 	public Serializable getSettingsReference() {
 		return ishLocParams;

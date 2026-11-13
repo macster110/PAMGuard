@@ -11,7 +11,11 @@ import javax.swing.JMenuItem;
 
 import IshmaelDetector.dataPlotFX.IshmaelDetPlotProvider;
 import IshmaelDetector.dataPlotFX.IshmaelFnPlotProvider;
+import IshmaelDetector.layoutFX.IshGUIFX;
+import IshmaelDetector.layoutFX.IshPaneFX;
 import PamController.PamControlledUnit;
+import PamController.PamControlledUnitGUI;
+import PamController.PamGUIManager;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
 import PamController.PamControllerInterface;
@@ -37,6 +41,11 @@ public abstract class IshDetControl extends PamControlledUnit implements PamSett
 	IshPeakProcess ishPeakProcess;
 	IshDetGraphics ishDetGraphics;
 	IshDetSave ishDetSave;
+
+	/**
+	 * The JavaFX GUI.
+	 */
+	private IshGUIFX ishGUIFX;
 
 	/** Initializer. 
 	 * 
@@ -211,6 +220,46 @@ public abstract class IshDetControl extends PamControlledUnit implements PamSett
 		if (ishPeakProcess != null)
 			ishPeakProcess.setupConnections();
 	}
+
+	/**
+	 * Set new detector parameters, e.g. from a settings pane, and set up the
+	 * processes to use them.
+	 * @param newParams - the new parameters.
+	 */
+	public void setIshDetParams(IshDetParams newParams) {
+		installNewParams(null, newParams);
+	}
+
+	/**
+	 * Get the help point for the detector.
+	 * @return the help point.
+	 */
+	public String getDetectorHelpPoint() {
+		return getHelpPoint();
+	}
+
+	@Override
+	public PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamGUIManager.FX) {
+			if (ishGUIFX == null) {
+				ishGUIFX = new IshGUIFX(this);
+			}
+			return ishGUIFX;
+		}
+		return null;
+	}
+
+	@Override
+	public void notifyModelChanged(int changeType) {
+		super.notifyModelChanged(changeType);
+		if (ishGUIFX != null) ishGUIFX.notifyGUIChange(changeType);
+	}
+
+	/**
+	 * Create the JavaFX settings pane for this detector.
+	 * @return the JavaFX settings pane.
+	 */
+	public abstract IshPaneFX createSettingsPaneFX();
 
 	public PamDataBlock getOutputDataBlock() {
 		return ishDetFnProcess.outputDataBlock;

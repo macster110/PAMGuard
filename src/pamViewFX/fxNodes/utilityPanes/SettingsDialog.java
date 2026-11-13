@@ -25,7 +25,10 @@ public class SettingsDialog<T> extends PamDialogFX<T>{
 		this.settingsPane=settingsPane;
 	
 		
-		this.setContent(settingsPane.getContentNode());
+		// give the settings a consistent margin inside the dialog. 
+		javafx.scene.layout.StackPane holder = new javafx.scene.layout.StackPane(settingsPane.getContentNode());
+		holder.setPadding(new javafx.geometry.Insets(10, 10, 0, 10));
+		this.setContent(holder);
 	
 
 		Stage stage = (Stage) this.getDialogPane().getScene().getWindow();

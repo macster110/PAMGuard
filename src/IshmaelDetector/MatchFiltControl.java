@@ -3,6 +3,9 @@
  */
 package IshmaelDetector;
 
+import IshmaelDetector.layoutFX.IshMatchFiltPaneFX;
+import IshmaelDetector.layoutFX.IshPaneFX;
+
 /**
  * @author Dave Mellinger
  */
@@ -101,4 +104,10 @@ public class MatchFiltControl extends IshDetControl implements PamSettings
 	String getHelpPoint() {
 		return "detectors.ishmael.docs.ishmael_matchedfilter";
 	}
+
+	@Override
+	public IshPaneFX createSettingsPaneFX() {
+		return new IshMatchFiltPaneFX(this);
+	}
+
 }

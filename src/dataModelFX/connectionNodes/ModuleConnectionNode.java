@@ -305,24 +305,7 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 	 * Create the module dialog from pane. 
 	 */
 	private void createModuleDialog() {
-		
-		PamControlledGUIFX pamControlledGUI=(PamControlledGUIFX) this.pamControlledUnit.getGUI(PamGUIManager.FX);
-		
-		if (pamControlledGUI.getSettingsPane()==null) return; 
-		//Note- set parameters is called by settings pane. 
-		SettingsDialog<?> newDialog=new SettingsDialog<>(pamControlledGUI.getSettingsPane());
-		newDialog.setResizable(true);
-		newDialog.setOnShown((value)->{
-			 pamControlledGUI.getSettingsPane().paneInitialized();
-		});
-		
-		//show the dialog 
-		newDialog.showAndWait().ifPresent(response -> {
-			if (response!=null) pamControlledGUI.updateParams(); 
-		});
-		
-		//notify stuff that process settings may have changed. 
-		PamController.getInstance().notifyModelChanged(PamControllerInterface.CHANGED_PROCESS_SETTINGS);
+		pamViewFX.PamGuiManagerFX.showModuleSettings(this.pamControlledUnit);
 	}
 
 	/**

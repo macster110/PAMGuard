@@ -3,6 +3,8 @@
  */
 package IshmaelDetector;
 
+import IshmaelDetector.layoutFX.IshPaneFX;
+
 /**
  * @author Hisham Qayum and Dave Mellinger
  */
@@ -130,4 +132,10 @@ public class SgramCorrControl extends IshDetControl implements PamSettings
 	String getHelpPoint() {
 		return "detectors.ishmael.docs.ishmael_speccorrelation";
 	}
+
+	@Override
+	public IshPaneFX createSettingsPaneFX() {
+		return new IshSpecCorrPaneFX(this);
+	}
+
 }

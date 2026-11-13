@@ -325,23 +325,7 @@ public class PamSettingsMenuPane extends PamVBox {
 	 * @param controlledUnit - the controlled unit to open settings for. 
 	 */
 	private void openSettingsDialog(PamControlledUnit controlledUnit){
-		//have intentionally not put a null settings pane check in here.
-		//Does any module not have a settings pane?
-		if (controlledUnit.getGUI(PamGUIManager.FX)!=null){
-			PamControlledGUIFX pamControlledUnit=(PamControlledGUIFX) controlledUnit.getGUI(PamGUIManager.FX);
-			SettingsDialog<?> newDialog=new SettingsDialog<>(pamControlledUnit.getSettingsPane());
-			newDialog.setResizable(true);
-			newDialog.setOnShown((value)->{
-				 pamControlledUnit.getSettingsPane().paneInitialized();
-			});
-			//show the dialog 
-			newDialog.showAndWait().ifPresent(response -> {
-				if (response!=null) pamControlledUnit.updateParams(); 
-			});
-			
-			//notify stuff that process settings may have changed. 
-			PamController.getInstance().notifyModelChanged(PamControllerInterface.CHANGED_PROCESS_SETTINGS);
-		}
+		PamGuiManagerFX.showModuleSettings(controlledUnit);
 	}
 	
 	
