@@ -593,6 +593,8 @@ public class MaskedFFTSettingsPane extends DynamicSettingsPane<MaskedFFTParamter
      * Update the model path label to show the currently downloaded model.
      */
     private void updateModelPathLabel() {
+    	//while a model downloads the label is bound to the download progress message.
+    	if (downloadInProgress) return;
     	modelPathLabel.setGraphic(null);
     	if (currentModelPath == null) {
     		modelPathLabel.setGraphic(PamGlyphDude.createPamIcon("mdi2c-close-circle-outline", Color.ORANGE, 10));

@@ -5,7 +5,10 @@ import java.io.Serializable;
 
 import javax.swing.JMenuItem;
 
+import PamController.PamControlledUnitGUI;
 import PamController.PamControlledUnitSettings;
+import PamController.PamGUIManager;
+import deepWhistle.layoutFX.DeepWhistleGUIFX;
 import PamController.PamSettingManager;
 import PamController.SettingsPane;
 import dataPlots.data.TDDataProviderRegister;
@@ -136,9 +139,41 @@ public class DeepWhistleControl extends  MaskedFFTControl {
 
 	@Override
 	public void setParameters(MaskedFFTParamters parameters) {
-		// TODO Auto-generated method stub
-
+		if (parameters instanceof DeepWhistleParamters) {
+			this.parameters = (DeepWhistleParamters) parameters;
+		}
+		updateParams(this.parameters);
 	}
+
+	/**
+	 * Get the process which applies the mask to FFT data. 
+	 * @return the masked FFT process. 
+	 */
+	public MaskedFFTProcess getMaskedFFTProcess() {
+		return process;
+	}
+
+	@Override
+	public PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamGUIManager.FX) {
+			if (deepWhistleGUIFX == null) {
+				deepWhistleGUIFX = new DeepWhistleGUIFX(this);
+			}
+			return deepWhistleGUIFX;
+		}
+		return null;
+	}
+
+	@Override
+	public void notifyModelChanged(int changeType) {
+		super.notifyModelChanged(changeType);
+		if (deepWhistleGUIFX != null) deepWhistleGUIFX.notifyGUIChange(changeType);
+	}
+
+	/**
+	 * The JavaFX GUI. 
+	 */
+	private DeepWhistleGUIFX deepWhistleGUIFX;
 
 
 }

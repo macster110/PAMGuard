@@ -82,6 +82,13 @@ public abstract class MaskedFFTProcess extends PamProcess {
     }
 
     @Override
+    public java.util.ArrayList<Class<? extends PamDataUnit>> getCompatibleDataUnits() {
+        java.util.ArrayList<Class<? extends PamDataUnit>> list = new java.util.ArrayList<Class<? extends PamDataUnit>>();
+        list.add(FFTDataUnit.class);
+        return list;
+    }
+
+    @Override
     public void pamStart() {
         // nothing special for now
     }

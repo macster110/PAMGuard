@@ -719,6 +719,7 @@ final public class PamModel implements PamSettings {
 		mi.setToolTipText("AI used to enhance whistle detection");
 		mi.setModulesMenuGroup(detectorsGroup);	
 		mi.setHelpPoint("detectors/deepWhistleHelp/docs/deepWhistle.html");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 
 		/*
 		 * ************* End Detectors Group *******************
