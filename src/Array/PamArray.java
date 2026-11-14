@@ -164,7 +164,7 @@ public class PamArray implements Serializable, Cloneable, ManagedParameters {
 		sortHydrophoneLocator();
 	}
 
-	protected void sortHydrophoneLocator() {
+	public void sortHydrophoneLocator() {
 		/*  
 		 * old hydrophones will not have an arrayLocatorName 
 		 *  in which case this first attempt will fail and it will

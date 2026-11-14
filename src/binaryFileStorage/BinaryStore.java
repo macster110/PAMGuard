@@ -314,7 +314,13 @@ PamSettingsSource, DataOutputStore {
 			return true;
 		}
 
-		BinaryStoreSettings newSettings = BinaryStorageDialog.showDialog(null, this);
+		BinaryStoreSettings newSettings;
+		if (PamGUIManager.isFX()) {
+			newSettings = showFXDialog();
+		}
+		else {
+			newSettings = BinaryStorageDialog.showDialog(null, this);
+		}
 		if (newSettings != null) {
 			binaryStoreSettings = newSettings.clone();
 			folder = new File(folderPath);
@@ -323,6 +329,30 @@ PamSettingsSource, DataOutputStore {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Show the JavaFX settings dialog, waiting for it to close if called from 
+	 * another thread. 
+	 * @return new settings or null if cancelled. 
+	 */
+	private BinaryStoreSettings showFXDialog() {
+		if (binaryStoreGUIFX == null) {
+			binaryStoreGUIFX = new BinaryStoreGUIFX(this);
+		}
+		if (javafx.application.Platform.isFxApplicationThread()) {
+			return binaryStoreGUIFX.showDialog(binaryStoreSettings);
+		}
+		java.util.concurrent.FutureTask<BinaryStoreSettings> task = new java.util.concurrent.FutureTask<>(
+				() -> binaryStoreGUIFX.showDialog(binaryStoreSettings));
+		javafx.application.Platform.runLater(task);
+		try {
+			return task.get();
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 
 	private void closeStores() {
@@ -610,7 +640,14 @@ PamSettingsSource, DataOutputStore {
 	 */
 	private boolean showStorageOptions(Frame frame) {
 
-		BinaryStoreSettings newSettings = BinaryStorageDialog.showDialog(frame, BinaryStore.this);
+		BinaryStoreSettings newSettings;
+		if (PamGUIManager.isFX()) {
+			// don't open a Swing dialog in the JavaFX GUI.
+			newSettings = showFXDialog();
+		}
+		else {
+			newSettings = BinaryStorageDialog.showDialog(frame, BinaryStore.this);
+		}
 		if (newSettings != null) {
 			boolean immediateChanges = binaryStoreSettings.isChanged(newSettings);
 			binaryStoreSettings = newSettings.clone();

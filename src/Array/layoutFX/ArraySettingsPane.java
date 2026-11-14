@@ -10,7 +10,14 @@ import Array.PamArray;
 import PamController.PamController;
 import PamController.SettingsPane;
 import javafx.scene.Node;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.Alert.AlertType;
+import pamViewFX.fxNodes.PamGridPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ToggleButton;
@@ -78,6 +85,23 @@ public class ArraySettingsPane extends SettingsPane<PamArray >{
 	private Label recivierDiagramLabel;
 
 	/**
+	 * List of arrays held by the array manager.
+	 */
+	private ComboBox<PamArray> arrayList;
+
+	/**
+	 * The array (from the array manager list) being edited.
+	 */
+	private PamArray selectedArray;
+
+	/**
+	 * Instrument information required by Tethys.
+	 */
+	private TextField instrumentType, instrumentId;
+
+	private boolean settingArrayList;
+
+	/**
 	 * Pane with controls to change speed of sound. 
 	 */
 	private SettingsPane<PamArray> environmentalPane;
@@ -113,7 +137,19 @@ public class ArraySettingsPane extends SettingsPane<PamArray >{
 		rightPane.setSpacing(5);
 
 		Pane hydrophone3DPane = create3DPane();
-		rightPane.getChildren().addAll(recivierDiagramLabel, hydrophone3DPane, environmentLabel, new PamBorderPane(environmentalPane.getContentNode()));
+		// instrument information required by Tethys, as in the Swing dialog.
+		PamGridPane instrumentGrid = new PamGridPane();
+		instrumentGrid.setHgap(5);
+		instrumentGrid.setVgap(5);
+		instrumentGrid.add(new Label("Instrument Type"), 0, 0);
+		instrumentGrid.add(instrumentType, 1, 0);
+		instrumentGrid.add(new Label("Instrument Id"), 2, 0);
+		instrumentGrid.add(instrumentId, 3, 0);
+		instrumentType.setPrefColumnCount(10);
+		instrumentId.setPrefColumnCount(8);
+
+		rightPane.getChildren().addAll(recivierDiagramLabel, hydrophone3DPane, environmentLabel, new PamBorderPane(environmentalPane.getContentNode()), 
+				instrumentGrid);
 		VBox.setVgrow(hydrophone3DPane, Priority.ALWAYS);
 
 		mainPane.setRight(rightPane);
@@ -271,11 +307,51 @@ public class ArraySettingsPane extends SettingsPane<PamArray >{
 		Region blank = new Region();
 		blank.setPrefWidth(70);
 
-		arrayImportExportBox.getChildren().addAll(importButton, exportButton, blank); 
+		// array management, as in the Swing array dialog.
+		MenuButton manageButton = new MenuButton("Manage");
+		manageButton.setGraphic(PamGlyphDude.createPamIcon("mdi2f-format-list-bulleted", PamGuiManagerFX.iconSize));
+		manageButton.setTooltip(new Tooltip("Create, copy, rename or delete hydrophone arrays"));
+		MenuItem newItem = new MenuItem("New Array...");
+		newItem.setOnAction(a -> newArray());
+		MenuItem copyItem = new MenuItem("Copy...");
+		copyItem.setOnAction(a -> copyArray());
+		MenuItem renameItem = new MenuItem("Rename...");
+		renameItem.setOnAction(a -> renameArray());
+		MenuItem deleteItem = new MenuItem("Delete");
+		deleteItem.setOnAction(a -> deleteArray());
+		manageButton.getItems().addAll(newItem, copyItem, renameItem, deleteItem);
+
+		arrayImportExportBox.getChildren().addAll(manageButton, importButton, exportButton); 
 
 		PamBorderPane titleHolder = new PamBorderPane();
 		titleHolder.setLeft(arrayLabel);
 		titleHolder.setRight(arrayImportExportBox);
+
+		// the list of arrays and instrument information.
+		arrayList = new ComboBox<PamArray>();
+		arrayList.setMaxWidth(Double.MAX_VALUE);
+		arrayList.setMinWidth(150);
+		arrayList.setTooltip(new Tooltip("Select which of the stored hydrophone arrays to use"));
+		arrayList.valueProperty().addListener((obs, oldArray, newArray) -> {
+			if (settingArrayList || newArray == null || newArray == oldArray) {
+				return;
+			}
+			// keep any changes made to the previous array.
+			if (oldArray != null) {
+				PamArray updated = getParams(oldArray);
+				if (updated == null) {
+					return;
+				}
+			}
+			selectArray(newArray);
+		});
+		instrumentType = new TextField();
+		instrumentType.setTooltip(new Tooltip("Instrument type, e.g. Towed array, HARP, EAR, Popup, DMON, Rock Hopper, etc."));
+		instrumentId = new TextField();
+		instrumentId.setTooltip(new Tooltip("Instrument identifier, e.g. serial number"));
+		titleHolder.setCenter(arrayList);
+		PamBorderPane.setAlignment(arrayList, Pos.CENTER_LEFT);
+		PamBorderPane.setMargin(arrayList, new Insets(5, 10, 0, 5));
 
 		//the streamer pane for changing streamer settings. 
 		streamerPane = new StreamersPane(); 
@@ -313,7 +389,15 @@ public class ArraySettingsPane extends SettingsPane<PamArray >{
 	private void exportArray() {
 		File file = fileChooser.showSaveDialog(getFXWindow());
 		if (file==null) return;
-		PamArray pamArray = getParams(new PamArray("saved_array: ", null)); 
+		// export the array as currently shown, including any unsaved changes.
+		PamArray base = selectedArray != null ? selectedArray.clone() : new PamArray("saved_array", null);
+		PamArray pamArray = getParams(base); 
+		if (pamArray == null) return;
+		String path = file.getAbsolutePath();
+		if (!path.toLowerCase().endsWith("." + ArrayManager.getArrayFileType())) {
+			path += "." + ArrayManager.getArrayFileType();
+		}
+		pamArray.setArrayFile(path);
 		boolean isSaved = ArrayManager.saveArrayToFile(pamArray); 
 		if (isSaved==false) {
 			PamDialogFX.showError("Unable to save the array file to \n" + file.toString());
@@ -327,7 +411,111 @@ public class ArraySettingsPane extends SettingsPane<PamArray >{
 		File file = fileChooser.showOpenDialog(getFXWindow());
 		if (file==null) return;
 		PamArray pamArray = ArrayManager.loadArrayFromFile(file.getPath()); 
-		this.setParams(pamArray);	
+		if (pamArray == null) {
+			PamDialogFX.showError("Unable to load the array file \n" + file.toString());
+			return;
+		}
+		// as in the Swing dialog, an imported array is added to the list of arrays.
+		pamArray.setArrayFile(file.getAbsolutePath());
+		pamArray.sortHydrophoneLocator();
+		addArray(pamArray);
+	}
+
+	/**
+	 * Add an array to the array manager and show it.
+	 * @param newArray - the new array.
+	 */
+	private void addArray(PamArray newArray) {
+		ArrayManager.getArrayManager().addArray(newArray);
+		selectArray(newArray);
+	}
+
+	/**
+	 * Show an array from the array manager list.
+	 */
+	private void selectArray(PamArray array) {
+		selectedArray = array;
+		fillArrayList();
+		setParams(array);
+	}
+
+	private void fillArrayList() {
+		settingArrayList = true;
+		arrayList.getItems().setAll(ArrayManager.getArrayManager().getRecentArrays());
+		if (selectedArray != null && !arrayList.getItems().contains(selectedArray)) {
+			arrayList.getItems().add(selectedArray);
+		}
+		arrayList.setValue(selectedArray);
+		settingArrayList = false;
+	}
+
+	private String askName(String title, String text, String defaultName) {
+		TextInputDialog dialog = new TextInputDialog(defaultName == null ? "" : defaultName);
+		dialog.initOwner(getFXWindow());
+		dialog.setTitle(title);
+		dialog.setHeaderText(null);
+		dialog.setContentText(text);
+		return dialog.showAndWait().map(String::trim).filter(n -> n.length() > 0).orElse(null);
+	}
+
+	private void newArray() {
+		String name = askName("New Array", "Enter a name for the new hydrophone array", null);
+		if (name != null) {
+			addArray(new PamArray(name, null));
+		}
+	}
+
+	private void copyArray() {
+		if (selectedArray == null) return;
+		String name = askName("Copy Array", "Enter a name for the array copy", null);
+		if (name == null) return;
+		PamArray copy = getParams(selectedArray.clone());
+		if (copy == null) return;
+		copy.setArrayName(name);
+		copy.setArrayFile(null);
+		addArray(copy);
+	}
+
+	private void renameArray() {
+		if (selectedArray == null) return;
+		String name = askName("Rename Array", "Enter a new name for the array", selectedArray.getArrayName());
+		if (name == null) return;
+		selectedArray.setArrayName(name);
+		currentArray.setArrayName(name);
+		fillArrayList();
+	}
+
+	private void deleteArray() {
+		if (selectedArray == null) return;
+		ArrayManager arrayManager = ArrayManager.getArrayManager();
+		if (arrayManager.getRecentArrays().size() < 2) {
+			PamDialogFX.showWarning("You cannot delete the last array in the list");
+			return;
+		}
+		boolean ok = PamDialogFX.showMessageDialog(getFXWindow(), "Confirm array delete",
+				"Are you sure you want to delete the array \"" + selectedArray.toString() + "\"", 
+				ButtonType.YES, ButtonType.NO, AlertType.CONFIRMATION);
+		if (!ok) return;
+		arrayManager.removeArray(selectedArray);
+		selectedArray = null;
+		selectArray(arrayManager.getRecentArrays().get(0));
+	}
+
+	/**
+	 * Get the array, from the array manager's list, which is being edited.
+	 * @return the selected array.
+	 */
+	public PamArray getSelectedArray() {
+		return selectedArray;
+	}
+
+	/**
+	 * Set the array to edit. Use this rather than setParams when opening the pane
+	 * so that the list of arrays is updated.
+	 * @param array - an array from the array manager.
+	 */
+	public void setSelectedArray(PamArray array) {
+		selectArray(array);
 	}
 
 	/**
@@ -354,6 +542,10 @@ public class ArraySettingsPane extends SettingsPane<PamArray >{
 		currParams = hydrophonePane.getParams(currParams); 
 		currParams.setHydrophoneInterpolation(hydrophonePane.getHydrophoneInterp());
 		currParams = environmentalPane.getParams(currParams);
+		if (currParams != null && instrumentType != null) {
+			currParams.setInstrumentType(PamUtils.PamUtils.trimString(instrumentType.getText()));
+			currParams.setInstrumentId(PamUtils.PamUtils.trimString(instrumentId.getText()));
+		}
 		//		System.out.println("Array settings pane: No. streamers: " + currParams.getStreamerCount());
 		return currParams;
 	}
@@ -366,6 +558,10 @@ public class ArraySettingsPane extends SettingsPane<PamArray >{
 		hydrophonePane.setParams(input); 
 		streamerPane.setParams(input); 
 		environmentalPane.setParams(input);
+		if (instrumentType != null) {
+			instrumentType.setText(input.getInstrumentType());
+			instrumentId.setText(input.getInstrumentId());
+		}
 
 		//draw the array
 		array3DPane.drawArray(input);

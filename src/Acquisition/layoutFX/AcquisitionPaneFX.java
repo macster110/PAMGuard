@@ -1,5 +1,7 @@
 package Acquisition.layoutFX;
 
+import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
+
 import java.util.ArrayList;
 
 import javafx.collections.FXCollections;
@@ -76,6 +78,16 @@ public class AcquisitionPaneFX extends SettingsPane<AcquisitionParameters>{
 	 * The total gain in the system 
 	 */
 	private TextField preampGain; 
+
+	/**
+	 * Subtract a DC offset from the data.
+	 */
+	private javafx.scene.control.CheckBox subtractDC;
+
+	/**
+	 * Time constant for DC subtraction.
+	 */
+	private TextField dcTimeConstant;
 
 	/**
 	 * Pane which allows users to map hardware channels to software channels	 
@@ -436,6 +448,16 @@ public class AcquisitionPaneFX extends SettingsPane<AcquisitionParameters>{
 		//preampGain.setPrefColumnCount(2);
 		gridpane.add(new Label("dB"), 2,2); 
 
+		gridpane.add(subtractDC = new javafx.scene.control.CheckBox("Subtract DC with"), 0, 3);
+		gridpane.add(dcTimeConstant = new PamTextField(), 1, 3);
+		dcTimeConstant.setPrefWidth(TEXT_FIELD_WIDTH);
+		gridpane.add(new Label("s time constant"), 2, 3);
+		String dcTip = "Some input devices have a fixed (DC) offset in their voltage measurement.\n"
+				+ "Subtracting this off can lead to improved PAMGuard performance.";
+		subtractDC.setTooltip(new javafx.scene.control.Tooltip(dcTip));
+		dcTimeConstant.setTooltip(new javafx.scene.control.Tooltip(dcTip));
+		subtractDC.setOnAction(e -> dcTimeConstant.setDisable(!subtractDC.isSelected()));
+
 		return gridpane;
 	}
 
@@ -449,6 +471,21 @@ public class AcquisitionPaneFX extends SettingsPane<AcquisitionParameters>{
 		acquisitionParameters.nChannels = nChannels.getSelectionModel().getSelectedItem();
 		acquisitionParameters.voltsPeak2Peak = Double.valueOf(vPeak2Peak.getText());
 		acquisitionParameters.preamplifier.setGain(Double.valueOf(preampGain.getText()));
+
+		acquisitionParameters.subtractDC = subtractDC.isSelected();
+		if (acquisitionParameters.subtractDC) {
+			try {
+				acquisitionParameters.dcTimeConstant = Double.valueOf(dcTimeConstant.getText());
+			}
+			catch (NumberFormatException e) {
+				PamDialogFX.showWarning("Invalid number for DC background time constant");
+				return null;
+			}
+			if (acquisitionParameters.dcTimeConstant <= 0) {
+				PamDialogFX.showWarning("The DC background subtraction time constant must be greater than zero");
+				return null;
+			}
+		}
 
 		//from swing params
 		//			if(!currentDaqSystem.areSampleSettingsOk(acquisitionParameters.nChannels, acquisitionParameters.sampleRate)){			
@@ -507,6 +544,10 @@ public class AcquisitionPaneFX extends SettingsPane<AcquisitionParameters>{
 		
 		
 		acquisitionParameters=input.clone(); 
+
+		subtractDC.setSelected(acquisitionParameters.subtractDC);
+		dcTimeConstant.setText(String.format("%3.1f", acquisitionParameters.dcTimeConstant));
+		dcTimeConstant.setDisable(!acquisitionParameters.subtractDC);
 		
 		int ind = 0;
 		for (int i = 0; i < acquisitionControl.getSystemList().size(); i++) {

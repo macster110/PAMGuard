@@ -31,16 +31,16 @@ public class ArrayGUIFX extends PamControlledGUIFX {
 		if (arraySettingsPane==null) {
 			arraySettingsPane= new ArraySettingsPane(); 
 		}
-		System.out.println("The current array is "+ arrayManager.getCurrentArray()); 
-		arraySettingsPane.setParams(arrayManager.getCurrentArray());
+		arraySettingsPane.setSelectedArray(arrayManager.getCurrentArray());
 		return arraySettingsPane; 
 	}
 	
 	@Override
 	public void updateParams() {
-		System.out.println("The current array is "+ arrayManager.getCurrentArray()); 
-
-		PamArray newParams=arraySettingsPane.getParams(arrayManager.getCurrentArray());
+		// the pane may have switched to a different array from the array manager's list.
+		PamArray selected = arraySettingsPane.getSelectedArray();
+		if (selected == null) selected = arrayManager.getCurrentArray();
+		PamArray newParams=arraySettingsPane.getParams(selected);
 		
 		if (newParams!=null) arrayManager.setCurrentArray(newParams);
 		//setup the controlled unit. 

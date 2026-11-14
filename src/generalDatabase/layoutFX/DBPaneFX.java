@@ -7,7 +7,9 @@ import pamViewFX.fxNodes.PamBorderPane;
 import pamViewFX.fxNodes.PamVBox;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.Label;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
@@ -48,6 +50,11 @@ public class DBPaneFX extends SettingsPane<DBParameters> {
 	 */
 	private SystemDialogPaneFX systemDialogPanel;
 
+	/**
+	 * Save data to the database immediately.
+	 */
+	private CheckBox useAutoCommit;
+
 	
 	public DBPaneFX(DBControl dbControl){
 		super(null);
@@ -65,6 +72,7 @@ public class DBPaneFX extends SettingsPane<DBParameters> {
 		if (systemDialogPanel != null && systemDialogPanel.getParams() == false) return null;
 
 		dBParams.setDataBaseSystem(systemList.getSelectionModel().getSelectedIndex());
+		dBParams.setUseAutoCommit(useAutoCommit.isSelected());
 
 
 
@@ -91,6 +99,23 @@ public class DBPaneFX extends SettingsPane<DBParameters> {
 		
 		mainPane.setTop(vBox);
 		mainPane.setPrefWidth(400);
+
+		Label optionsLabel = new Label("Options");
+		PamGuiManagerFX.titleFont2style(optionsLabel);
+		useAutoCommit = new CheckBox("Use AutoCommit");
+		useAutoCommit.setTooltip(new Tooltip("Auto Commit saves data immediately to the database.\n"
+				+ "Turning this off can improve performance since multiple records will be written together."));
+		useAutoCommit.setOnAction(e -> {
+			if (useAutoCommit.isSelected()) {
+				pamViewFX.fxNodes.pamDialogFX.PamDialogFX.showWarning(null, "Database AutoCommit",
+						"Using Auto Commit may drastically slow down database (and PAMGuard) performance. "
+						+ "We recommend that you don't use it.");
+			}
+		});
+		PamVBox optionsBox = new PamVBox(optionsLabel, useAutoCommit);
+		optionsBox.setSpacing(5);
+		optionsBox.setPadding(new Insets(10, 0, 0, 0));
+		mainPane.setBottom(optionsBox);
 		
 		return mainPane;
 	}
@@ -99,6 +124,7 @@ public class DBPaneFX extends SettingsPane<DBParameters> {
 	public void setParams(DBParameters dBParams) {
 		
 		this.dBParams=dBParams.clone();
+		useAutoCommit.setSelected(dBParams.getUseAutoCommit());
 		
 		systemList.getItems().removeAll(systemList.getItems());
 		ArrayList<DBSystem> dbSystems = dBControl.getDatabaseSystems();

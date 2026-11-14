@@ -66,7 +66,7 @@ public class BinaryStoreGUIFX extends PamControlledGUIFX {
 
 
 		Optional<BinaryStoreSettings> dBParams=dBsettingsDialog.showAndWait();
-		if (dBParams!=null) {
+		if (dBParams!=null && dBParams.isPresent()) {
 			return dBParams.get();
 		}
 		else {

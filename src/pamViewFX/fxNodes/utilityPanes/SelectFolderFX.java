@@ -41,6 +41,7 @@ public class SelectFolderFX extends PamBorderPane{
 	public SelectFolderFX(String borderLabel, int textLength, boolean showSubFolderOption) {
 		this.showSubFolderOption = showSubFolderOption;
 		createPanel(borderLabel, textLength);
+		setVisibleControls();
 	}
 
 	public SelectFolderFX(String borderLabel, int textLength) {
@@ -222,6 +223,7 @@ public class SelectFolderFX extends PamBorderPane{
 
 	private void setVisibleControls() {
 		includeSubFoldersCheckBox.setVisible(showSubFolderOption);
+		includeSubFoldersCheckBox.setManaged(showSubFolderOption);
 	}
 
 }
