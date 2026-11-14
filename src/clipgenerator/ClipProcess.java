@@ -393,6 +393,13 @@ public class ClipProcess extends SpectrogramMarkProcess {
 	/**
 	 * Called at end of setup of after settings dialog to subscribe data blocks. 
 	 */
+	@Override
+	public ArrayList<Class<? extends PamDataUnit>> getCompatibleDataUnits() {
+		ArrayList<Class<? extends PamDataUnit>> list = new ArrayList<Class<? extends PamDataUnit>>();
+		list.add(PamDetection.RawDataUnit.class);
+		return list;
+	}
+
 	public synchronized void subscribeDataBlocks() {
 		unSubscribeDataBlocks();
 		rawDataBlock = (PamRawDataBlock) PamController.getInstance().getDataBlockByLongName(clipControl.clipSettings.dataSourceName);

@@ -10,7 +10,10 @@ import javax.swing.JMenu;
 import javax.swing.JMenuItem;
 
 import PamController.PamControlledUnit;
+import PamController.PamControlledUnitGUI;
 import PamController.PamControlledUnitSettings;
+import PamController.PamGUIManager;
+import clipgenerator.layoutFX.ClipGUIFX;
 import PamController.PamController;
 import PamController.PamControllerInterface;
 import PamController.PamSettingManager;
@@ -184,7 +187,9 @@ public class ClipControl extends PamControlledUnit implements PamSettings, ClipD
 			}
 			break;
 		}
-	
+		if (clipGUIFX != null) {
+			clipGUIFX.notifyGUIChange(changeType);
+		}
 	}
 
 	/**
@@ -222,6 +227,14 @@ public class ClipControl extends PamControlledUnit implements PamSettings, ClipD
 		}
 	}
 	
+	/**
+	 * Make sure there are clip settings for every data block which can 
+	 * trigger clips, e.g. before showing a settings pane. 
+	 */
+	public void refreshTriggerBlocks() {
+		checkTriggerBlocks();
+	}
+
 	/**
 	 * Get a list of datablocks which might trigger a clip generation. 
 	 * @return list of triggering data blocks. 
@@ -346,6 +359,36 @@ public class ClipControl extends PamControlledUnit implements PamSettings, ClipD
 	public ClipSettings getClipSettings() {
 		return clipSettings;
 	}
+
+	/**
+	 * Set new clip generator settings, e.g. from a JavaFX settings pane, and 
+	 * subscribe to the trigger data. Does the same as pressing OK in the Swing dialog. 
+	 * @param newSettings - the new settings. 
+	 */
+	public void setClipSettings(ClipSettings newSettings) {
+		if (newSettings == null) {
+			return;
+		}
+		clipSettings = newSettings.clone();
+		clipProcess.subscribeDataBlocks();
+		clipProcess.getClipDataBlock().getPamSymbolManager().clearChoosers();
+	}
+
+	@Override
+	public PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamGUIManager.FX) {
+			if (clipGUIFX == null) {
+				clipGUIFX = new ClipGUIFX(this);
+			}
+			return clipGUIFX;
+		}
+		return null;
+	}
+
+	/**
+	 * The JavaFX GUI. 
+	 */
+	private ClipGUIFX clipGUIFX;
 
 	public PamDataUnit findTriggerDataUnit(ClipDataUnit clipDataUnit) {
 		String trigName = clipDataUnit.triggerName;

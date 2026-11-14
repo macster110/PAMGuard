@@ -564,6 +564,7 @@ final public class PamModel implements PamSettings {
 		mi.setToolTipText("Generates and stores short clips of sound data in response to detections");
 		mi.setModulesMenuGroup(processingGroup);
 		mi.setHelpPoint("sound_processing/ClipGenerator/docs/ClipGenerator.html");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX);
 
 		mi = PamModuleInfo.registerControlledUnit(AmpControl.class.getName(), "Signal Amplifier");	
 		mi.addDependency(new PamDependency(RawDataUnit.class, "Acquisition.AcquisitionControl"));	

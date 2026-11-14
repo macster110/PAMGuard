@@ -51,6 +51,46 @@ public class ClipDisplayParameters implements Cloneable, Serializable, ManagedPa
 		}
 	}
 
+	/**
+	 * Get a copy of the parameters. 
+	 * @return a copy of the parameters. 
+	 */
+	public ClipDisplayParameters copy() {
+		return clone();
+	}
+
+	public int getMaxClips() {
+		return maxClips;
+	}
+
+	public void setMaxClips(int maxClips) {
+		this.maxClips = maxClips;
+	}
+
+	public int getMaxMinutes() {
+		return maxMinutes;
+	}
+
+	public void setMaxMinutes(int maxMinutes) {
+		this.maxMinutes = maxMinutes;
+	}
+
+	public boolean isShowFullSummary() {
+		return showFullSummary;
+	}
+
+	public void setShowFullSummary(boolean showFullSummary) {
+		this.showFullSummary = showFullSummary;
+	}
+
+	public boolean isShowControlPanel() {
+		return showControlPanel;
+	}
+
+	public void setShowControlPanel(boolean showControlPanel) {
+		this.showControlPanel = showControlPanel;
+	}
+
 	public ColourArrayType getColourMap() {
 		if (colourMap == null) {
 			colourMap = ColourArrayType.GREY;

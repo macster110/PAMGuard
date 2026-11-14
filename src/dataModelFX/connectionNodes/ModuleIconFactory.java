@@ -36,7 +36,7 @@ public class ModuleIconFactory {
 	public enum ModuleIcon {
 		DATAMAP, NMEA, GPS, MAP, SOUND_AQ, SOUND_OUTPUT, FFT, FILTER, CLICK, CLICK_TRAIN, RECORDER, WHISTLE_MOAN,
 		NOISE_BAND, NOISE_FILT, DATABASE, BINARY, TIME_DISPLAY, DETECTION_DISPLAY, ARRAY, DEEP_LEARNING, MATCHED_CLICK_CLASSIFIER,
-		DECIMATOR, CPOD, TETHYS, ISHMAEL_ENERGY, ISHMAEL_SPEC_CORR, ISHMAEL_MATCHED_FILTER, ISHMAEL_LOCATOR, DEEP_WHISTLE
+		DECIMATOR, CPOD, TETHYS, ISHMAEL_ENERGY, ISHMAEL_SPEC_CORR, ISHMAEL_MATCHED_FILTER, ISHMAEL_LOCATOR, DEEP_WHISTLE, CLIP_GENERATOR
 	}
 
 	/**
@@ -144,6 +144,9 @@ public class ModuleIconFactory {
 			break;
 		case DEEP_WHISTLE:
 			iconNode = PamGlyphDude.createModuleIcon("mdi2b-brain"); 
+			break;
+		case CLIP_GENERATOR:
+			iconNode = PamGlyphDude.createModuleIcon("mdi2c-content-cut"); 
 			break;
 		case ISHMAEL_LOCATOR:
 			iconNode = PamGlyphDude.createModuleIcon("mdi2m-map-marker-radius-outline"); 
@@ -315,7 +318,10 @@ public class ModuleIconFactory {
 			icon=ModuleIcon.ISHMAEL_MATCHED_FILTER; 
 			break; 
 		case "deepWhistle.DeepWhistleControl":
-			icon=ModuleIcon.DEEP_WHISTLE; 
+			icon=ModuleIcon.DEEP_WHISTLE;
+			break;
+		case "clipgenerator.ClipControl":
+			icon=ModuleIcon.CLIP_GENERATOR; 
 			break; 
 		case "IshmaelLocator.IshLocControl":
 			icon=ModuleIcon.ISHMAEL_LOCATOR; 
