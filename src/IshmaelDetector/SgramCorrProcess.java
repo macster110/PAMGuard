@@ -118,6 +118,11 @@ public class SgramCorrProcess extends IshDetFnProcess
 	public void makeKernel(SgramCorrParams p, double sRate, double fRate, 
 			int gramHeight) 
 	{
+		if (p.segment == null || p.segment.length == 0 || gramHeight <= 0) {
+			// no kernel shape has been defined, so there is nothing to correlate with.
+			kernel = null;
+			return;
+		}
 		//Find duration and freq spans of the segments.
 		double minT = Double.POSITIVE_INFINITY, maxT = Double.NEGATIVE_INFINITY;
 		minF = minT;
@@ -135,7 +140,12 @@ public class SgramCorrProcess extends IshDetFnProcess
 		int minBin = (int)Math.floor((minF - p.spread*4) / binBW);
 		int maxBin = (int)Math.ceil ((maxF + p.spread*4) / binBW);
 		minBin = Math.max(minBin, 0);
-		maxBin = Math.min(maxBin, gramHeight/2);
+		maxBin = Math.min(maxBin, gramHeight - 1);	// gramHeight bins span 0 to Nyquist
+		if (maxBin < minBin) {
+			// the kernel is entirely above the Nyquist frequency.
+			kernel = null;
+			return;
+		}
 		int nBin = maxBin - minBin + 1;
 		int durN = Math.max(1, (int)Math.ceil((maxT - minT) * fRate));
 
@@ -200,12 +210,22 @@ public class SgramCorrProcess extends IshDetFnProcess
 		IshDetFnDataUnit outputUnit = getOutputDataUnit(arg);
 		
 		//The actual spectrogram correlation calculation.  First copy sams.
+		double[][] kernel = this.kernel;	// local copy in case the kernel is remade in another thread
+		if (kernel == null) {
+			return;		// no kernel segments have been set up
+		}
 		PerChannelInfo chan = perChannelInfo[chanIx];
-		if (chan.storedGram == null) {
-			return;
+		if (chan == null || chan.storedGram == null || chan.storedGram.length != kernel.length 
+				|| chan.storedGram[0].length != kernel[0].length) {
+			// the kernel has changed size, so start again for this channel.
+			chan = perChannelInfo[chanIx] = new PerChannelInfo();
+			if (chan.storedGram == null) {
+				return;
+			}
 		}
 		double[] slice = chan.storedGram[chan.sliceIx];
-		for (int bin = 0, j = binOffset; bin < slice.length; bin++, j++) {
+		int nBins = inputData.length();
+		for (int bin = 0, j = binOffset; bin < slice.length && j < nBins; bin++, j++) {
 			double mag = inputData.magsq(j); 
 			slice[bin] = p.useLog ? Math.log10(Math.max(1.0, mag)) : mag;
 		}
