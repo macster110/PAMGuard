@@ -84,6 +84,7 @@ public class DLWarningDialog {
 	 */
 	public void showWarning(String dlWarning) {
 		this.warningShow = true;
+		pamViewFX.fxNodes.pamDialogFX.PamDialogFX.countWarning();
 		showOwnedWarning("Deep Learning Warning", dlWarning, AlertType.ERROR, null);
 //		try {
 //			SwingUtilities.invokeAndWait(()->{

@@ -198,9 +198,93 @@ public class DatagramManager {
 		return true;
 	}
 
+	/**
+	 * Show the datagram settings in the JavaFX GUI. Can be called from any thread. 
+	 * @param firstCall true if the datagrams have not been made yet. 
+	 * @return true if the settings were changed. 
+	 */
+	private boolean showDatagramDialogFX(boolean firstCall) {
+		if (!javafx.application.Platform.isFxApplicationThread()) {
+			java.util.concurrent.FutureTask<Boolean> task = new java.util.concurrent.FutureTask<Boolean>(() -> showDatagramDialogFX(firstCall));
+			javafx.application.Platform.runLater(task);
+			try {
+				return task.get();
+			} catch (Exception e) {
+				e.printStackTrace();
+				return false;
+			}
+		}
+		javafx.scene.control.TextInputDialog dialog = new javafx.scene.control.TextInputDialog(
+				String.format("%d", datagramSettings.datagramSeconds));
+		dialog.setTitle("Datagram Settings");
+		dialog.setHeaderText(null);
+		javafx.scene.control.Label info = new javafx.scene.control.Label(
+				"Datagrams give an overview of the contents of a large dataset on the data map. "
+				+ "For datasets lasting several months, bins of 10 minutes (600 seconds) or longer are appropriate. "
+				+ "For shorter datasets you may want bins of less than a minute. The whole datagram is held in memory, "
+				+ "so short bins for a very long dataset may use all available memory.");
+		info.setWrapText(true);
+		info.setMaxWidth(420);
+		javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(5, new javafx.scene.control.Label("Datagram bin size"), 
+				dialog.getEditor(), new javafx.scene.control.Label("seconds"));
+		row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+		dialog.getEditor().setPrefColumnCount(6);
+		dialog.getDialogPane().setContent(new javafx.scene.layout.VBox(10, info, row));
+		dialog.getDialogPane().getStylesheets().addAll(
+				pamViewFX.fxStyles.PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());
+		if (PamController.getMainStage() != null && PamController.getMainStage().isShowing()) {
+			dialog.initOwner(PamController.getMainStage());
+		}
+		// don't close the dialog unless the value is a positive whole number. 
+		javafx.scene.Node okButton = dialog.getDialogPane().lookupButton(javafx.scene.control.ButtonType.OK);
+		okButton.addEventFilter(javafx.event.ActionEvent.ACTION, event -> {
+			int secs = 0;
+			try {
+				secs = Integer.valueOf(dialog.getEditor().getText().trim());
+			}
+			catch (NumberFormatException e) {
+			}
+			if (secs <= 0) {
+				event.consume();
+				pamViewFX.fxNodes.pamDialogFX.PamDialogFX.showWarning(null, "Datagram Settings", 
+						"The datagram bin size must be a positive whole number of seconds.");
+			}
+		});
+		java.util.Optional<String> result = dialog.showAndWait();
+		if (!result.isPresent()) {
+			return false;
+		}
+		DatagramSettings newSettings = datagramSettings.clone();
+		newSettings.datagramSeconds = Integer.valueOf(result.get().trim());
+		if (firstCall) {
+			datagramSettings = newSettings;
+			datagramSettings.validDatagramSettings = true;
+			return true;
+		}
+		if (newSettings.datagramSeconds == datagramSettings.datagramSeconds) {
+			return true;
+		}
+		javafx.scene.control.Alert alert = new javafx.scene.control.Alert(javafx.scene.control.Alert.AlertType.CONFIRMATION, 
+				"Recalculating the datagram for a large dataset may take a long time. Are you sure you want to continue?", 
+				javafx.scene.control.ButtonType.YES, javafx.scene.control.ButtonType.NO);
+		alert.setTitle("Datagram Settings");
+		alert.setHeaderText(null);
+		alert.getDialogPane().getStylesheets().addAll(
+				pamViewFX.fxStyles.PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());
+		if (alert.showAndWait().orElse(javafx.scene.control.ButtonType.NO) != javafx.scene.control.ButtonType.YES) {
+			return false;
+		}
+		datagramSettings = newSettings;
+		updateDatagrams();
+		return true;
+	}
+
 	public boolean showDatagramDialog(boolean firstCall) {
 		if(PamGUIManager.getGUIType()==PamGUIManager.NOGUI) {
 			return false;
+		}
+		if (PamGUIManager.isFX()) {
+			return showDatagramDialogFX(firstCall);
 		}
 		DatagramSettings newSettings = DatagramDialog.showDialog(PamController.getMainFrame(), this);
 		if (newSettings != null) {

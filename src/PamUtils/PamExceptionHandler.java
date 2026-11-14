@@ -23,6 +23,12 @@ public class PamExceptionHandler implements Thread.UncaughtExceptionHandler {
 	}
 
 	protected void handleException(Thread thread, Throwable exception) {
+		if (PamController.getInstance() == null || PamController.getInstance().getModelInterface() == null) {
+			// PAMGuard hasn't been created yet, so there are no modules or plug-ins to blame.
+			System.err.println("\nPamExceptionHandler: Caught Exception on thread " + thread.getName());
+			exception.printStackTrace();
+			return;
+		}
 		
 	    // if PamModel is currently accessing an interface, warn the user and then move
 	    // on

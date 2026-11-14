@@ -214,12 +214,13 @@ public class ClipCanvasFX extends Region {
 			e.consume();
 		});
 
-		new AnimationTimer() {
+		animationTimer = new AnimationTimer() {
 			@Override
 			public void handle(long now) {
 				animate();
 			}
-		}.start();
+		};
+		animationTimer.start();
 	}
 
 	/*
@@ -1016,9 +1017,15 @@ public class ClipCanvasFX extends Region {
 	}
 
 	/**
+	 * Timer which animates zooming and repaints the display. 
+	 */
+	private AnimationTimer animationTimer;
+
+	/**
 	 * Stop making images, e.g. when the display closes.
 	 */
 	public void dispose() {
+		animationTimer.stop();
 		imageMaker.stop();
 	}
 

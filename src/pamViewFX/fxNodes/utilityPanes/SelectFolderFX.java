@@ -174,8 +174,9 @@ public class SelectFolderFX extends PamBorderPane{
 		File f = new File(folder);
 		if (checkPath) {
 			if (f.exists() == false) {
-				if (PamDialogFX.showMessageDialog("Select Directory", "The directory " + folder + " does not exist " +
-						"do you want to create it ?")){
+				if (PamDialogFX.showMessageDialog(null, "Select Directory", "The directory " + folder + " does not exist. " +
+						"Do you want to create it?", javafx.scene.control.ButtonType.YES, javafx.scene.control.ButtonType.NO, 
+						javafx.scene.control.Alert.AlertType.CONFIRMATION)){
 					if (f.mkdirs() == false) {
 						// print a warning message
 						PamDialogFX.showWarning(PamController.getMainStage(), "Error", "The folder " + folder + " could not be created");

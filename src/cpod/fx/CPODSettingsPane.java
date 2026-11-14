@@ -418,8 +418,18 @@ public class CPODSettingsPane extends SettingsPane<CPODParams> {
 	//	}
 
 
+	/**
+	 * The last parameters the pane was set with. 
+	 */
+	private CPODParams lastParams;
+
 	@Override
 	public CPODParams getParams(CPODParams currParams) {
+		if (currParams == null) {
+			// the settings dialog checks the pane without passing in any parameters. 
+			if (lastParams == null) return null;
+			currParams = lastParams.clone();
+		}
 		currParams.offlineFolder = currentFolder==null? null:currentFolder.getAbsolutePath(); 
 		currParams.subFolders = subFolder.selectedProperty().get();
 		try {
@@ -435,6 +445,7 @@ public class CPODSettingsPane extends SettingsPane<CPODParams> {
 
 	@Override
 	public void setParams(CPODParams cpodParams) {
+		this.lastParams = cpodParams;
 		this.pathLabel.setText(cpodParams.offlineFolder);
 		subFolder.setSelected(cpodParams.subFolders);
 

@@ -171,6 +171,7 @@ public class WarnOnceDialogFX {
 	public void showDialog() {
 		//System.out.println("SHOW DIALOG: " +this); 
 		
+		pamViewFX.fxNodes.pamDialogFX.PamDialogFX.countWarning();
 		Optional<ButtonType> type = alert.showAndWait();
 		
 		if (type.filter(t -> t == ButtonType.YES).isPresent()) {
@@ -240,6 +241,21 @@ public class WarnOnceDialogFX {
 		}
 	}
 
+	/**
+	 * Messages are often written for Swing dialogs and so contain HTML tags. JavaFX labels show
+	 * these as plain text, so convert the common tags into line breaks and remove the rest. 
+	 * @param message - the message, which may contain HTML. 
+	 * @return the message as plain text. 
+	 */
+	public static String htmlToText(String message) {
+		if (message == null) return null;
+		String text = message.replaceAll("(?i)<\\s*br\\s*/?>", "\n");
+		text = text.replaceAll("(?i)<\\s*/?\\s*p\\s*[^>]*>", "\n\n");
+		text = text.replaceAll("(?i)</?\\s*(html|body|b|i|u|strong|em|center|font|span|div)(\\s[^>]*)?>", "");
+		text = text.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
+		return text.replaceAll("\n{3,}", "\n\n").trim();
+	}
+
 	public boolean isShowAgain() {
 		return dontShowAgain.isSelected() == false;
 	}
@@ -277,14 +293,14 @@ public class WarnOnceDialogFX {
 			protected Node createDetailsButton() {
 
 				dontShowAgain = new CheckBox();
-				dontShowAgain.setText(optOutMessage + " ever");
+				dontShowAgain.setText(optOutMessage);
 
 				dontShowAgainThisSess = new CheckBox();
-				dontShowAgainThisSess.setText(" this session ");
+				dontShowAgainThisSess.setText("Don't show again this session");
 
 				checkBoxPane = new PamHBox(); 
 				checkBoxPane.getChildren().addAll(dontShowAgain, dontShowAgainThisSess); 
-				checkBoxPane.setSpacing(5); 
+				checkBoxPane.setSpacing(15); 
 				checkBoxPane.setAlignment(Pos.CENTER_LEFT);
 
 				return checkBoxPane;
@@ -294,7 +310,7 @@ public class WarnOnceDialogFX {
 		alert.getDialogPane().getButtonTypes().addAll(buttonTypes);
 		
 		
-		alert.getDialogPane().setContentText(message);
+		alert.getDialogPane().setContentText(htmlToText(message));
 		// Fool the dialog into thinking there is some expandable content
 		// a Group won't take up any space if it has no children
 		alert.getDialogPane().setExpandableContent(new Group());

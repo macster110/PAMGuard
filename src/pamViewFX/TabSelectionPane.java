@@ -66,7 +66,7 @@ public class TabSelectionPane extends SettingsPane<PamGuiTabFX> {
 //		addButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.PLUS, Color.WHITE, PamGuiManagerFX.iconSize)); 
 		addButton.setGraphic(PamGlyphDude.createPamIcon("mdi2p-plus", Color.WHITE, PamGuiManagerFX.iconSize)); 
 		addButton.setOnAction((action)->{
-			pamGuiFX.addPamTab(new TabInfo("Display " +(pamGuiFX.getTabs().size()+1)), null, true); 
+			pamGuiFX.addPamTab(new TabInfo(pamGuiFX.getPamGuiManagerFX().uniqueTabName("Display " + pamGuiFX.getTabs().size(), null)), null, true); 
 			populateChoiceBox();
 			//select the tab which has just been added. 
 			tabChoice.getSelectionModel().selectLast();
@@ -100,18 +100,28 @@ public class TabSelectionPane extends SettingsPane<PamGuiTabFX> {
 		return  new PamBorderPane(vboxholder); 
 	}
 	
+	/**
+	 * Displays can't be added to the data model or to a tab filled by a static display. 
+	 */
+	private boolean isDisplayTab(PamGuiTabFX tab) {
+		return !TabInfo.DATA_MODEL_TAB_NAME.equals(tab.getName()) && !tab.isStaticDisplay();
+	}
+
 	private void populateChoiceBox(){
 		tabChoice.getItems().clear();
 		for (int i=0; i<pamGuiFX.getTabs().size(); i++){
-			tabChoice.getItems().add(pamGuiFX.getTabs().get(i).getLabel().getText()); 
+			if (!isDisplayTab(pamGuiFX.getTabs().get(i))) continue;
+			tabChoice.getItems().add(pamGuiFX.getTabs().get(i).getName()); 
 		}
 	}
 
 	@Override
 	public PamGuiTabFX getParams(PamGuiTabFX g) {
 		
+		String selected = tabChoice.getSelectionModel().getSelectedItem();
 		for (int i=0; i<pamGuiFX.getTabs().size(); i++){
-			if (tabChoice.getSelectionModel().getSelectedItem() == pamGuiFX.getTabs().get(i).getLabel().getText()){
+			if (!isDisplayTab(pamGuiFX.getTabs().get(i))) continue;
+			if (selected != null && selected.equals(pamGuiFX.getTabs().get(i).getName())){
 				return pamGuiFX.getTabs().get(i);
 			}
 		}

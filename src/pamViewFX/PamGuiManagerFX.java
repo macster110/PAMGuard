@@ -235,13 +235,11 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		sceneRoot.setPadding(javafx.geometry.Insets.EMPTY);
 		PamVBox.setVgrow(stages.get(0), javafx.scene.layout.Priority.ALWAYS);
 		String _os = System.getProperty("os.name", "").toLowerCase();
-		systemMenuBar.setMinHeight(0); //needed or we end up with a little bar at the top of the window
 		if (_os.contains("mac")) {
-			sceneRoot.getChildren().addAll(systemMenuBar, stages.get(0));
-		} else {
-			//no system bar if Windows or Linux
-			sceneRoot.getChildren().addAll(stages.get(0));
+			systemMenuBar.setMinHeight(0); //needed or we end up with a little bar at the top of the window
 		}
+		//on macOS the menu bar moves to the top of the screen, on Windows and Linux it sits at the top of the window. 
+		sceneRoot.getChildren().addAll(systemMenuBar, stages.get(0));
 
 		scene = new Scene(sceneRoot);
 		//register with the style manager rather than adding the sheets directly, so the whole scene
@@ -314,12 +312,21 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		// Sound medium submenu
 		Menu mediumMenu = new Menu("Sound Medium");
 		setMenuItemGraphic(mediumMenu, PamSettingsMenuPane.ICON_SOUND_MEDIUM);
-		MenuItem waterItem = new MenuItem("Water");
+		javafx.scene.control.ToggleGroup mediumGroup = new javafx.scene.control.ToggleGroup();
+		javafx.scene.control.RadioMenuItem waterItem = new javafx.scene.control.RadioMenuItem("Water");
+		waterItem.setToggleGroup(mediumGroup);
 		waterItem.setOnAction(e -> {
 			if (PamController.getInstance().getGlobalMediumManager().getGlobalMediumParameters().currentMedium != SoundMedium.Water)
 				PamController.getInstance().getGlobalMediumManager().setCurrentMedium(SoundMedium.Water);
 		});
-		MenuItem airItem = new MenuItem("Air");
+		javafx.scene.control.RadioMenuItem airItem = new javafx.scene.control.RadioMenuItem("Air");
+		airItem.setToggleGroup(mediumGroup);
+		//show the current medium whenever the menu opens. 
+		mediumMenu.setOnShowing(e -> {
+			boolean water = PamController.getInstance().getGlobalMediumManager().getGlobalMediumParameters().currentMedium == SoundMedium.Water;
+			waterItem.setSelected(water);
+			airItem.setSelected(!water);
+		});
 		airItem.setOnAction(e -> {
 			if (PamController.getInstance().getGlobalMediumManager().getGlobalMediumParameters().currentMedium != SoundMedium.Air)
 				PamController.getInstance().getGlobalMediumManager().setCurrentMedium(SoundMedium.Air);
@@ -563,7 +570,6 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	public void removeControlledUnit(PamControlledUnit controlledUnit){
 		//now set the content for the tab.
 		if (controlledUnit.getGUI(PamGUIManager.FX)!=null){
-			System.out.println("PAMGuiMangerFX: Remove module (PamControlledUnit)" +controlledUnit.getUnitName()); 
 			//if FX content then is handles as an FX Node within GUI manager. 
 			PamControlledGUIFX pamControlledUnitFX=(PamControlledGUIFX) controlledUnit.getGUI(PamGUIManager.FX);
 			//figure out which tab the display should be added to. 
@@ -626,7 +632,6 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 			}
 
 			//if loop has completed then no tab has found. This should not ordinarily happen...
-			System.out.println("PamGuiManagerFX: No tab was found for the user display on start up?");
 			String tabName; 
 			if (newDisplay.getDisplayParams().tabName!=null) tabName=newDisplay.getDisplayParams().tabName; 
 			else tabName=newDisplay.getName(); 
@@ -643,11 +648,20 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	private void addDisplay(UserDisplayNodeFX newDisplay){
 		PamGuiTabFX tab;
 
-		System.out.println("ADD USER DISPLAY");
 
 		if (!newDisplay.isStaticDisplay()){
 			//if a non static display then add to a selected tab. 
 			tab=getDisplayTab(newDisplay); 
+			if (tab == null) {
+				//the user cancelled the choice of tab. The module has been added, so its display must go somewhere. 
+				ArrayList<PamGuiTabFX> displayTabs = getTabs(true);
+				if (displayTabs.size() > 0) {
+					tab = displayTabs.get(displayTabs.size()-1);
+				}
+				else {
+					tab = stages.get(0).addPamTab(new TabInfo(uniqueTabName("Display 1", null)), null, true);
+				}
+			}
 			tab.addInternalPane(newDisplay);
 		}
 		else {
@@ -667,7 +681,6 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 			//					+ newDisplay.getDisplayParams().sizeY);
 
 			newDisplay.getDisplayParams().tabName=tab.getName(); 
-			System.out.println("ADD USER DISPLAY 2a " + newDisplay.getDisplayParams().tabName + " " + tab.getName() + " " + tab.getTabInfo().tabName);
 			newDisplay.setFrameHolder(internalFrame); 
 
 			//Have to platform later this as needs some time to intitialise? 11/08/2018
@@ -681,7 +694,6 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		else {
 			if (newDisplay.getDisplayParams()!=null) {
 				newDisplay.getDisplayParams().tabName=tab.getName(); 
-				System.out.println("ADD USER DISPLAY 2b " + newDisplay.getDisplayParams().tabName);
 			}
 		}
 
@@ -710,9 +722,10 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		for (int i=0; i<stages.size(); i++){
 			tabs=stages.get(i).getTabs();
 			for (int j=0; j<tabs.size(); j++){
-				if (!tabs.get(j).isStaticDisplay() || excludeStatic){
-					allTabs.add(tabs.get(j));
-				}
+				//the data model is never a tab for displays. 
+				if (TabInfo.DATA_MODEL_TAB_NAME.equals(tabs.get(j).getName())) continue;
+				if (excludeStatic && tabs.get(j).isStaticDisplay()) continue;
+				allTabs.add(tabs.get(j));
 				//System.out.println(" Tab name: "+tabs.get(j).getLabel().getText());
 			}
 		}
@@ -732,8 +745,12 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		int tabIndex=0; 
 
 		//no tab available, so add a new tab.
-		if (allTabs.size()<=1){
-			return stages.get(0).addPamTab(new TabInfo("Display 1"), null, true);
+		if (allTabs.size()==0){
+			return stages.get(0).addPamTab(new TabInfo(uniqueTabName("Display 1", null)), null, true);
+		}
+		else if (allTabs.size()==1){
+			// only one place it can go, so don't ask. 
+			return allTabs.get(0);
 		}
 		else{
 
@@ -754,6 +771,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 			//can create 
 			if (result.isPresent()){
 				tabIndex=allTabs.indexOf(result.get());
+				if (tabIndex < 0) return null;
 			}
 			else return null;
 		}
@@ -841,8 +859,50 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 			dataModelFX.notifyModelChanged(changeType);
 		}
 
+		if (changeType == PamControllerInterface.INITIALIZATION_COMPLETE) {
+			Platform.runLater(() -> reportModulesWithoutFXGUI());
+		}
+
 		//System.out.println("PAMGUIMANAGERFX: Notify model changed: "+changeType);	
 
+	}
+
+	/**
+	 * Tell the user about any modules in the configuration which have no JavaFX user interface, e.g. 
+	 * when a configuration made with the Swing GUI is opened. The modules still run, but have no 
+	 * displays or settings here. 
+	 */
+	private void reportModulesWithoutFXGUI() {
+		ArrayList<String> names = new ArrayList<String>();
+		int n = pamController.getNumControlledUnits();
+		for (int i = 0; i < n; i++) {
+			PamControlledUnit unit = pamController.getControlledUnit(i);
+			if (unit == null) continue;
+			Object gui = null;
+			try {
+				gui = unit.getGUI(PamGUIManager.FX);
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+			}
+			if (!(gui instanceof PamControlledGUIFX)) {
+				names.add(unit.getUnitName() + " (" + unit.getUnitType() + ")");
+			}
+		}
+		if (names.size() == 0) return;
+		boolean hasDisplay = getTabs(false).size() > 0;
+		StringBuilder msg = new StringBuilder();
+		msg.append("This configuration contains modules which do not have a JavaFX user interface yet:\n\n");
+		for (String name : names) {
+			msg.append("    ").append(name).append("\n");
+		}
+		msg.append("\nThese modules will still process and store data, but their displays and settings are only "
+				+ "available in the standard (Swing) PAMGuard user interface.");
+		if (!hasDisplay) {
+			msg.append("\n\nThere are no displays in this configuration. To view data, add a Time Display or "
+					+ "Detection Display from the Displays group in the Data Model.");
+		}
+		PamView.dialog.warn.WarnOnce.showWarningFX(primaryStage, "Modules without a JavaFX interface", msg.toString(), AlertType.INFORMATION);
 	}
 
 	@Override
@@ -853,7 +913,68 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 
 	@Override
 	public void showControlledUnit(PamControlledUnit unit) {
-		// TODO Auto-generated method stub
+		showDisplays(unit);
+	}
+
+	/**
+	 * Show the displays of a module. Any display which is not in a tab, e.g. because the user closed
+	 * its tab, is added to a tab again. Then the tab holding the first display is selected. 
+	 * @param unit - the module.
+	 * @return true if the module has a display. 
+	 */
+	public boolean showDisplays(PamControlledUnit unit) {
+		if (unit == null || !(unit.getGUI(PamGUIManager.FX) instanceof PamControlledGUIFX)) return false;
+		ArrayList<UserDisplayNodeFX> displays = ((PamControlledGUIFX) unit.getGUI(PamGUIManager.FX)).getDisplays();
+		if (displays == null || displays.size() == 0) return false;
+		for (UserDisplayNodeFX display : displays) {
+			if (!isDisplayShown(display)) {
+				addDisplay(display);
+			}
+		}
+		switchToTab(displays.get(0));
+		return true;
+	}
+
+	/**
+	 * Check whether a display is in one of the tabs. 
+	 */
+	private boolean isDisplayShown(UserDisplayNodeFX display) {
+		for (PamGuiTabFX tab : getAllTabs()) {
+			if (tab.getContentHolder().getCenter() == display.getNode()) return true;
+			for (int k=0; k<tab.getInternalPanes().size(); k++) {
+				if (tab.getInternalPanes().get(k).getUserDisplayNode() == display) return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Get a tab name which is not used by any other tab. Displays find their tab by name when a 
+	 * configuration is loaded so every tab needs a different name. 
+	 * @param name - the name wanted. 
+	 * @param ignore - a tab to ignore, e.g. the tab being renamed. Can be null. 
+	 * @return the name, with a number added or changed if another tab already has it. 
+	 */
+	public String uniqueTabName(String name, PamGuiTabFX ignore) {
+		String base = name;
+		int n = 2;
+		java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(.*\\S)\\s+(\\d+)$").matcher(name);
+		if (m.matches()) {
+			base = m.group(1);
+			n = Integer.parseInt(m.group(2)) + 1;
+		}
+		String unique = name;
+		while (tabNameUsed(unique, ignore)) {
+			unique = base + " " + n++;
+		}
+		return unique;
+	}
+
+	private boolean tabNameUsed(String name, PamGuiTabFX ignore) {
+		for (PamGuiTabFX tab : getAllTabs()) {
+			if (tab != ignore && name.equals(tab.getName())) return true;
+		}
+		return false;
 	}
 
 	@Override
@@ -1000,7 +1121,6 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		Optional<String> result = dialog.showAndWait();
 
 		if (result.isPresent()){
-			System.out.println("Your name: " + result.get());
 			return result.get();
 		}
 		else return null;
@@ -1116,14 +1236,64 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 
 		//now restore the settings for the display - this has to happen here as too early everywhere else. 
 		PamSettingManager.getInstance().registerSettings(this);
-		primaryStage.setFullScreen(pamGuiSettings.fullscreen);
-		primaryStage.setWidth(pamGuiSettings.width);
-		primaryStage.setHeight(pamGuiSettings.height);
+		restoreWindowBounds();
 		sortFrameTitles();
 
 		primaryStage.show();
 
 		return primaryView;
+	}
+
+	/**
+	 * Put the main window where it was last time, but always on a screen which is 
+	 * currently connected and never larger than that screen. 
+	 */
+	private void restoreWindowBounds() {
+		double w = pamGuiSettings.width;
+		double h = pamGuiSettings.height;
+		double x = pamGuiSettings.x;
+		double y = pamGuiSettings.y;
+		javafx.geometry.Rectangle2D bounds = javafx.stage.Screen.getPrimary().getVisualBounds();
+		if (!Double.isNaN(x) && !Double.isNaN(y)) {
+			// use the screen the window was on, if it's still there. 
+			java.util.List<javafx.stage.Screen> screens = javafx.stage.Screen.getScreensForRectangle(x, y, Math.max(w, 1), Math.max(h, 1));
+			if (screens.size() > 0) {
+				bounds = screens.get(0).getVisualBounds();
+			}
+			else {
+				x = y = Double.NaN;
+			}
+		}
+		if (Double.isNaN(w) || w < 400) w = 1400;
+		if (Double.isNaN(h) || h < 300) h = 900;
+		w = Math.min(w, bounds.getWidth());
+		h = Math.min(h, bounds.getHeight());
+		if (Double.isNaN(x) || Double.isNaN(y)) {
+			x = bounds.getMinX() + (bounds.getWidth() - w) / 2;
+			y = bounds.getMinY() + (bounds.getHeight() - h) / 2;
+		}
+		x = Math.max(bounds.getMinX(), Math.min(x, bounds.getMaxX() - w));
+		y = Math.max(bounds.getMinY(), Math.min(y, bounds.getMaxY() - h));
+		primaryStage.setX(x);
+		primaryStage.setY(y);
+		primaryStage.setWidth(w);
+		primaryStage.setHeight(h);
+		primaryStage.setMaximized(pamGuiSettings.maximized);
+		primaryStage.setFullScreen(pamGuiSettings.fullscreen);
+
+		// remember the size of the window when it isn't maximised, so it can be restored to that. 
+		javafx.beans.value.ChangeListener<Number> boundsListener = (obs, oldVal, newVal) -> {
+			if (!primaryStage.isMaximized() && !primaryStage.isFullScreen() && !primaryStage.isIconified()) {
+				pamGuiSettings.width = primaryStage.getWidth();
+				pamGuiSettings.height = primaryStage.getHeight();
+				pamGuiSettings.x = primaryStage.getX();
+				pamGuiSettings.y = primaryStage.getY();
+			}
+		};
+		primaryStage.widthProperty().addListener(boundsListener);
+		primaryStage.heightProperty().addListener(boundsListener);
+		primaryStage.xProperty().addListener(boundsListener);
+		primaryStage.yProperty().addListener(boundsListener);
 	}
 
 	public Stage setPrimaryStage(Stage primaryStage2) {
@@ -1327,8 +1497,8 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 			}
 		}
 		pamGuiSettings.tabInfos=tabInfos;
-		pamGuiSettings.width = primaryStage.getWidth();
-		pamGuiSettings.height = primaryStage.getHeight();
+		// the size and position of the window are kept up to date by listeners on the stage.
+		pamGuiSettings.maximized = primaryStage.isMaximized();
 		pamGuiSettings.fullscreen = primaryStage.isFullScreen();
 
 		return pamGuiSettings;

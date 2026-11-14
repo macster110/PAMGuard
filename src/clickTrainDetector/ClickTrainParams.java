@@ -108,7 +108,7 @@ public class ClickTrainParams implements Serializable, Cloneable, ManagedParamet
 	}
 	
 	@Override
-	protected ClickTrainParams clone() {
+	public ClickTrainParams clone() {
 		try {
 			ClickTrainParams clonedParams =(ClickTrainParams) super.clone();
 			if (clonedParams.ctClassifierParams!=null) {

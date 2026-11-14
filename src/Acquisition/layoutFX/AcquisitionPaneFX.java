@@ -521,6 +521,10 @@ public class AcquisitionPaneFX extends SettingsPane<AcquisitionParameters>{
 		//last because this actually sets something.
 		if (offlineDAQPaneFX != null) {
 			OfflineFileParameters ofp = offlineDAQPaneFX.getParams();
+			if (ofp == null) {
+				// the offline pane has already told the user what was wrong. 
+				return null;
+			}
 			//System.out.println("ofp:  Offileine Params AqusitionPanFX " + ofp.enable + " " + ofp.folderName);
 			//in FX we don;t have option for using files or nut. If no folder selected then don;t use files. 
 			if (ofp.folderName==null || ofp.folderName.equals("")){

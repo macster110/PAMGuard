@@ -164,7 +164,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 
 		ClipDataBlock dataBlock = clipControl.getClipDataBlock();
 		if (dataBlock != null) {
-			dataBlock.addObserver(new ClipObserver());
+			dataBlock.addObserver(clipObserver = new ClipObserver());
 		}
 
 		marker = new ClipDisplayMarkerFX(this);
@@ -1124,8 +1124,18 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		return true;
 	}
 
+	/**
+	 * Observer of the clip data block. 
+	 */
+	private ClipObserver clipObserver;
+
 	@Override
 	public void closeNode() {
+		// called when the module is removed, so stop watching for new clips. 
+		ClipDataBlock dataBlock = clipControl.getClipDataBlock();
+		if (dataBlock != null && clipObserver != null) {
+			dataBlock.deleteObserver(clipObserver);
+		}
 		clipCanvas.dispose();
 		OverlayMarkProviders.singleInstance().removeProvider(marker);
 	}

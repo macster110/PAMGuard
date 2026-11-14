@@ -76,15 +76,29 @@ public class MatchFiltProcess2 extends IshDetFnProcess {
 		prepareProcess();
 	}
 	
+	/**
+	 * The last warning shown about the kernel. The process is prepared whenever anything in the 
+	 * PAMGuard model changes, so only show the same warning once. 
+	 */
+	private static String lastKernelWarning;
+
+	private void kernelWarning(String warning) {
+		if (warning.equals(lastKernelWarning)) {
+			return;
+		}
+		lastKernelWarning = warning;
+		WarnOnce.showWarning("Ish Matched Filter", warning, WarnOnce.OK_OPTION);
+	}
+
 	private boolean prepareKernel(MatchFiltParams params) {
 		ArrayList<String> kernelList = params.kernelFilenameList;
 		if (kernelList.size() == 0) {
-			WarnOnce.showWarning("Ish Matched Filter", "No Kernel file specified in configuration", WarnOnce.OK_OPTION);
+			kernelWarning("No Kernel file specified in configuration");
 			return false;
 		}
 		File kernelFile = new File(kernelList.get(0));
 		if (kernelFile.exists() == false) {
-			WarnOnce.showWarning("Ish Matched Filter", "Kernel file " + kernelFile.getAbsolutePath() + " doesn't exist", WarnOnce.OK_OPTION);
+			kernelWarning("Kernel file " + kernelFile.getAbsolutePath() + " doesn't exist");
 			return false;
 		}
 		

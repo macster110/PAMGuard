@@ -542,7 +542,8 @@ public class Pamguard {
 		if(runMode == PamController.RUN_REMOTE) {
 			spashTime = 0;
 		}
-		if (showSplash && spashTime > 0 && (PamGUIManager.getGUIType() != PamGUIManager.NOGUI)) {
+		// the splash screen is a Swing window, so it's only shown for the Swing GUI. 
+		if (showSplash && spashTime > 0 && PamGUIManager.isSwing()) {
 			new Splash(spashTime, chosenRunMode);
 		}
 		//		
@@ -570,6 +571,10 @@ public class Pamguard {
 
 		if (PamGUIManager.isSwing()) {
 			SwingUtilities.invokeLater(createPamguard);
+		}
+		else if (PamGUIManager.isFX()) {
+			// the JavaFX GUI needs a stage, which comes from the JavaFX application. 
+			PamguardFX.launchFX(chosenRunMode);
 		}
 		else {
 			PamController.create(chosenRunMode);

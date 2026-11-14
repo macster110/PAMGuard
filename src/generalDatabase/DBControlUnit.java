@@ -19,8 +19,8 @@ import PamController.DataOutputStore;
 import PamController.PamConfiguration;
 import PamController.PamControlledUnit;
 import PamController.PamController;
-import PamController.PamControllerInterface;
 import PamController.PamGUIManager;
+import PamController.PamControllerInterface;
 import PamController.PamSettingManager;
 import PamController.fileprocessing.StoreStatus;
 import PamController.status.ModuleStatus;
@@ -69,12 +69,19 @@ public class DBControlUnit extends DBControl implements DataOutputStore {
 		if (PamController.getInstance().isInitializationComplete()) {
 			// we're clearly adding a database to an open configuration, so pop up the 
 			// dialog to allow the user to set the database. 
-			SwingUtilities.invokeLater(new Runnable() {
+			Runnable select = new Runnable() {
 				@Override
 				public void run() {
 					selectDatabase(getGuiFrame(), getUnitName());
 				}
-			});
+			};
+			if (PamGUIManager.isFX()) {
+				// the JavaFX database dialog must be opened on the JavaFX thread. 
+				javafx.application.Platform.runLater(select);
+			}
+			else {
+				SwingUtilities.invokeLater(select);
+			}
 		}
 	}
 

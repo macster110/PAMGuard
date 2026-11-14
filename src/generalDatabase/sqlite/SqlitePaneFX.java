@@ -120,12 +120,18 @@ public class SqlitePaneFX implements SystemDialogPaneFX {
 		int ind = dbList.getSelectionModel().getSelectedIndex();
 		if (ind >= 0) {
 			File selFile = dbList.getSelectionModel().getSelectedItem();
-			if (selFile.exists() == false) return false;
+			if (selFile.exists() == false) {
+				pamViewFX.fxNodes.pamDialogFX.PamDialogFX.showWarning(null, "Database", 
+						"The database file " + selFile.getAbsolutePath() + " does not exist. Choose another file or create a new database.");
+				return false;
+			}
 			sqliteSystem.getRecentDatabases().remove(selFile);
 			sqliteSystem.getRecentDatabases().add(0, selFile);
 			return true;
 		}
 		else {
+			pamViewFX.fxNodes.pamDialogFX.PamDialogFX.showWarning(null, "Database", 
+					"No database has been selected. Open an existing database or create a new one, or press Cancel.");
 			return false;
 		}
 	}

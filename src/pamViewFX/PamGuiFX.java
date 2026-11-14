@@ -293,7 +293,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		});
 
 		mainTabPane.getAddTabButton().setOnAction((value)->{
-		    addPamTab(new TabInfo("Display " + (this.getNumTabs()+1)), null ,true); 
+		    addPamTab(new TabInfo(pamGuiManagerFX.uniqueTabName("Display " + this.getNumTabs(), null)), null ,true); 
 		    mainTabPane.layout();
 		});
 		
@@ -334,7 +334,9 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 			// Swap right-side content if the tab has custom content
 			sharedToolbar.swapRightContent(tab.getCustomToolbarRight());
 			// Update the resize toggle state
-			sharedToolbar.showResizableControl(tab.isStaticDisplay());
+			sharedToolbar.showResizableControl(tab.isResizableDisplays());
+			// the switch shows whether the displays in this tab are currently being moved and resized. 
+			sharedToolbar.setEditSelected(tab.getEditable());
 		}
 	}
 	
@@ -378,18 +380,37 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
         	}
         }
         
-        newTab.setOnClosed((action)->{
-        	//when a tab is closer. 
-        	for (int i=0; i<newTab.getInternalPanes().size(); i++) {
-        		System.out.println("REMOVE TAB: " + newTab.getInternalPanes().size());
+        newTab.setOnCloseRequest((action)->{
+        	if (!confirmTabClose(newTab)) {
+        		action.consume();
+        	}
+        });
 
-	        	newTab.getInternalPanes().get(i).getUserDisplayNode().closeNode();
-	        	if (newTab.getInternalPanes().get(i).getUserDisplayNode().getUserDisplayControl()!=null) {
-	        		System.out.println("REMOVE CONTROLLED DISPLAY UNIT: " + newTab.getInternalPanes().get(i).getUserDisplayNode().getUserDisplayControl());
-	        		//the display is a standalone display and so remove the tab means the controlled unit should be removed from the data model 
-	        		PamController.getInstance().removeControlledUnt(newTab.getInternalPanes().get(i).getUserDisplayNode().getUserDisplayControl());
-	        		PamGuiManagerFX.getInstance().getDataModelFX().dataModeltoPamModel();
-	        	}
+        newTab.setOnClosed((action)->{
+        	//removing a display module changes the list of panes, so work from a copy. 
+        	ArrayList<UserDisplayNodeFX> displays = new ArrayList<UserDisplayNodeFX>();
+        	for (int i=0; i<newTab.getInternalPanes().size(); i++) {
+        		UserDisplayNodeFX display = newTab.getInternalPanes().get(i).getUserDisplayNode();
+        		if (display != null) displays.add(display);
+        	}
+        	boolean removedModule = false;
+        	for (UserDisplayNodeFX display : displays) {
+        		if (display.getUserDisplayControl()!=null) {
+        			//a standalone display module, so closing the tab removes the module from the data model.
+        			display.closeNode();
+        			PamController.getInstance().removeControlledUnt(display.getUserDisplayControl());
+        			removedModule = true;
+        		}
+        		else {
+        			/*
+        			 * The display belongs to another module, e.g. the map or the clip generator. The module stays in
+        			 * the data model and the display is kept so that it can be shown again from the module. 
+        			 */
+        			newTab.removeInternalPane(display);
+        		}
+        	}
+        	if (removedModule) {
+        		PamGuiManagerFX.getInstance().getDataModelFX().dataModeltoPamModel();
         	}
         });
         
@@ -401,6 +422,38 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
         return newTab;
 	}
 		
+	/**
+	 * Ask the user whether they really want to close a tab which holds displays. 
+	 * @param tab - the tab which is about to close.
+	 * @return true to close the tab. 
+	 */
+	private boolean confirmTabClose(PamGuiTabFX tab) {
+		int nStandAlone = 0;
+		int nModule = 0;
+		for (int i=0; i<tab.getInternalPanes().size(); i++) {
+			UserDisplayNodeFX display = tab.getInternalPanes().get(i).getUserDisplayNode();
+			if (display == null) continue;
+			if (display.getUserDisplayControl()!=null) nStandAlone++;
+			else nModule++;
+		}
+		if (nStandAlone + nModule == 0) {
+			return true;
+		}
+		String msg = String.format("The tab \"%s\" holds %d display%s.", tab.getName(), nStandAlone + nModule, 
+				nStandAlone + nModule == 1 ? "" : "s");
+		if (nStandAlone > 0) {
+			msg += String.format("\n\n%d display module%s will be removed from the data model.", nStandAlone, nStandAlone == 1 ? "" : "s");
+		}
+		if (nModule > 0) {
+			msg += "\n\nDisplays which belong to other modules, such as the map, can be shown again from "
+					+ "the module in the data model.";
+		}
+		msg += "\n\nClose the tab?";
+		return pamViewFX.fxNodes.pamDialogFX.PamDialogFX.showMessageDialog(stage, "Close tab", msg,
+				javafx.scene.control.ButtonType.YES, javafx.scene.control.ButtonType.CANCEL, 
+				javafx.scene.control.Alert.AlertType.CONFIRMATION);
+	}
+
 	/**
 	 * Add a tab for the data model. 
 	 * @param dataModelPaneFX - the data model 
@@ -572,11 +625,10 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 			//HACK,
 			editWindows.setPadding(new Insets(8,0,0,0));
 			//editWindows.setAlignment(Pos.CENTER);		
-			editWindows.selectedProperty().addListener((listen)->{
+			editWindows.selectedProperty().addListener((obs, oldVal, newVal)->{
 				PamGuiTabFX selectedTab = getSelectedTab();
-				if (selectedTab != null) {
-					boolean editable=!selectedTab.getEditable();
-					selectedTab.setPanesEditable(editable);
+				if (selectedTab != null && selectedTab.getEditable() != newVal) {
+					selectedTab.setPanesEditable(newVal);
 				}
 			});
 			
@@ -664,15 +716,8 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 				showExportPane();
 			});
 			
-			PamButton importButton = new PamButton("Import data");
-			importButton.setGraphic(PamGlyphDude.createPamIcon("mdi2d-database-import", PamGuiManagerFX.iconSize));
-			importButton.setOnAction((action)->{
-				//import dialog
-			});
-
-
-			
-			playControls.getChildren().addAll(reProcess, exportButton, importButton);
+			//there is no JavaFX data import yet, so no import button. 
+			playControls.getChildren().addAll(reProcess, exportButton);
 			playControls.setSpacing(5);
 			playControls.setPadding(new Insets(0,10,0,50));
 //			playControls.getStyleClass().add("pane-opaque");
@@ -800,9 +845,15 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		 * Show the controls which allows manula resizing of the pane. 
 		 * @param resize. 
 		 */
+		public void setEditSelected(boolean selected) {
+			editWindows.setSelected(selected);
+		}
+
+		/**
+		 * Show the controls which allow manual resizing of the panes. 
+		 * @param resize - true to show the controls. 
+		 */
 		public void showResizableControl(boolean resize) {
-			//always set panes to be in non edit mode. 
-			editWindows.setSelected(false);
 			editWindows.setVisible(resize);
 			editWindows.setDisable(!resize);
 		}
@@ -1046,8 +1097,6 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 	 * @param paneFactory
 	 */
 	public boolean addStatusBarPane(PaneFactory paneFactory) {
-		
-		System.out.println("PamGuiFX: addToolBarPane: adding pane factory " + paneFactory.getPaneFactoryName());
 		
 		if (sharedToolbar == null) return false;
 		

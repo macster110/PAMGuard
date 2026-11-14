@@ -209,7 +209,8 @@ public class PamGuiTabFX extends PamTabFX {
 	 */
 	public void renameTab(String newName) {
 		if (newName == null || newName.trim().isEmpty()) return;
-		newName = newName.trim();
+		//displays find their tab by name when a configuration is loaded, so names must be unique. 
+		newName = pamGui.getPamGuiManagerFX().uniqueTabName(newName.trim(), this);
 
 		//update the visible label and drag text.
 		setLabelText(newName);
@@ -245,7 +246,8 @@ public class PamGuiTabFX extends PamTabFX {
 	public void setResizableDisplays(boolean  resize){
 		this.isResizable=resize; 
 		ToolBarPane sharedToolbar = pamGui.getSharedToolbar();
-		if (sharedToolbar != null) {
+		// only change the tool bar if this is the tab the user is looking at. 
+		if (sharedToolbar != null && this.isSelected()) {
 			sharedToolbar.showResizableControl(resize);
 		}
 	}
@@ -366,9 +368,20 @@ public class PamGuiTabFX extends PamTabFX {
 
 		//TILE means equally sized windows 
 		if (sortType==SORT_TILE){
-			for (int i=0; i<internalPanes.size(); i++){
-				internalPanes.get(i).setPaneSize(availWidth/internalPanes.size(), availHeight);
-				internalPanes.get(i).setPaneLayout(originX + (i*availWidth)/internalPanes.size(), originY);
+			//a grid which is as close to square as possible, with the last row stretched to fill the width. 
+			int n = internalPanes.size();
+			if (n == 0) return;
+			int nCols = (int) Math.ceil(Math.sqrt(n));
+			int nRows = (int) Math.ceil(n / (double) nCols);
+			double cellH = availHeight / nRows;
+			double gap = 5;
+			for (int i=0; i<n; i++){
+				int row = i / nCols;
+				int col = i % nCols;
+				int colsInRow = (row == nRows-1) ? n - row*nCols : nCols;
+				double cellW = availWidth / colsInRow;
+				internalPanes.get(i).setPaneLayout(originX + col*cellW, originY + row*cellH);
+				internalPanes.get(i).setPaneSize(cellW - (col == colsInRow-1 ? 0 : gap), cellH - (row == nRows-1 ? 0 : gap));
 			}
 			return;
 		}
@@ -393,7 +406,7 @@ public class PamGuiTabFX extends PamTabFX {
 
 			//calc number of small windows and large windows 
 			for (int i = 0; i < dw.size(); i++) {
-				if (dw.get(i).getUserDisplayNode().isMinorDisplay()) {
+				if (isMinor(dw.get(i))) {
 					smallWindows++;
 				}
 			}
@@ -416,7 +429,7 @@ public class PamGuiTabFX extends PamTabFX {
 					w = (horz) ? (availWidth / largeWindows) : availWidth;
 				}
 				for (int i = 0; i < dw.size(); i++) {
-					if (dw.get(i).getUserDisplayNode().isMinorDisplay()) continue;
+					if (isMinor(dw.get(i))) continue;
 
 					dw.get(i).setPaneLayout(x, y);
 					
@@ -443,7 +456,7 @@ public class PamGuiTabFX extends PamTabFX {
 				}
 				
 				for (int i = 0; i < dw.size(); i++) {
-					if (!dw.get(i).getUserDisplayNode().isMinorDisplay()) continue;
+					if (!isMinor(dw.get(i))) continue;
 					dw.get(i).setPaneLayout(x, y);
 					
 					//set the padding if the pane is not the last pane.
@@ -455,6 +468,13 @@ public class PamGuiTabFX extends PamTabFX {
 			}
 			return;
 		}
+	}
+
+	/**
+	 * Check whether an internal pane holds a minor display. 
+	 */
+	private boolean isMinor(PamGuiInternalPane pane) {
+		return pane.getUserDisplayNode() != null && pane.getUserDisplayNode().isMinorDisplay();
 	}
 
 	/**
@@ -554,8 +574,21 @@ public class PamGuiTabFX extends PamTabFX {
 		return pamGui;
 	}
 
-	public boolean isStaticDisplay() {
+	/**
+	 * Check whether the displays in the tab can be moved and resized by the user. 
+	 * @return true if displays can be moved and resized. 
+	 */
+	public boolean isResizableDisplays() {
 		return this.isResizable;
+	}
+
+	/**
+	 * Check whether the tab holds a static display, i.e. a single display which fills the tab
+	 * and cannot be moved or resized.
+	 * @return true if the tab holds a static display. 
+	 */
+	public boolean isStaticDisplay() {
+		return !this.isResizable;
 //		if (contentHolder.getChildren().get(0) instanceof UserDisplayNodeFX){
 //			(( UserDisplayNodeFX)this.getContent()).isStaticDisplay();
 //			return true;

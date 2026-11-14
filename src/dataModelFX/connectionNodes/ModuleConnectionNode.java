@@ -248,7 +248,22 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 		removeButton.getStyleClass().add("square-button");
 
 		PamHBox topBox=new PamHBox(); 
-		topBox.getChildren().addAll(settingsButton, removeButton); 
+		topBox.getChildren().addAll(settingsButton); 
+		if (hasDisplays()) {
+			//button to show the module's display, and to bring it back if its tab has been closed. 
+			PamButton displayButton=new PamButton(); 
+			displayButton.getStyleClass().add("icon-button");
+			displayButton.setGraphic(PamGlyphDude.createPamIcon("mdi2m-monitor", Color.WHITE, PamGuiManagerFX.iconSize));
+			displayButton.setMaxSize(Double.MAX_VALUE,Double.MAX_VALUE);
+			displayButton.getStyleClass().add("square-button");
+			displayButton.setTooltip(new javafx.scene.control.Tooltip("Show the display"));
+			displayButton.setOnAction((change)->{
+				PamController.getInstance().getGuiManagerFX().showDisplays(pamControlledUnit);
+			});
+			HBox.setHgrow(displayButton, Priority.ALWAYS);
+			topBox.getChildren().add(displayButton);
+		}
+		topBox.getChildren().addAll(removeButton); 
 		topBox.prefWidthProperty().bind(this.getConnectionNodeBody().widthProperty());
 		HBox.setHgrow(settingsButton, Priority.ALWAYS);
 		HBox.setHgrow(removeButton, Priority.ALWAYS);
@@ -265,6 +280,20 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 		hidingPane.layoutYProperty().bind(this.getConnectionNodeBody().layoutYProperty().subtract(10));
 		
 		return hidingPane;
+	}
+
+	/**
+	 * Check whether the module has displays which are shown in the display tabs. 
+	 */
+	private boolean hasDisplays() {
+		try {
+			if (pamControlledUnit == null || !(pamControlledUnit.getGUI(PamGUIManager.FX) instanceof PamControlledGUIFX)) return false;
+			java.util.ArrayList<userDisplayFX.UserDisplayNodeFX> displays = ((PamControlledGUIFX) pamControlledUnit.getGUI(PamGUIManager.FX)).getDisplays();
+			return displays != null && displays.size() > 0;
+		}
+		catch (Exception e) {
+			return false;
+		}
 	}
 
 	/**
@@ -291,6 +320,9 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 		}
 		
 		// does the module have a display which can show settings? If so switch to tab and show that.  
+		if (pamControlledGUI.getDisplays() == null) return;
+		//make sure the displays are in a tab - the user may have closed it. 
+		PamController.getInstance().getGuiManagerFX().showDisplays(pamControlledUnit);
 		for (int i=0; i<pamControlledGUI.getDisplays().size(); i++){
 			if (pamControlledGUI.getDisplays().get(i).requestNodeSettingsPane()){
 				//requestNodeSettingsPane() will have sorted out the display to show settings so now 

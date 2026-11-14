@@ -80,7 +80,10 @@ public abstract class PamDialogFX<T> extends Dialog<T> {
 		//set results converter
 		this.setResultConverter(dialogButton -> {
 		    if (dialogButton == ButtonType.OK) {
-		        return getParams();
+		    	// the parameters were already read, and checked, when OK was pressed. 
+		    	T params = okParams != null ? okParams : getParams();
+		    	okParams = null;
+		        return params;
 		    }
 		    return null;
 		});
@@ -92,14 +95,72 @@ public abstract class PamDialogFX<T> extends Dialog<T> {
 		//add listener to prevent close request if the dialog
 		final Button btOk = (Button) this.getDialogPane().lookupButton(ButtonType.OK);
 		btOk.addEventFilter(ActionEvent.ACTION, event -> {
-			if (getParams()==null) {
+			int nWarnings = warningsShown;
+			okParams = null;
+			try {
+				okParams = getParams();
+			}
+			catch (Exception e) {
+				e.printStackTrace();
 				event.consume();
-				showParamsWarning();
+				PamDialogFX.showWarning(null, "Unable to use these settings", 
+						"There was an error reading the settings: " + e);
+				return;
+			}
+			if (okParams==null) {
+				event.consume();
+				// only show the general warning if the dialog hasn't already told the user what's wrong. 
+				if (nWarnings == warningsShown) {
+					showParamsWarning();
+				}
 			}
 		});
 
+		/*
+		 * Validation decorations (validatorfx) wrap the root of the scene in another pane. If that
+		 * happens before the dialog is shown, e.g. because a control starts with an invalid value, then 
+		 * JavaFX can't show the dialog. So put the dialog pane back as it was just before showing.
+		 */
+		this.addEventHandler(javafx.scene.control.DialogEvent.DIALOG_SHOWING, event -> restoreDialogRoot());
+
 	}
 	
+	/**
+	 * Parameters read when the OK button was pressed. 
+	 */
+	private T okParams;
+
+	/**
+	 * Count of warning and message dialogs shown. Used to check whether a dialog has already told
+	 * the user what was wrong with their settings. 
+	 */
+	private static volatile int warningsShown = 0;
+
+	/**
+	 * Note that a warning has been shown to the user. Call this from any other class which shows
+	 * its own warning dialogs. 
+	 */
+	public static void countWarning() {
+		warningsShown++;
+	}
+
+	/**
+	 * Make sure the dialog pane is the root of the dialog's scene. 
+	 */
+	private void restoreDialogRoot() {
+		try {
+			DialogPane pane = getDialogPane();
+			if (pane == null || pane.getScene() == null) return;
+			if (pane.getScene().getRoot() == pane) return;
+			if (pane.getParent() instanceof javafx.scene.layout.Pane) {
+				((javafx.scene.layout.Pane) pane.getParent()).getChildren().remove(pane);
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	/**
 	 * Set a default PAMGuard icon on the dialog. 
 	 */
@@ -118,7 +179,7 @@ public abstract class PamDialogFX<T> extends Dialog<T> {
 	 * 	Shows a warning message when getParams() returns null. Can be overriden to show specific error message
 	 */
 	public void showParamsWarning(){
-		PamDialogFX.showWarning(null, "Dialog unable to close", "The dialog was unable to close due to an error");
+		PamDialogFX.showWarning(null, "Unable to use these settings", "One or more of the settings are missing or not valid. Please check them and try again.");
 	}
 	
 
@@ -185,6 +246,7 @@ public abstract class PamDialogFX<T> extends Dialog<T> {
 	 * @param content - content of dialog
 	 */
 	public static boolean showMessageDialog(Window owner, String title, String content, ButtonType yesButton, ButtonType noButton, AlertType alertType){		
+		countWarning();
 		Alert alert = new Alert(alertType, 
 				content,
 	             yesButton, 

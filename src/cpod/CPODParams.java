@@ -21,7 +21,7 @@ public class CPODParams extends OfflineFileParams {
 	 * @see fileOfflineData.OfflineFileParams#clone()
 	 */
 	@Override
-	protected CPODParams clone() {
+	public CPODParams clone() {
 		return (CPODParams) super.clone();
 	}
 

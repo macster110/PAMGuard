@@ -23,12 +23,25 @@ public class PAMGuiFXSettings implements Serializable, Cloneable {
 	/**
 	 * The width of the screen. 
 	 */
-	public double width = 1920;
+	public double width = 1400;
 	
 	/**
 	 * The height in pixels. 
 	 */
-	public double height = 1024; 
+	public double height = 900; 
+
+	/**
+	 * The position of the window on the screen. NaN if the window has never been positioned. 
+	 */
+	public double x = Double.NaN;
+
+	public double y = Double.NaN;
+
+	/**
+	 * True if the window is maximised. 
+	 */
+	public boolean maximized = false;
+
 	
 	
 	/**

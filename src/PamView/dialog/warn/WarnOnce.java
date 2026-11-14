@@ -413,6 +413,15 @@ public class WarnOnce implements PamSettings {
 	 */
 	private int showWarningDialog(Window parent, String title, String message, String messageName, int messageType, String helpPoint, Throwable error, String okButtonText, String cancelButtonText, boolean disableCheckBoxes) {
 
+		if (PamGUIManager.isFX()) {
+			/*
+			 * Never show a Swing dialog in the JavaFX GUI, even if the caller passed a Swing window. A
+			 * modal Swing dialog shown from the JavaFX thread freezes the JavaFX windows. 
+			 */
+			return showWarningDialogFX(null, title, message, getAlertType(messageType), helpPoint, error, 
+					okButtonText, cancelButtonText, disableCheckBoxes);
+		}
+
 		// check if we should show the warning again this session
 		Boolean showAgain = showThisSess.get(messageName);
 		if (showAgain == null) {

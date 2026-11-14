@@ -405,8 +405,17 @@ public class ClickTrainAlgorithmPaneFX extends SettingsPane<ClickTrainParams> {
 	}
 
 	
+	/**
+	 * The last parameters the pane was set with. 
+	 */
+	private ClickTrainParams lastParams;
+
 	@Override
 	public ClickTrainParams getParams(ClickTrainParams currParams) {
+		if (currParams == null) {
+			// the settings dialog checks the pane without passing in any parameters. 
+			currParams = lastParams == null ? new ClickTrainParams() : lastParams.clone();
+		}
 		try {
 			currParams.dataSourceIndex = sourcePane.getSourceIndex();
 			currParams.dataSourceName = sourcePane.getSourceLongName();
@@ -509,6 +518,7 @@ public class ClickTrainAlgorithmPaneFX extends SettingsPane<ClickTrainParams> {
 	@Override
 	@SuppressWarnings("rawtypes")
 	public void setParams(ClickTrainParams clickTrainParams) {
+		this.lastParams = clickTrainParams;
 
 		// and fill in the data source list (may have changed - or might in later versions)
 		ArrayList<PamDataBlock> rd = clickTrainControl.getPamConfiguration().getDataBlocks(ClickDetection.class, true); 
