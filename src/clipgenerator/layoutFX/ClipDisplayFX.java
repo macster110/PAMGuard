@@ -778,30 +778,71 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 				return;
 			}
 			clip.setTriggerDataUnit(clip.findTriggerDataUnit());
-			Platform.runLater(() -> {
-				int map = knownChannelSources | clip.getChannelBitmap();
-				if (map != knownChannelSources) {
-					knownChannelSources = map;
-					updateChannelChoice();
-				}
-				clipCanvas.addClip(clip, !params.clipParams.getNewClipOrder());
-				trimClips();
-				updateStatus();
-			});
+			/*
+			 * Clips can arrive in bursts, e.g. from a click detector in a busy period. Queue them and 
+			 * add everything that is waiting in one go on the FX thread, rather than one FX task, one 
+			 * trim of the old clips and one status update for every clip.
+			 */
+			newClips.add(clip);
+			if (addPending.compareAndSet(false, true)) {
+				Platform.runLater(() -> addQueuedClips());
+			}
 		}
 
 		@Override
 		public void updateData(PamObservable observable, PamDataUnit pamDataUnit) {
-			Platform.runLater(() -> {
-				clipCanvas.updateShownClips();
-				updateStatus();
-			});
+			if (updatePending.compareAndSet(false, true)) {
+				Platform.runLater(() -> {
+					updatePending.set(false);
+					clipCanvas.updateShownClips();
+					updateStatus();
+				});
+			}
 		}
 
 		@Override
 		public void removeObservable(PamObservable o) {
 		}
 
+	}
+
+	/**
+	 * New clips waiting to be added to the display. 
+	 */
+	private final java.util.concurrent.ConcurrentLinkedQueue<ClipDataUnit> newClips = new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+	/**
+	 * True when a task to add the queued clips is waiting on the FX thread. 
+	 */
+	private final java.util.concurrent.atomic.AtomicBoolean addPending = new java.util.concurrent.atomic.AtomicBoolean();
+
+	/**
+	 * True when a task to update the shown clips is waiting on the FX thread. 
+	 */
+	private final java.util.concurrent.atomic.AtomicBoolean updatePending = new java.util.concurrent.atomic.AtomicBoolean();
+
+	/**
+	 * Add all of the queued clips to the display. Called on the FX thread. 
+	 */
+	private void addQueuedClips() {
+		addPending.set(false);
+		ClipDataUnit clip;
+		int map = knownChannelSources;
+		java.util.ArrayList<ClipDataUnit> clips = new java.util.ArrayList<>();
+		while ((clip = newClips.poll()) != null) {
+			map |= clip.getChannelBitmap();
+			clips.add(clip);
+		}
+		if (clips.isEmpty()) {
+			return;
+		}
+		clipCanvas.addClips(clips, !params.clipParams.getNewClipOrder());
+		if (map != knownChannelSources) {
+			knownChannelSources = map;
+			updateChannelChoice();
+		}
+		trimClips();
+		updateStatus();
 	}
 
 	private void trimClips() {

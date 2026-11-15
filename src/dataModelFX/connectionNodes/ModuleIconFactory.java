@@ -226,7 +226,8 @@ public class ModuleIconFactory {
 	 */
 	public Node getModuleNode(String className) {
 		ModuleIcon icon = getModuleIcon(className); 
-		if (icon==null) return null; 
+		// a generic icon for modules which don't have their own, rather than a blank box. 
+		if (icon==null) return PamGlyphDude.createModuleIcon("mdi2p-puzzle-outline"); 
 		else return getModuleNode(icon); 
 	}
 

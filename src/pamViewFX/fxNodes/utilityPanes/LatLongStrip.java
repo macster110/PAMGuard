@@ -200,7 +200,6 @@ public class LatLongStrip extends PamBorderPane {
 
 		degHBox.getChildren().clear(); 
 				
-		System.out.println("FORMATSTYLE: " + formatStyle + " val " + currentValue); 
 		
 		switch (formatType) {
 		case LatLong.FORMAT_DECIMALMINUTES:

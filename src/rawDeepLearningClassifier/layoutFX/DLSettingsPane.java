@@ -982,7 +982,6 @@ public class DLSettingsPane  extends SettingsPane<RawDLParams>{
 		segEnableSwitch.setSelected(currParams.enableSegmentation);
 
 		//		//set up the model and the custom pane if necessary.  
-		System.out.println("DLSettingsPane: setParams 5");
 
 
 		//this.modelSelectPane.updatePathLabel(); 

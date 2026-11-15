@@ -394,11 +394,9 @@ public class ConnectionPane extends Pane {
 				// is connected toa child
 				else if (bypassStructure && parentNode instanceof ConnectionStructure) {
 					// go down another level
-					System.out.println("getConnectionPlug: Yep, the plug is defo connected to a structure: "); 
 					node = getConnectionPlug(parentNode,
 							parentNode.getConnectionPlugs().get(i).getConnectedShape().getConnectionNode(),
 							includeBranch, bypassStructure);
-					System.out.println("getConnectionPlug: node " + node); 
 
 				}
 				if (node != null)

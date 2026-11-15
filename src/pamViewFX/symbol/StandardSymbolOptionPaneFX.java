@@ -493,7 +493,6 @@ public class StandardSymbolOptionPaneFX  extends FXSymbolOptionsPane<StandardSym
 		//params sometimes- caused by the setParams triggerring getParams call. 
 		//params.symbolData=params.symbolData.clone(); 
 		if (setParams) {
-			System.out.println("StandardSymbolsOptionsPane: " + params.symbolData);
 			return params; 
 		}
 		

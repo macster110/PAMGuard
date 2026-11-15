@@ -77,6 +77,7 @@ import pamViewFX.fxSettingsPanes.StorageOptionsPane;
 import pamViewFX.fxStyles.PamAtlantaStyle;
 import pamViewFX.fxStyles.PamDefaultStyle;
 import pamViewFX.fxStyles.PamStylesManagerFX;
+import PamController.pamWizard.PamAutoConfigUtils;
 import pamViewFX.pamTask.PamTaskUpdate;
 import userDisplayFX.UserDisplayNodeFX;
 
@@ -860,11 +861,88 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		}
 
 		if (changeType == PamControllerInterface.INITIALIZATION_COMPLETE) {
+			nFFTModules = countFFTModules();
 			Platform.runLater(() -> reportModulesWithoutFXGUI());
+		}
+		else if (changeType == PamControllerInterface.ADD_CONTROLLEDUNIT && pamController.isInitializationComplete()) {
+			checkNewFFTModule();
+		}
+		else if (changeType == PamControllerInterface.REMOVE_CONTROLLEDUNIT) {
+			nFFTModules = countFFTModules();
 		}
 
 		//System.out.println("PAMGUIMANAGERFX: Notify model changed: "+changeType);	
 
+	}
+
+	/**
+	 * The number of FFT modules in the configuration the last time it was checked. 
+	 */
+	private int nFFTModules = 0;
+
+	private static final String FFT_CLASS = "fftManager.PamFFTControl";
+
+	private static final String TIME_DISPLAY_CLASS = "dataPlotsFX.TDDisplayController";
+
+	private int countFFTModules() {
+		return pamController.findControlledUnits(fftManager.PamFFTControl.class).size();
+	}
+
+	/**
+	 * @return true if the configuration has a Time Display module. 
+	 */
+	private boolean hasTimeDisplay() {
+		return pamController.findControlledUnits(dataPlotsFX.TDDisplayController.class).size() > 0;
+	}
+
+	/**
+	 * Called when a module has been added by the user. The first time an FFT module is added to a 
+	 * configuration with no Time Display, add a Time Display showing a spectrogram so that there is 
+	 * something to look at straight away. 
+	 */
+	private void checkNewFFTModule() {
+		int n = countFFTModules();
+		boolean newFFT = n > nFFTModules;
+		nFFTModules = n;
+		if (!newFFT || hasTimeDisplay()) {
+			return;
+		}
+		// wait a moment, because automatic configuration tools add their own displays after the FFT module. 
+		javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.millis(750));
+		wait.setOnFinished(e -> {
+			if (!hasTimeDisplay() && countFFTModules() > 0) {
+				addSpectrogramDisplay();
+			}
+		});
+		wait.play();
+	}
+
+	/**
+	 * Add a Time Display to the configuration. If the configuration has FFT data then the display 
+	 * shows a spectrogram of the first FFT data found. 
+	 * @return true if a display was added. 
+	 */
+	public boolean addSpectrogramDisplay() {
+		try {
+			String name = "Time Display";
+			int i = 2;
+			while (pamController.findControlledUnit(dataPlotsFX.TDDisplayController.class, name) != null) {
+				name = "Time Display " + (i++);
+			}
+			java.util.function.Supplier<dataPlotsFX.layout.TDDisplayFX> display = 
+					PamAutoConfigUtils.addTimeDisplay(name);
+			PamAutoConfigUtils.whenReady(display, null, tdDisplay -> {
+				ArrayList<PamguardMVC.PamDataBlock> fftBlocks = pamController.getFFTDataBlocks();
+				if (fftBlocks != null && fftBlocks.size() > 0) {
+					tdDisplay.addDataBlock(fftBlocks.get(0), null);
+				}
+			});
+			return true;
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
 	}
 
 	/**
@@ -899,8 +977,23 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		msg.append("\nThese modules will still process and store data, but their displays and settings are only "
 				+ "available in the standard (Swing) PAMGuard user interface.");
 		if (!hasDisplay) {
-			msg.append("\n\nThere are no displays in this configuration. To view data, add a Time Display or "
-					+ "Detection Display from the Displays group in the Data Model.");
+			// offer to add a display so that there is something to look at. 
+			msg.append("\n\nThere are no displays in this configuration. Would you like to add a Time Display now? "
+					+ "More displays can be added from the Displays group in the Data Model.");
+			javafx.scene.control.ButtonType addDisplay = new javafx.scene.control.ButtonType("Add a Time Display", 
+					javafx.scene.control.ButtonBar.ButtonData.YES);
+			javafx.scene.control.ButtonType notNow = new javafx.scene.control.ButtonType("Not now", 
+					javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);
+			javafx.scene.control.Alert alert = new javafx.scene.control.Alert(AlertType.INFORMATION, msg.toString(), addDisplay, notNow);
+			alert.setTitle("Modules without a JavaFX interface");
+			alert.setHeaderText(null);
+			alert.initOwner(primaryStage);
+			alert.getDialogPane().getStylesheets().addAll(PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());
+			alert.getDialogPane().setMinHeight(javafx.scene.layout.Region.USE_PREF_SIZE);
+			if (alert.showAndWait().orElse(notNow) == addDisplay) {
+				addSpectrogramDisplay();
+			}
+			return;
 		}
 		PamView.dialog.warn.WarnOnce.showWarningFX(primaryStage, "Modules without a JavaFX interface", msg.toString(), AlertType.INFORMATION);
 	}

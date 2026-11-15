@@ -67,6 +67,86 @@ public class DataModelModulePane  extends PamBorderPane {
 	public DataModelModulePane(DataModelPaneFX dataModelPaneFX) {
 		this.dataModelPaneFX=dataModelPaneFX; 
 		this.setCenter(createPane()); 
+		this.setTop(createSearchPane());
+	}
+
+	/**
+	 * Text field used to search the list of modules.
+	 */
+	private javafx.scene.control.TextField searchField;
+
+	/**
+	 * The tiles (icon and name) for each module, in the same order as moduleRectangles.
+	 */
+	private ArrayList<Node> moduleTiles = new ArrayList<Node>();
+
+	/**
+	 * The titled panes which hold each group of modules. 
+	 */
+	private ArrayList<PamTitledPane> groupPanes = new ArrayList<PamTitledPane>();
+
+	/**
+	 * Create the search box shown above the list of modules. 
+	 */
+	private Node createSearchPane() {
+		searchField = new javafx.scene.control.TextField();
+		searchField.setPromptText("Search modules");
+		searchField.textProperty().addListener((obs, oldVal, newVal) -> filterModules(newVal));
+		StackPane holder = new StackPane(searchField);
+		holder.setPadding(new Insets(8, 10, 8, 10));
+		PamStylesManagerFX.getPamStylesManagerFX().styleNode(holder, PamStylesManagerFX.STYLE_SLIDING);
+		return holder;
+	}
+
+	/**
+	 * Only show the modules with names or groups that contain the search text. 
+	 * @param search - the search text. Null or empty shows everything. 
+	 */
+	private void filterModules(String search) {
+		String text = search == null ? "" : search.trim().toLowerCase();
+		for (int i = 0; i < moduleTiles.size() && i < moduleRectangles.size(); i++) {
+			PamModuleInfo info = moduleRectangles.get(i).getPamModuleInfo();
+			boolean show = text.isEmpty() || info.getDefaultName().toLowerCase().contains(text)
+					|| info.getModulesMenuGroup().getMenuName().toLowerCase().contains(text);
+			moduleTiles.get(i).setVisible(show);
+			moduleTiles.get(i).setManaged(show);
+		}
+		// hide groups which have nothing left in them. 
+		for (PamTitledPane groupPane : groupPanes) {
+			boolean any = false;
+			if (groupPane.getContent() instanceof javafx.scene.layout.Pane) {
+				for (Node child : ((javafx.scene.layout.Pane) groupPane.getContent()).getChildren()) {
+					any |= child.isVisible();
+				}
+			}
+			groupPane.setVisible(any);
+			groupPane.setManaged(any);
+			if (any && !text.isEmpty()) {
+				groupPane.setExpanded(true);
+			}
+		}
+	}
+
+	/**
+	 * Create a tile for the list of modules which shows the module icon with its name underneath. 
+	 * @param rect - the module icon, which is the part that is dragged. 
+	 * @return the tile. 
+	 */
+	private Node createModuleTile(ModuleRectangle rect) {
+		javafx.scene.control.Label name = new javafx.scene.control.Label(rect.getPamModuleInfo().getDefaultName());
+		name.setWrapText(true);
+		name.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+		name.setAlignment(javafx.geometry.Pos.TOP_CENTER);
+		name.setMaxWidth(ModuleNodeParams.DEFAULT_WIDTH + 10);
+		name.setMinHeight(32);
+		name.setPrefHeight(32);
+		name.setStyle("-fx-font-size: 11px; -fx-text-fill: white;");
+		PamVBox tile = new PamVBox(4);
+		tile.setAlignment(javafx.geometry.Pos.TOP_CENTER);
+		tile.getChildren().addAll(rect, name);
+		// the name fades with the icon when no more of the module can be added. 
+		name.opacityProperty().bind(rect.opacityProperty());
+		return tile;
 	}
 	
 	private PamScrollPane createPane(){
@@ -123,6 +203,8 @@ public class DataModelModulePane  extends PamBorderPane {
 	protected void populateModuleListPane(){
 				
 		moduleRectangles=new ArrayList<ModuleRectangle>(); 
+		moduleTiles.clear();
+		groupPanes.clear();
 		
 		//get the list of module
 		ArrayList<PamModuleInfo> moduleList = PamModuleInfo.getModuleList();
@@ -158,9 +240,12 @@ public class DataModelModulePane  extends PamBorderPane {
 						moduleList.get(j).getModulesMenuGroup().getMenuName()==moduleGroups.get(i)) {
 					//add to list
 					moduleRectangles.add(createModuleRectangle(moduleList.get(j)));
-					moduleTilePanes[i].getChildren().add(moduleRectangles.get(moduleRectangles.size()-1));
+					Node tile = createModuleTile(moduleRectangles.get(moduleRectangles.size()-1));
+					moduleTiles.add(tile);
+					moduleTilePanes[i].getChildren().add(tile);
 				}
 			}
+			groupPanes.add(titledPanes[i]);
 			moduleSelectPane.getChildren().add(titledPanes[i]);
 		}
 		
@@ -172,6 +257,9 @@ public class DataModelModulePane  extends PamBorderPane {
 		//
 	
 		this.moduleSelectPane.setContent(moduleSelectPane); 
+		if (searchField != null) {
+			filterModules(searchField.getText());
+		}
 	}
 	
 	

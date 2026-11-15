@@ -149,6 +149,17 @@ public class DataModelConnectPane extends ConnectionPane {
 			//check if the module is already added to pane.
 			checkModulesAdded();
 			break; 
+		case PamControllerInterface.INITIALIZATION_COMPLETE:
+			if (autoPlaced) {
+				// modules had no saved positions so lay them out by data flow. 
+				autoPlaced = false;
+				javafx.application.Platform.runLater(this::tidyLayout);
+				// some modules only connect to their data source after everything else has been set up. 
+				javafx.animation.PauseTransition later = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(2));
+				later.setOnFinished(e -> tidyLayout());
+				later.play();
+			}
+			break;
 			//			case PamControllerInterface.INITIALIZATION_COMPLETE:
 			//			break; 
 			//		case PamControllerInterface.CHANGED_PROCESS_SETTINGS:
@@ -270,6 +281,10 @@ public class DataModelConnectPane extends ConnectionPane {
 		if (lastDropPos == null) {
 			//called if a module is added from another location other than the data model e.g. a add modules menu
 			Point2D xy = getAutoDropPosition(connectionNodes); //get an automatic posiiton to drop the node that does not overlap with other nodes
+			if (!PamController.getInstance().isInitializationComplete()) {
+				// a configuration with no saved positions, e.g. one made in the Swing GUI, is being loaded.
+				autoPlaced = true;
+			}
 			newNode = this.dataModelPaneFX.getConnectionNodeFactory().addNewModule(pamControlledUnit, xy.getX(), xy.getY());
 		} 
 
@@ -312,7 +327,8 @@ public class DataModelConnectPane extends ConnectionPane {
 
 		//iterate sequentially through positions...
 		while (nDrops<1000) {
-			newPoint =  new Point2D(250*(nDrops % 5), 250*(nDrops % 5));
+			// work along rows of a grid. 
+			newPoint =  new Point2D(LAYOUT_MARGIN + LAYOUT_SPACING_X*(nDrops % 5), LAYOUT_MARGIN + LAYOUT_SPACING_Y*(nDrops / 5));
 
 			pointOK = true; 
 			for (int i=0; i<connectionNodes.size(); i++) {
@@ -334,6 +350,161 @@ public class DataModelConnectPane extends ConnectionPane {
 		return newPoint;
 	}
 
+
+	/**
+	 * Margin around the automatic layout in pixels. 
+	 */
+	private static final double LAYOUT_MARGIN = 40;
+
+	/**
+	 * Horizontal distance between modules in the automatic layout in pixels. 
+	 */
+	private static final double LAYOUT_SPACING_X = 250;
+
+	/**
+	 * Vertical distance between modules in the automatic layout in pixels. 
+	 */
+	private static final double LAYOUT_SPACING_Y = 170;
+
+	/**
+	 * Maximum number of modules without connections in one row of the automatic layout. 
+	 */
+	private static final int LAYOUT_LOOSE_PER_ROW = 6;
+
+	/**
+	 * True if modules were placed automatically while a configuration was loading. 
+	 */
+	private boolean autoPlaced = false;
+
+	/**
+	 * Lay the modules out by data flow. Modules which make or process data are placed in columns 
+	 * from left to right, each one to the right of the module its data comes from. Modules with no 
+	 * data connections (e.g. the database and displays) are placed in rows underneath. 
+	 */
+	public void tidyLayout() {
+		ArrayList<ConnectionNode> nodes = getAllConnectionNodes(); 
+		ArrayList<ModuleConnectionNode> moduleNodes = new ArrayList<ModuleConnectionNode>();
+		for (ConnectionNode node : nodes) {
+			if (node instanceof ModuleConnectionNode && ((ModuleConnectionNode) node).getPamControlledUnit() != null) {
+				moduleNodes.add((ModuleConnectionNode) node);
+			}
+		}
+		if (moduleNodes.isEmpty()) {
+			return;
+		}
+
+		// find the modules which each module gets its data from. 
+		java.util.HashMap<PamControlledUnit, ModuleConnectionNode> unitNodes = new java.util.HashMap<>();
+		for (ModuleConnectionNode node : moduleNodes) {
+			unitNodes.put(node.getPamControlledUnit(), node);
+		}
+		java.util.HashMap<ModuleConnectionNode, ArrayList<ModuleConnectionNode>> parents = new java.util.HashMap<>();
+		java.util.HashSet<ModuleConnectionNode> hasChildren = new java.util.HashSet<>();
+		for (ModuleConnectionNode node : moduleNodes) {
+			ArrayList<ModuleConnectionNode> nodeParents = new ArrayList<ModuleConnectionNode>();
+			PamControlledUnit unit = node.getPamControlledUnit();
+			for (int i = 0; i < unit.getNumPamProcesses(); i++) {
+				PamguardMVC.PamProcess process = unit.getPamProcess(i);
+				if (process == null || process.getParentDataBlock() == null) continue;
+				PamguardMVC.PamProcess parentProcess = process.getParentDataBlock().getParentProcess();
+				if (parentProcess == null) continue;
+				ModuleConnectionNode parentNode = unitNodes.get(parentProcess.getPamControlledUnit());
+				if (parentNode != null && parentNode != node && !nodeParents.contains(parentNode)) {
+					nodeParents.add(parentNode);
+					hasChildren.add(parentNode);
+				}
+			}
+			// and anything which is connected in the data model display. 
+			for (ConnectionNode guiParent : getParentConnectionNodes(node)) {
+				if (guiParent instanceof ModuleConnectionNode && guiParent != node && moduleNodes.contains(guiParent)
+						&& !nodeParents.contains(guiParent)) {
+					nodeParents.add((ModuleConnectionNode) guiParent);
+					hasChildren.add((ModuleConnectionNode) guiParent);
+				}
+			}
+			parents.put(node, nodeParents);
+		}
+
+		// the column of a module is one more than the furthest right of its parents. 
+		java.util.HashMap<ModuleConnectionNode, Integer> columns = new java.util.HashMap<>();
+		int nColumns = 0;
+		for (ModuleConnectionNode node : moduleNodes) {
+			nColumns = Math.max(nColumns, findColumn(node, parents, columns, 0) + 1);
+		}
+
+		ArrayList<ArrayList<ModuleConnectionNode>> columnNodes = new ArrayList<>();
+		for (int i = 0; i < nColumns; i++) {
+			columnNodes.add(new ArrayList<ModuleConnectionNode>());
+		}
+		ArrayList<ModuleConnectionNode> looseNodes = new ArrayList<ModuleConnectionNode>();
+		for (ModuleConnectionNode node : moduleNodes) {
+			if (parents.get(node).isEmpty() && !hasChildren.contains(node)) {
+				looseNodes.add(node);
+			}
+			else {
+				columnNodes.get(columns.get(node)).add(node);
+			}
+		}
+
+		// place the columns, keeping each module close to the height of its parents to limit crossing lines. 
+		java.util.HashMap<ModuleConnectionNode, Double> rows = new java.util.HashMap<>();
+		int maxRows = 0;
+		for (int col = 0; col < nColumns; col++) {
+			ArrayList<ModuleConnectionNode> column = columnNodes.get(col);
+			column.sort((a, b) -> Double.compare(meanParentRow(a, parents, rows), meanParentRow(b, parents, rows)));
+			for (int row = 0; row < column.size(); row++) {
+				ModuleConnectionNode node = column.get(row);
+				rows.put(node, (double) row);
+				node.getConnectionNodeBody().setLayoutX(LAYOUT_MARGIN + col * LAYOUT_SPACING_X);
+				node.getConnectionNodeBody().setLayoutY(LAYOUT_MARGIN + row * LAYOUT_SPACING_Y);
+			}
+			maxRows = Math.max(maxRows, column.size());
+		}
+
+		// modules with no data connections go underneath. 
+		for (int i = 0; i < looseNodes.size(); i++) {
+			ModuleConnectionNode node = looseNodes.get(i);
+			node.getConnectionNodeBody().setLayoutX(LAYOUT_MARGIN + (i % LAYOUT_LOOSE_PER_ROW) * LAYOUT_SPACING_X);
+			node.getConnectionNodeBody().setLayoutY(LAYOUT_MARGIN + (maxRows + i / LAYOUT_LOOSE_PER_ROW) * LAYOUT_SPACING_Y);
+		}
+		this.requestLayout();
+	}
+
+	/**
+	 * Find the layout column of a module. 
+	 */
+	private int findColumn(ModuleConnectionNode node, java.util.HashMap<ModuleConnectionNode, ArrayList<ModuleConnectionNode>> parents, 
+			java.util.HashMap<ModuleConnectionNode, Integer> columns, int depth) {
+		Integer known = columns.get(node);
+		if (known != null) {
+			return known;
+		}
+		int column = 0;
+		if (depth < 50) { // protects against a loop in the data model.
+			for (ModuleConnectionNode parent : parents.get(node)) {
+				column = Math.max(column, findColumn(parent, parents, columns, depth + 1) + 1);
+			}
+		}
+		columns.put(node, column);
+		return column;
+	}
+
+	/**
+	 * The mean row of the parents of a module which have already been placed. 
+	 */
+	private double meanParentRow(ModuleConnectionNode node, java.util.HashMap<ModuleConnectionNode, ArrayList<ModuleConnectionNode>> parents, 
+			java.util.HashMap<ModuleConnectionNode, Double> rows) {
+		double sum = 0;
+		int n = 0;
+		for (ModuleConnectionNode parent : parents.get(node)) {
+			Double row = rows.get(parent);
+			if (row != null) {
+				sum += row;
+				n++;
+			}
+		}
+		return n == 0 ? Double.MAX_VALUE : sum / n;
+	}
 
 	/**
 	 * Check module connections. Attempts to make the pamDataModel reflect the GUI data model. 

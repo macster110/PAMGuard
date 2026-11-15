@@ -233,7 +233,15 @@ public class DataModelPaneFX extends PamBorderPane {
 		zoomControls.setSpacing(5);
 		zoomControls.setAlignment(javafx.geometry.Pos.CENTER);
 		zoomControls.setPadding(new javafx.geometry.Insets(0, 10, 0, 20));
-		zoomControls.getChildren().addAll(zoomIn, zoomOut);
+		PamButton tidy = new PamButton("Tidy");
+		tidy.setGraphic(Glyph.create("FontAwesome|SITEMAP").size(16).color(Color.GRAY));
+		tidy.setTooltip(new javafx.scene.control.Tooltip("Arrange the modules from left to right in the order that data flows through them"));
+		tidy.setOnAction((action) -> {
+			dataModelPane.tidyLayout();
+		});
+		tidy.getStyleClass().add("transparent-button");
+
+		zoomControls.getChildren().addAll(tidy, zoomIn, zoomOut);
 		
 		// Set this as the custom toolbar right content for the data model tab
 		pamTab.setCustomToolbarRight(zoomControls);
@@ -816,7 +824,6 @@ public class DataModelPaneFX extends PamBorderPane {
 					}
 					// disconnect any multiplex data block.
 					if (childUnit.getPamProcess(k).isMultiplex()) {
-						System.out.println("Removing parent datablock from multiplex list");
 						childUnit.getPamProcess(k)
 						.removeMultiPlexDataBlock(parentUnit.getPamProcess(i).getOutputDataBlock(j));
 					}

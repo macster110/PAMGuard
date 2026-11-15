@@ -669,7 +669,6 @@ public class StandardConnectionNode extends Group implements ConnectionNode {
 	public boolean connectNode(StandardConnectionNode parentNode){ 
 
 		if (ConnectionPane.isNodeConnected(this, parentNode, true, false)){
-			System.out.println("Connection Node: these nodes are already connected!");
 			return false; 
 		}
 
@@ -682,7 +681,6 @@ public class StandardConnectionNode extends Group implements ConnectionNode {
 			if (connectionSockets.get(i).getConnectedShape()!=null && 
 					connectionSockets.get(i).getConnectedShape().getConnectionNode()==parentNode){
 				//important here as complexity of all this connection socket code means occasionally can attempt to connect connected nodes. 
-				System.out.println("Connection Node: these nodes are already connected!");
 				return false; 
 			}
 			if (connectionSockets.get(i).getConnectedShape()==null

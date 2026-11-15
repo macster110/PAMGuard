@@ -157,7 +157,6 @@ public class SettingsFilePane extends SettingsPane<SettingsFileData> {
 		settingsFileData.setFirstFile(selFile);
 		fileBox.getSelectionModel().select(0); //reset the combobox. Need this toi make szure we don;t get weird bugs in the files used. 
 		
-		System.out.println("Get Params: Sel index = " + fileBox.getSelectionModel().getSelectedIndex()+ " File: "+selFile);
 //		for (int i=0; i<settingsFileData.recentFiles.size(); i++){
 //			System.out.println("File: "+i+ " "+settingsFileData.recentFiles.get(i));
 //		}

@@ -666,7 +666,6 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 			
 		}
 		
-		System.out.println("Add module: " + pamControlledUnit.getUnitName() + " " + pamControlledUnit.getPamModuleInfo());
 		
 		if (pamControlledUnit.getPamModuleInfo()!=null) {
 			Node icon = ModuleIconFactory.getInstance().

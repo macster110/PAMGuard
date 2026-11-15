@@ -222,11 +222,9 @@ public class SourcePaneFX extends PamBorderPane {
 			channelPanel.getChildren().add(selectAll =new CheckBox("All"));
 			channelBoxes =new CheckBox[PamConstants.MAX_CHANNELS];
 			selectAll.setOnAction((action)->{
-	            System.out.println("Stylesheets: 0: " +  getStylesheets().size());
 				if (selectAll.isSelected()) selectAllChannels();
 				else selectNoChannels();
 	            channelValidator.validate(); //makes sure any error signs are removed.
-	            System.out.println("Stylesheets: 1: " +  getStylesheets().size());
 			});
 		}
 		

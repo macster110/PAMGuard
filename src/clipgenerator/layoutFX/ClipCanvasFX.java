@@ -233,6 +233,26 @@ public class ClipCanvasFX extends Region {
 	 * @param atStart - true to put it at the start (top left), false to put it at the end.
 	 */
 	public void addClip(ClipDataUnit clip, boolean atStart) {
+		addClipItem(clip, atStart);
+		rebuildShown();
+	}
+
+	/**
+	 * Add several clips, in the order they were made, and rebuild the display once.
+	 * @param clips - the new clips, oldest first. 
+	 * @param atStart - true to add at the start of the display, false to add at the end.
+	 */
+	public void addClips(List<ClipDataUnit> clips, boolean atStart) {
+		if (clips == null || clips.isEmpty()) {
+			return;
+		}
+		for (ClipDataUnit clip : clips) {
+			addClipItem(clip, atStart);
+		}
+		rebuildShown();
+	}
+
+	private void addClipItem(ClipDataUnit clip, boolean atStart) {
 		ClipItem item = new ClipItem(clip);
 		if (atStart) {
 			allItems.add(0, item);
@@ -241,7 +261,6 @@ public class ClipCanvasFX extends Region {
 			allItems.add(item);
 		}
 		item.shown = clipDisplay.shouldShow(clip);
-		rebuildShown();
 	}
 
 	/**

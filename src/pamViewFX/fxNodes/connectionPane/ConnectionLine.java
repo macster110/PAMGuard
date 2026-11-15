@@ -273,7 +273,6 @@ public class ConnectionLine extends Line implements ConnectorNode {
 	 */
 	private StandardConnectionSocket createBranchSocket(ConnectorNode plugShape){
 		
-		System.out.println("Connection Line create branch: " + this.connectionNode); 
 		
 		//create new socket
 		StandardConnectionSocket newSocket=new StandardConnectionSocket(connectionNode, StandardConnectionNode.plugBodyWidth-5, StandardConnectionNode.plugEndWidth, 

@@ -471,6 +471,10 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
         dataModelPaneFX.createToolbarControls(newTab); 
         
         newTab.setMainContent(dataModelPaneFX);
+        // the data model is usually selected before its controls exist, so show them now. 
+        if (mainTabPane.getSelectionModel().getSelectedItem() == newTab) {
+        	updateToolbarForTab(newTab);
+        }
         return dataModelPaneFX; 
 		
 	}
