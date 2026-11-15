@@ -25,7 +25,7 @@ public class LtsaParameters implements Cloneable, Serializable, ManagedParameter
 	public int longerFactor = 10;
 
 	@Override
-	protected LtsaParameters clone() {
+	public LtsaParameters clone() {
 		try {
 			LtsaParameters params = (LtsaParameters) super.clone();
 			params.intervalSeconds = this.intervalSeconds;

@@ -17,6 +17,8 @@ import Acquisition.FolderInputSystem;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
+import PamController.PamControlledUnitGUI;
+import PamController.PamGUIManager;
 import PamController.PamControllerInterface;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
@@ -630,6 +632,75 @@ public class RecorderControl extends PamControlledUnit implements PamSettings {
 			if (rt.getName().equals(triggerName)) {
 				return rt;
 			}
+		}
+		return null;
+	}
+
+	/**
+	 * Add a view which is told about changes to the recorder state, e.g. from the JavaFX GUI. 
+	 * @param recorderView - the view. 
+	 */
+	public void addRecorderView(RecorderView recorderView) {
+		if (!recorderViews.contains(recorderView)) {
+			recorderViews.add(recorderView);
+		}
+	}
+
+	/**
+	 * Remove a view added with {@link #addRecorderView(RecorderView)}. 
+	 * @param recorderView - the view. 
+	 */
+	public void removeRecorderView(RecorderView recorderView) {
+		recorderViews.remove(recorderView);
+	}
+
+	/**
+	 * Press one of the recorder buttons, e.g. from the JavaFX GUI. 
+	 * @param command - one of the RecorderView.BUTTON_ values. 
+	 */
+	public void pressButton(int command) {
+		buttonCommand(command);
+	}
+
+	/**
+	 * @return the last recorder button pressed, one of the RecorderView.BUTTON_ values.
+	 */
+	public int getPressedButton() {
+		return pressedButton;
+	}
+
+	/**
+	 * @return true if recordings can be started, i.e. data are arriving and channels are selected. 
+	 */
+	public boolean isRecordingEnabled() {
+		return shouldEnableRecording();
+	}
+
+	/**
+	 * @return the name of the file being written, or null if there isn't one. 
+	 */
+	public String getRecordingFileName() {
+		return recorderStorage == null ? null : recorderStorage.getFileName();
+	}
+
+	/**
+	 * Set new recorder settings, e.g. from the JavaFX settings pane. 
+	 * @param newSettings - the new settings. 
+	 */
+	public void setRecorderSettings(RecorderSettings newSettings) {
+		recorderSettings = newSettings.clone();
+		newParams();
+	}
+
+	private SoundRecorder.layoutFX.RecorderGUIFX recorderGUIFX;
+
+	@Override
+	public PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamGUIManager.FX) {
+			if (recorderGUIFX == null) {
+				recorderGUIFX = new SoundRecorder.layoutFX.RecorderGUIFX(this);
+			}
+			return recorderGUIFX;
 		}
 		return null;
 	}

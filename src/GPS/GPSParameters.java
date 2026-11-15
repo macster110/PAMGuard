@@ -144,6 +144,20 @@ public class GPSParameters implements Serializable, Cloneable, ManagedParameters
 
 
 
+	/**
+	 * @return the long data name of the NMEA data block that GPS data are read from. 
+	 */
+	public String getNmeaSource() {
+		return nmeaSource;
+	}
+
+	/**
+	 * @param nmeaSource the long data name of the NMEA data block to read GPS data from. 
+	 */
+	public void setNmeaSource(String nmeaSource) {
+		this.nmeaSource = nmeaSource;
+	}
+
 	public float getSmoothingTime() {
 		return smoothingTime;
 	}

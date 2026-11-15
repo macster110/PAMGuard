@@ -382,6 +382,52 @@ public class RecorderSettings implements Serializable, Cloneable, ManagedParamet
 	}
 
 	//transient AudioFileFormat.Type fileType = AudioFileFormat.Type.WAVE;
+	/*
+	 * Accessors used by the JavaFX settings pane. 
+	 */
+	public int getBitDepth() {
+		return bitDepth;
+	}
+
+	public void setBitDepth(int bitDepth) {
+		this.bitDepth = bitDepth;
+	}
+
+	public boolean isLimitLengthSeconds() {
+		return limitLengthSeconds;
+	}
+
+	public void setLimitLengthSeconds(boolean limitLengthSeconds) {
+		this.limitLengthSeconds = limitLengthSeconds;
+	}
+
+	public boolean isLimitLengthMegaBytes() {
+		return limitLengthMegaBytes;
+	}
+
+	public void setLimitLengthMegaBytes(boolean limitLengthMegaBytes) {
+		this.limitLengthMegaBytes = limitLengthMegaBytes;
+	}
+
+	public boolean isDatedSubFolders() {
+		return datedSubFolders;
+	}
+
+	public void setDatedSubFolders(boolean datedSubFolders) {
+		this.datedSubFolders = datedSubFolders;
+	}
+
+	/**
+	 * @return true if the recorder returns to the state it was in when PAMGuard last stopped. 
+	 */
+	public boolean isAutoStart() {
+		return autoStart;
+	}
+
+	public void setAutoStart(boolean autoStart) {
+		this.autoStart = autoStart;
+	}
+
 	public void setFileType(AudioFileFormat.Type fileType) {
 		this.fileType = fileType.toString();
 	}

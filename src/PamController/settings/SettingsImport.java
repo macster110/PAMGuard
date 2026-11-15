@@ -75,6 +75,30 @@ public class SettingsImport {
 		if (ans == false) {
 			return false;
 		}
+		importGroups(groupedSettings);
+		return true;
+	}
+
+	/**
+	 * Read a settings file and arrange its settings into groups by module, ready for 
+	 * the user to choose what to import. Used by the JavaFX import dialog. 
+	 * @param settingsFile psfx file name
+	 * @return grouped settings, or null if the file could not be read. 
+	 */
+	public ArrayList<SettingsImportGroup> readSettingsGroups(String settingsFile) {
+		ArrayList<PamControlledUnitSettings> settings = readSettingsFile(settingsFile);
+		if (settings == null) {
+			return null;
+		}
+		return organiseSettingsGroups(settings);
+	}
+
+	/**
+	 * Import settings groups using the import choice set in each group, either 
+	 * as new modules or replacing existing modules. 
+	 * @param groupedSettings grouped settings with import choices set. 
+	 */
+	public void importGroups(ArrayList<SettingsImportGroup> groupedSettings) {
 		/**
 		 * OK - so we get here and need to actually import some stuff. Wow !
 		 */
@@ -109,7 +133,6 @@ public class SettingsImport {
 			aUnit.notifyModelChanged(PamController.INITIALIZATION_COMPLETE);
 		}
 
-		return true;
 	}
 
 	/**

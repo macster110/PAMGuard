@@ -10,7 +10,8 @@ import javax.swing.SwingUtilities;
 import PamController.PamController;
 import PamController.PamSettingManager;
 import PamController.PamguardVersionInfo;
-import PamController.settings.SettingsImport;
+import PamController.settings.SettingsImportDialogFX;
+import PamController.settings.output.xml.XMLWriterDialogFX;
 import PamModel.CommonPluginInterface;
 import PamModel.PamModel;
 import PamUtils.PamFileFilter;
@@ -42,8 +43,7 @@ import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
  * Swing GUI's File and Help menus. They are used by both the sliding settings pane and the menu bar so
  * the two always do the same thing.
  * <p>
- * Some actions have no JavaFX dialog yet (time, time zone, module ordering, module import and XML export).
- * These open the existing Swing dialog on the Swing thread.
+ * All of these actions open JavaFX dialogs.
  *
  * @author Jamie Macaulay
  *
@@ -246,21 +246,17 @@ public class PamGuiActionsFX {
 	}
 
 	/**
-	 * Import module settings from a different configuration. Swing dialog.
+	 * Import module settings from a different configuration.
 	 */
 	public static void importModules() {
-		SwingUtilities.invokeLater(() -> new SettingsImport(PamController.getInstance()).loadSettingsFile());
+		SettingsImportDialogFX.showDialog(PamController.getInstance());
 	}
 
 	/**
-	 * Export the configuration to XML. Swing dialog.
+	 * Export the configuration to XML.
 	 */
 	public static void exportXML() {
-		SwingUtilities.invokeLater(() -> PamController.getInstance().exportGeneralXMLSettings(null, PamCalendarTime()));
-	}
-
-	private static long PamCalendarTime() {
-		return PamUtils.PamCalendar.getTimeInMillis();
+		XMLWriterDialogFX.showDialog();
 	}
 
 	/**

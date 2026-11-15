@@ -24,6 +24,9 @@ public class LtsaControl extends PamControlledUnit implements PamSettings {
 		ltsaProcess = new LtsaProcess(this);
 		addPamProcess(ltsaProcess);
 		new FFTPluginPanelProvider(ltsaProcess.getLtsaDataBlock());
+		// lets the JavaFX Time Display show the LTSA as a spectrogram. 
+		dataPlotsFX.data.TDDataProviderRegisterFX.getInstance().registerDataInfo(
+				new dataPlotsFX.spectrogramPlotFX.FFTPlotProvider(this, ltsaProcess.getLtsaDataBlock()));
 		PamSettingManager.getInstance().registerSettings(this);
 	}
 
@@ -76,6 +79,35 @@ public class LtsaControl extends PamControlledUnit implements PamSettings {
 			PamControlledUnitSettings pamControlledUnitSettings) {
 		ltsaParameters = ((LtsaParameters) pamControlledUnitSettings.getSettings()).clone();
 		return true;
+	}
+
+	/**
+	 * Set new parameters and set up the LTSA process again. 
+	 * @param ltsaParameters - the new parameters.
+	 */
+	public void setLtsaParameters(LtsaParameters ltsaParameters) {
+		this.ltsaParameters = ltsaParameters.clone();
+		ltsaProcess.setupProcess();
+	}
+
+	/**
+	 * @return the process which makes the LTSA. 
+	 */
+	public LtsaProcess getLtsaProcess() {
+		return ltsaProcess;
+	}
+
+	private ltsa.layoutFX.LtsaGUIFX ltsaGUIFX;
+
+	@Override
+	public PamController.PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamController.PamGUIManager.FX) {
+			if (ltsaGUIFX == null) {
+				ltsaGUIFX = new ltsa.layoutFX.LtsaGUIFX(this);
+			}
+			return ltsaGUIFX;
+		}
+		return null;
 	}
 
 	public LtsaParameters getLtsaParameters() {

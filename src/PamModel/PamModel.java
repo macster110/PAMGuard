@@ -242,12 +242,14 @@ final public class PamModel implements PamSettings {
 		mi = PamModuleInfo.registerControlledUnit(NMEA.NMEAControl.class.getName(), "NMEA Data Collection");
 		mi.setModulesMenuGroup(mapsGroup);
 		mi.setToolTipText("Collects NMEA data from a serial port");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 		mi.setMinNumber(0);
 		mi.setHelpPoint("mapping/NMEA/docs/configuringNMEADataSource.html");
 
 		mi = PamModuleInfo.registerControlledUnit(GPS.GPSControl.class.getName(), "GPS Processing");
 		mi.setModulesMenuGroup(mapsGroup);
 		mi.setToolTipText("Interprets NMEA data to extract GPS data");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 		mi.setMinNumber(0);
 		mi.setHelpPoint("mapping/NMEA/docs/ConfiguringGPS.html");
 		if (!isViewer) {
@@ -256,7 +258,7 @@ final public class PamModel implements PamSettings {
 		}
 
 		mi = PamModuleInfo.registerControlledUnit(Map.MapController.class.getName(), "Map");	
-		// GPS has no JavaFX GUI yet, so in the JavaFX GUI the map works without it, e.g. for static arrays. 
+		// In the JavaFX GUI the map works without GPS, e.g. for static arrays. GPS can still be added. 
 		if (!PamGUIManager.isFX()) mi.addDependency(new PamDependency(GpsDataUnit.class, "GPS.GPSControl"));
 		mi.setToolTipText("Displays a map of vessel position and detections");
 		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
@@ -554,6 +556,7 @@ final public class PamModel implements PamSettings {
 		mi.setModulesMenuGroup(processingGroup);
 
 		mi = PamModuleInfo.registerControlledUnit(RecorderControl.class.getName(), "Sound recorder");	
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 		mi.addDependency(new PamDependency(RawDataUnit.class, "Acquisition.AcquisitionControl"));	
 		mi.setToolTipText("Records audio data to wav of AIF files");
 		mi.setModulesMenuGroup(processingGroup);
@@ -614,6 +617,7 @@ final public class PamModel implements PamSettings {
 		mi.setHelpPoint("sound_processing/NoiseOneBand/Docs/NoiseOneBand.html");
 
 		mi = PamModuleInfo.registerControlledUnit(LtsaControl.class.getName(), "Long Term Spectral Average");
+		mi.addGUICompatabilityFlag(PamGUIManager.FX); //has FX enabled GUI.
 		mi.addDependency(new PamDependency(RawDataUnit.class, "fftManager.PamFFTControl"));	
 		mi.setToolTipText("Make Long Term Spectral Average Measurements");
 		mi.setModulesMenuGroup(processingGroup);

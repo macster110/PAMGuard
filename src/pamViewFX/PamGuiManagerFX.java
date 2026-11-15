@@ -617,6 +617,17 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	 */
 	private PamGuiTabFX getDisplayTab(UserDisplayNodeFX newDisplay) {
 		PamGuiTabFX tab;
+		if (nextDisplayTabName != null) {
+			// a display added by code which should go into a tab of its own. 
+			String tabName = nextDisplayTabName;
+			nextDisplayTabName = null;
+			for (PamGuiTabFX aTab : getAllTabs()) {
+				if (aTab.getName().equals(tabName)) {
+					return aTab;
+				}
+			}
+			return stages.get(0).addPamTab(new TabInfo(uniqueTabName(tabName, null)), null, true);
+		}
 		if (PamController.getInstance().isInitializationComplete()){
 			//ask the user what tab to add the display to 
 			tab=this.showTabSelectDialog();
@@ -863,13 +874,16 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 
 		if (changeType == PamControllerInterface.INITIALIZATION_COMPLETE) {
 			nFFTModules = countFFTModules();
+			nLtsaModules = countLtsaModules();
 			Platform.runLater(() -> reportModulesWithoutFXGUI());
 		}
 		else if (changeType == PamControllerInterface.ADD_CONTROLLEDUNIT && pamController.isInitializationComplete()) {
 			checkNewFFTModule();
+			checkNewLtsaModule();
 		}
 		else if (changeType == PamControllerInterface.REMOVE_CONTROLLEDUNIT) {
 			nFFTModules = countFFTModules();
+			nLtsaModules = countLtsaModules();
 		}
 
 		//System.out.println("PAMGUIMANAGERFX: Notify model changed: "+changeType);	
@@ -916,6 +930,99 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 			}
 		});
 		wait.play();
+	}
+
+	/**
+	 * The number of LTSA modules the last time it was checked. 
+	 */
+	private int nLtsaModules = 0;
+
+	private int countLtsaModules() {
+		return pamController.findControlledUnits(ltsa.LtsaControl.class).size();
+	}
+
+	/**
+	 * When the user adds an LTSA module, add a Time Display which shows the LTSA over a long time range. 
+	 */
+	private void checkNewLtsaModule() {
+		ArrayList<PamControlledUnit> ltsas = pamController.findControlledUnits(ltsa.LtsaControl.class);
+		boolean newLtsa = ltsas.size() > nLtsaModules;
+		nLtsaModules = ltsas.size();
+		if (!newLtsa) {
+			return;
+		}
+		ltsa.LtsaControl ltsaControl = (ltsa.LtsaControl) ltsas.get(ltsas.size() - 1);
+		javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.millis(750));
+		wait.setOnFinished(e -> addLtsaDisplay(ltsaControl));
+		wait.play();
+	}
+
+	/**
+	 * Visible time range of the LTSA display. 
+	 */
+	private static final long LTSA_VISIBLE_MILLIS = 6L * 3600L * 1000L;
+
+	/**
+	 * If not null, the next display added goes into a tab with this name, which is made if needed, 
+	 * rather than asking the user. 
+	 */
+	private String nextDisplayTabName;
+
+	/**
+	 * Add a Time Display which shows an LTSA. 
+	 * @param ltsaControl - the LTSA module. 
+	 * @return true if a display was added. 
+	 */
+	public boolean addLtsaDisplay(ltsa.LtsaControl ltsaControl) {
+		try {
+			String name = ltsaControl.getUnitName() + " Display";
+			int i = 2;
+			while (pamController.findControlledUnit(dataPlotsFX.TDDisplayController.class, name) != null) {
+				name = ltsaControl.getUnitName() + " Display " + (i++);
+			}
+			// a new LTSA measures nothing until channels are chosen, so start with all channels of its FFT source. 
+			ltsa.LtsaParameters ltsaParams = ltsaControl.getLtsaParameters();
+			if (ltsaParams.channelMap == 0) {
+				PamguardMVC.PamDataBlock<?> fftSource = ltsaParams.dataSource == null ? null : 
+					pamController.getFFTDataBlock(ltsaParams.dataSource);
+				if (fftSource == null) {
+					for (PamguardMVC.PamDataBlock<?> block : pamController.getFFTDataBlocks()) {
+						if (!(block instanceof ltsa.LtsaDataBlock)) {
+							fftSource = block;
+							break;
+						}
+					}
+				}
+				if (fftSource != null && !(fftSource instanceof ltsa.LtsaDataBlock)) {
+					ltsa.LtsaParameters newParams = ltsaParams.clone();
+					newParams.dataSource = fftSource.getLongDataName();
+					newParams.channelMap = fftSource.getSequenceMap();
+					ltsaControl.setLtsaParameters(newParams);
+				}
+			}
+			// the LTSA display gets a tab of its own. 
+			nextDisplayTabName = ltsaControl.getUnitName();
+			java.util.function.Supplier<dataPlotsFX.layout.TDDisplayFX> display = PamAutoConfigUtils.addTimeDisplay(name);
+			PamAutoConfigUtils.whenReady(display, null, tdDisplay -> {
+				nextDisplayTabName = null;
+				tdDisplay.addDataBlock(ltsaControl.getLtsaProcess().getLtsaDataBlock(), null);
+				// an LTSA is made over hours, so show hours rather than seconds. 
+				tdDisplay.getTDParams().visibleTimeRange = LTSA_VISIBLE_MILLIS;
+				tdDisplay.getTDParams().scrollableTimeRange = LTSA_VISIBLE_MILLIS * 4;
+				if (tdDisplay.getTimeScroller() != null) {
+					if (!tdDisplay.isViewer()) {
+						long start = (long) tdDisplay.getTDParams().startMillis;
+						tdDisplay.getTimeScroller().setRangeMillis(start, start + LTSA_VISIBLE_MILLIS * 4, false);
+					}
+					tdDisplay.getTimeScroller().setVisibleMillis(LTSA_VISIBLE_MILLIS);
+				}
+			});
+			return true;
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+			return false;
+		}
 	}
 
 	/**

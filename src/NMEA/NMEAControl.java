@@ -41,6 +41,8 @@ import pamguard.GlobalArguments;
 import PamController.PamControlledUnit;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
+import PamController.PamControlledUnitGUI;
+import PamController.PamGUIManager;
 import PamController.PamSettingManager;
 import PamController.PamSettings;
 import PamController.command.SummaryCommand;
@@ -353,6 +355,19 @@ public class NMEAControl extends PamControlledUnit implements PamSettings {
 		sb.append("</NMEAraw>");
 		
 		return NMEAString;
+	}
+
+	private NMEA.layoutFX.NMEAGUIFX nmeaGUIFX;
+
+	@Override
+	public PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamGUIManager.FX) {
+			if (nmeaGUIFX == null) {
+				nmeaGUIFX = new NMEA.layoutFX.NMEAGUIFX(this);
+			}
+			return nmeaGUIFX;
+		}
+		return null;
 	}
 
 	public void setNmeaParameters(NMEAParameters newParams) {

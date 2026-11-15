@@ -11,6 +11,8 @@ import javax.swing.JMenuItem;
 
 import NMEA.NMEADataBlock;
 import PamController.PamControlledUnit;
+import PamController.PamControlledUnitGUI;
+import PamController.PamGUIManager;
 import PamController.PamControlledUnitSettings;
 import PamController.PamController;
 import PamController.PamSettingManager;
@@ -236,6 +238,29 @@ public class GPSControl extends PamControlledUnit implements PamSettings, Positi
 	}
 	public GPSParameters getGpsParameters() {
 		return gpsParameters;
+	}
+
+	/**
+	 * Set new GPS parameters and tell the GPS and heading processes. 
+	 * @param newParams new parameters. 
+	 */
+	public void setGpsParameters(GPSParameters newParams) {
+		gpsParameters = newParams.clone();
+		gpsProcess.noteNewSettings();
+		headingProcess.noteNewSettings();
+	}
+
+	private GPS.layoutFX.GPSGUIFX gpsGUIFX;
+
+	@Override
+	public PamControlledUnitGUI getGUI(int flag) {
+		if (flag == PamGUIManager.FX) {
+			if (gpsGUIFX == null) {
+				gpsGUIFX = new GPS.layoutFX.GPSGUIFX(this);
+			}
+			return gpsGUIFX;
+		}
+		return null;
 	}
 
 	/**
