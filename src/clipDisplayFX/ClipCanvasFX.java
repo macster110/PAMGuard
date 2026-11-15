@@ -1,4 +1,4 @@
-package clipgenerator.layoutFX;
+package clipDisplayFX;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayDeque;
@@ -17,7 +17,6 @@ import PamView.PamColors.PamColor;
 import PamView.PamSymbol;
 import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamDataUnit;
-import clipgenerator.ClipDataUnit;
 import clipgenerator.clipDisplay.ClipDisplayParameters;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
@@ -232,7 +231,7 @@ public class ClipCanvasFX extends Region {
 	 * @param clip - the clip.
 	 * @param atStart - true to put it at the start (top left), false to put it at the end.
 	 */
-	public void addClip(ClipDataUnit clip, boolean atStart) {
+	public void addClip(PamDataUnit clip, boolean atStart) {
 		addClipItem(clip, atStart);
 		rebuildShown();
 	}
@@ -242,17 +241,17 @@ public class ClipCanvasFX extends Region {
 	 * @param clips - the new clips, oldest first. 
 	 * @param atStart - true to add at the start of the display, false to add at the end.
 	 */
-	public void addClips(List<ClipDataUnit> clips, boolean atStart) {
+	public void addClips(List<PamDataUnit> clips, boolean atStart) {
 		if (clips == null || clips.isEmpty()) {
 			return;
 		}
-		for (ClipDataUnit clip : clips) {
+		for (PamDataUnit clip : clips) {
 			addClipItem(clip, atStart);
 		}
 		rebuildShown();
 	}
 
-	private void addClipItem(ClipDataUnit clip, boolean atStart) {
+	private void addClipItem(PamDataUnit clip, boolean atStart) {
 		ClipItem item = new ClipItem(clip);
 		if (atStart) {
 			allItems.add(0, item);
@@ -282,9 +281,9 @@ public class ClipCanvasFX extends Region {
 	 * Replace all clips, e.g. when new data are loaded in viewer mode.
 	 * @param clips - the clips in display order.
 	 */
-	public void setClips(Collection<ClipDataUnit> clips) {
+	public void setClips(Collection<PamDataUnit> clips) {
 		clearClips();
-		for (ClipDataUnit clip : clips) {
+		for (PamDataUnit clip : clips) {
 			ClipItem item = new ClipItem(clip);
 			item.shown = clipDisplay.shouldShow(clip);
 			allItems.add(item);
@@ -402,8 +401,8 @@ public class ClipCanvasFX extends Region {
 	 * Get the selected clips in display order.
 	 * @return list of selected clips.
 	 */
-	public List<ClipDataUnit> getSelectedClips() {
-		ArrayList<ClipDataUnit> sel = new ArrayList<ClipDataUnit>();
+	public List<PamDataUnit> getSelectedClips() {
+		ArrayList<PamDataUnit> sel = new ArrayList<PamDataUnit>();
 		for (ClipItem item : shownItems) {
 			if (item.highlight) {
 				sel.add(item.clip);
@@ -784,10 +783,11 @@ public class ClipCanvasFX extends Region {
 			double bottom = item.h - BORDER;
 			gc.fillText(String.format("Ch%d", item.channel), BORDER + 2, bottom);
 			gc.setTextAlign(TextAlignment.RIGHT);
-			gc.fillText(String.format("%3.2fs", item.durationSeconds()), item.w - BORDER - 2, bottom);
+			double dur = item.durationSeconds();
+			gc.fillText(dur < 0.1 ? String.format("%3.1fms", dur * 1000.) : String.format("%3.2fs", dur), item.w - BORDER - 2, bottom);
 			gc.setTextAlign(TextAlignment.LEFT);
 			// rotated maximum frequency on the left
-			double f = item.clip.getDisplaySampleRate() / 2. * params.frequencyScale;
+			double f = RawClipHelper.getDisplaySampleRate(item.clip) / 2. * params.frequencyScale;
 			gc.save();
 			gc.translate(BORDER, iy);
 			gc.rotate(-90);
@@ -828,7 +828,7 @@ public class ClipCanvasFX extends Region {
 			return;
 		}
 		ClipDisplayParameters params = clipDisplay.getClipDisplayParameters();
-		double fMax = item.clip.getDisplaySampleRate() / 2. * params.frequencyScale;
+		double fMax = RawClipHelper.getDisplaySampleRate(item.clip) / 2. * params.frequencyScale;
 		proj.setClip(item.clip.getTimeMilliseconds(), item.durationSeconds() * 1000., fMax, x, y, w, h);
 		proj.clearHoverList();
 		try {
@@ -1124,10 +1124,8 @@ public class ClipCanvasFX extends Region {
 			ClipDisplayParameters params = clipDisplay.getClipDisplayParameters();
 			int fftLen = 1 << params.getLogFFTLength();
 			java.awt.Color[] colours = clipDisplay.getColourArray().getColours();
-			BufferedImage bi = item.clip.getClipImage(item.channel, fftLen, fftLen / 2, params.amlitudeMinVal,
+			BufferedImage bi = RawClipHelper.makeClipImage(item.clip, item.channel, fftLen, params.amlitudeMinVal,
 					params.amlitudeMinVal + params.amplitudeRangeVal, colours);
-			// the image is all we need so free the spectrogram data held by the clip.
-			item.clip.clearClipSpecData();
 			if (bi == null) {
 				return null;
 			}
@@ -1159,7 +1157,7 @@ public class ClipCanvasFX extends Region {
 	 */
 	private class ClipItem {
 
-		final ClipDataUnit clip;
+		final PamDataUnit clip;
 
 		final int channel;
 
@@ -1209,7 +1207,7 @@ public class ClipCanvasFX extends Region {
 			return image != null && imageSettingsKey.equals(imageKey);
 		}
 
-		ClipItem(ClipDataUnit clip) {
+		ClipItem(PamDataUnit clip) {
 			this.clip = clip;
 			this.channel = Math.max(0, PamUtils.getLowestChannel(clip.getChannelBitmap()));
 			estimateSize();
@@ -1222,9 +1220,7 @@ public class ClipCanvasFX extends Region {
 		void estimateSize() {
 			ClipDisplayParameters params = clipDisplay.getClipDisplayParameters();
 			int fftLen = 1 << params.getLogFFTLength();
-			int hop = fftLen / 2;
-			double nSamples = durationSeconds() * clip.getDisplaySampleRate();
-			double nT = Math.max(1, Math.floor((nSamples - (fftLen - hop)) / hop));
+			double nT = RawClipHelper.getImageColumns(clip, fftLen);
 			if (image != null && imageSettingsKey.equals(imageKey)) {
 				nT = image.getWidth();
 			}
@@ -1239,22 +1235,19 @@ public class ClipCanvasFX extends Region {
 			h = imageH + 2 * BORDER + 2 * TEXT_BORDER;
 		}
 
+		private double duration = -1;
+
 		double durationSeconds() {
-			Long dur = clip.getSampleDuration();
-			float fs = clip.getSourceSampleRate();
-			if (dur == null || fs <= 0) {
-				return 0.1;
+			if (duration < 0) {
+				duration = RawClipHelper.getDurationSeconds(clip);
 			}
-			return dur / (double) fs;
+			return duration;
 		}
 
 		PamDataUnit getTrigger() {
 			if (!triggerSearched) {
 				triggerSearched = true;
-				trigger = clip.getTriggerDataUnit();
-				if (trigger == null) {
-					trigger = clip.findTriggerDataUnit();
-				}
+				trigger = RawClipHelper.getTrigger(clip);
 			}
 			return trigger;
 		}

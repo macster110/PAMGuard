@@ -1,18 +1,16 @@
 package clipgenerator.layoutFX;
 
-import java.util.ArrayList;
-
 import PamController.PamControllerInterface;
 import PamController.SettingsPane;
 import PamguardMVC.PamDataBlock;
 import clipgenerator.ClipControl;
 import clipgenerator.ClipSettings;
 import pamViewFX.PamControlledGUIFX;
-import userDisplayFX.UserDisplayNodeFX;
 
 /**
- * JavaFX GUI for the clip generator. Provides the settings pane and a JavaFX clip
- * display which shows the clips on a large zoomable canvas.
+ * JavaFX GUI for the clip generator. Provides the settings pane. Clips are shown
+ * with the separate Clip Display module ({@link clipDisplayFX.ClipDisplayControlFX})
+ * which can also show any other data that holds raw sound.
  *
  * @author Jamie Macaulay
  *
@@ -22,10 +20,6 @@ public class ClipGUIFX extends PamControlledGUIFX {
 	private ClipControl clipControl;
 
 	private ClipSettingsPaneFX settingsPane;
-
-	private ArrayList<UserDisplayNodeFX> displays;
-
-	private ClipDisplayFX clipDisplay;
 
 	public ClipGUIFX(ClipControl clipControl) {
 		this.clipControl = clipControl;
@@ -54,16 +48,6 @@ public class ClipGUIFX extends PamControlledGUIFX {
 	}
 
 	@Override
-	public ArrayList<UserDisplayNodeFX> getDisplays() {
-		if (displays == null) {
-			clipDisplay = new ClipDisplayFX(clipControl);
-			displays = new ArrayList<UserDisplayNodeFX>();
-			displays.add(clipDisplay);
-		}
-		return displays;
-	}
-
-	@Override
 	public void notifyGUIChange(int changeType) {
 		switch (changeType) {
 		case PamControllerInterface.CHANGED_PROCESS_SETTINGS:
@@ -75,16 +59,6 @@ public class ClipGUIFX extends PamControlledGUIFX {
 			}
 			break;
 		}
-		if (clipDisplay != null) {
-			clipDisplay.notifyModelChanged(changeType);
-		}
-	}
-
-	/**
-	 * @return the clip display, or null if it has not been created.
-	 */
-	public ClipDisplayFX getClipDisplay() {
-		return clipDisplay;
 	}
 
 }

@@ -1,4 +1,4 @@
-package clipgenerator.layoutFX;
+package clipDisplayFX;
 
 import java.util.ArrayList;
 import java.util.List;

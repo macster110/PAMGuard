@@ -404,8 +404,20 @@ public class ReprocessManager {
 		}
 		else if (PamGUIManager.getGUIType() == PamGUIManager.FX) {
 			// otherwise we'll need to show a dialog to let the user decide what to do 
-			ReprocessStoreChoice choice = ReprocessChoiceDialogFX.showDialog(PamController.getMainStage(), choices);
-			return choice;
+			// this runs on a worker thread, but the dialog must be made on the FX thread. 
+			if (javafx.application.Platform.isFxApplicationThread()) {
+				return ReprocessChoiceDialogFX.showDialog(PamController.getMainStage(), choices);
+			}
+			java.util.concurrent.FutureTask<ReprocessStoreChoice> task = new java.util.concurrent.FutureTask<>(
+					() -> ReprocessChoiceDialogFX.showDialog(PamController.getMainStage(), choices));
+			javafx.application.Platform.runLater(task);
+			try {
+				return task.get();
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+				return null;
+			}
 		}
 		else {
 			// otherwise we'll need to show a dialog to let the user decide what to do 

@@ -831,6 +831,12 @@ final public class PamModel implements PamSettings {
 			mi.setToolTipText("Display detection data");
 			mi.setModulesMenuGroup(displaysGroup);
 			mi.addGUICompatabilityFlag(PamGUIManager.FX);
+
+			mi = PamModuleInfo.registerControlledUnit(clipDisplayFX.ClipDisplayControlFX.class.getName(), "Clip Display" );
+			mi.setToolTipText("Show sounds as a zoomable grid of spectrogram clips. The data can be anything which holds raw sound, "
+					+ "e.g. clip generator clips, clicks or deep learning detections");
+			mi.setModulesMenuGroup(displaysGroup);
+			mi.addGUICompatabilityFlag(PamGUIManager.FX);
 		}
 		/**
 		 ************* End Display Group ********************

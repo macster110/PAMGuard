@@ -273,35 +273,35 @@ public class GebcoNETCDF {
 	/**
 	 * @return the nLat
 	 */
-	protected int getnLat() {
+	public int getnLat() {
 		return nLat;
 	}
 
 	/**
 	 * @return the nLon
 	 */
-	protected int getnLon() {
+	public int getnLon() {
 		return nLon;
 	}
 
 	/**
 	 * @return the latRange
 	 */
-	protected double[] getLatRange() {
+	public double[] getLatRange() {
 		return latRange;
 	}
 
 	/**
 	 * @return the lonRange
 	 */
-	protected double[] getLonRange() {
+	public double[] getLonRange() {
 		return lonRange;
 	}
 
 	/**
 	 * @return the elevationRange
 	 */
-	protected double[] getElevationRange() {
+	public double[] getElevationRange() {
 		return elevationRange;
 	}
 

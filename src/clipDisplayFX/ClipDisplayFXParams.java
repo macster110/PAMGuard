@@ -1,4 +1,4 @@
-package clipgenerator.layoutFX;
+package clipDisplayFX;
 
 import java.io.Serializable;
 
@@ -30,6 +30,12 @@ public class ClipDisplayFXParams implements Serializable, Cloneable {
 	 * Channel map of clips to show. 0 shows all channels.
 	 */
 	public int displayChannels = 0;
+
+	/**
+	 * Long name of the data block shown on the display. Any data block whose data
+	 * units hold raw sound can be used, e.g. clips, clicks or deep learning detections.
+	 */
+	public String dataSourceName;
 
 	/**
 	 * Position of the display.

@@ -1,4 +1,4 @@
-package clipgenerator.layoutFX;
+package clipDisplayFX;
 
 import PamUtils.Coordinate3d;
 import PamUtils.PamCoordinate;
