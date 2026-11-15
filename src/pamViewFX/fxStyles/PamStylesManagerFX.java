@@ -231,6 +231,61 @@ public class PamStylesManagerFX {
 	}
 	
 	/**
+	 * The window style sheets last added to every window's scene.
+	 */
+	private List<String> windowSheets = new ArrayList<String>();
+
+	/**
+	 * True once the listener which styles new windows has been added.
+	 */
+	private boolean windowListenerAdded;
+
+	/**
+	 * Add the current style's window style sheets (see
+	 * {@link PamDefaultStyle#getWindowStylesheets()}) to every window, taking off the
+	 * ones added before, and make sure windows opened later get them too. JavaFX
+	 * thread only.
+	 */
+	private void updateWindowStylesheets() {
+		if (!PamGUIManager.isFX() || curStyle == null) {
+			return;
+		}
+		List<String> old = windowSheets;
+		windowSheets = curStyle.getWindowStylesheets();
+		for (javafx.stage.Window window : new ArrayList<javafx.stage.Window>(javafx.stage.Window.getWindows())) {
+			styleWindow(window, old);
+		}
+		if (!windowListenerAdded) {
+			windowListenerAdded = true;
+			javafx.stage.Window.getWindows().addListener((javafx.collections.ListChangeListener<javafx.stage.Window>) c -> {
+				while (c.next()) {
+					for (javafx.stage.Window window : c.getAddedSubList()) {
+						styleWindow(window, null);
+					}
+				}
+			});
+		}
+	}
+
+	/**
+	 * Swap the window style sheets on one window's scene.
+	 */
+	private void styleWindow(javafx.stage.Window window, List<String> oldSheets) {
+		Scene scene = window.getScene();
+		if (scene == null) {
+			return;
+		}
+		if (oldSheets != null) {
+			scene.getStylesheets().removeAll(oldSheets);
+		}
+		for (String sheet : windowSheets) {
+			if (!scene.getStylesheets().contains(sheet)) {
+				scene.getStylesheets().add(sheet);
+			}
+		}
+	}
+
+	/**
 	 * Set the default style
 	 */
 	public void setDefaultStyle() {
@@ -328,6 +383,7 @@ public class PamStylesManagerFX {
 			return;
 		}
 		updateUserAgentStylesheet();
+		updateWindowStylesheets();
 		/*
 		 * Copy the entries out before touching anything: applying a style can trigger
 		 * layout, which mustn't run while the weak map is locked.

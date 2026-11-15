@@ -315,4 +315,17 @@ public class PamDefaultStyle {
 		return null;
 	}
 
+	/**
+	 * Style sheets to add to the scene of every JavaFX window, on top of the user
+	 * agent style sheet. Used for colour modes which only exist as an override of
+	 * another theme (e.g. the red on black Night mode), so that windows which don't
+	 * add the PAMGuard style sheets themselves (alerts, the outside of dialogs) follow
+	 * the mode too. Only used by the JavaFX GUI.
+	 *
+	 * @return style sheet URLs, possibly empty.
+	 */
+	public ArrayList<String> getWindowStylesheets() {
+		return new ArrayList<String>();
+	}
+
 }

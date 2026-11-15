@@ -227,7 +227,7 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 		PamButton settingsButton=new PamButton(); 
 		settingsButton.getStyleClass().add("icon-button");
 //		settingsButton.setGraphic(PamGlyphDude.createPamGlyph(MaterialIcon.SETTINGS, Color.WHITE, PamGuiManagerFX.iconSize));
-		settingsButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", Color.WHITE, PamGuiManagerFX.iconSize));
+		settingsButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
 		settingsButton.setMaxSize(Double.MAX_VALUE,Double.MAX_VALUE);
 		settingsButton.getStyleClass().add("square-button");
 		settingsButton.setOnAction((change)->{
@@ -238,7 +238,7 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 		PamButton removeButton=new PamButton(); 
 		removeButton.getStyleClass().add("icon-button");
 //		removeButton.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.REMOVE, Color.WHITE, PamGuiManagerFX.iconSize));
-		removeButton.setGraphic(PamGlyphDude.createPamIcon("mdi2m-minus", Color.WHITE, PamGuiManagerFX.iconSize));
+		removeButton.setGraphic(PamGlyphDude.createPamIcon("mdi2m-minus", PamGuiManagerFX.iconSize));
 		removeButton.setMaxSize(Double.MAX_VALUE,Double.MAX_VALUE);
 		removeButton.setOnAction((change)->{
 			if (this.pamControlledUnit==null || this.pamControlledUnit.getPamModuleInfo()== null || this.pamControlledUnit.getPamModuleInfo().canRemove()){
@@ -253,7 +253,7 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 			//button to show the module's display, and to bring it back if its tab has been closed. 
 			PamButton displayButton=new PamButton(); 
 			displayButton.getStyleClass().add("icon-button");
-			displayButton.setGraphic(PamGlyphDude.createPamIcon("mdi2m-monitor", Color.WHITE, PamGuiManagerFX.iconSize));
+			displayButton.setGraphic(PamGlyphDude.createPamIcon("mdi2m-monitor", PamGuiManagerFX.iconSize));
 			displayButton.setMaxSize(Double.MAX_VALUE,Double.MAX_VALUE);
 			displayButton.getStyleClass().add("square-button");
 			displayButton.setTooltip(new javafx.scene.control.Tooltip("Show the display"));
@@ -442,7 +442,8 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 			this.holderPane = HolderPane; 
 			this.top= top; 
 
-			this.getStylesheets().addAll(PamController.getInstance().getGuiManagerFX().getPamSettingsCSS());
+			// registered, so that it is restyled when the colour mode changes.
+			pamViewFX.fxStyles.PamStylesManagerFX.getPamStylesManagerFX().styleNode(this, pamViewFX.fxStyles.PamStylesManagerFX.STYLE_SLIDING);
 
 			showButton=new PamButton(); 
 			showButton.setMaxWidth(Double.MAX_VALUE);

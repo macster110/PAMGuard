@@ -846,6 +846,24 @@ public class PamColors implements PamSettings {
 	}
 
 	/**
+	 * @return true if the JavaFX GUI draws its dialogs and settings panes light as
+	 *         well as its displays when the Day scheme is in use.
+	 */
+	public boolean isAllLightFX() {
+		return colorSettings != null && colorSettings.isAllLightFX();
+	}
+
+	/**
+	 * Set whether the JavaFX GUI draws its dialogs and settings panes light as well as
+	 * its displays when the Day scheme is in use. Call {@link #setColourScheme(String)}
+	 * afterwards to restyle.
+	 * @param allLight true for all light, false for light displays with dark dialogs.
+	 */
+	public void setAllLightFX(boolean allLight) {
+		colorSettings.setAllLightFX(allLight);
+	}
+
+	/**
 	 * Set the colour scheme by name and refresh all colours.
 	 * @param schemeName - the scheme name, e.g. ColourScheme.DAYSCHEME or ColourScheme.NIGHTSCHEME
 	 */

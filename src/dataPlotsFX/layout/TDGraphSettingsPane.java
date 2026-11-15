@@ -84,7 +84,7 @@ public class TDGraphSettingsPane extends DynamicSettingsPane<TDGraphParametersFX
 		super(ownerWindow);
 		this.tdGraph=tdGraph;
 		mainPane = createPane();
-		mainPane.getStylesheets().addAll(tdGraph.getTDDisplay().getCSSSettingsResource());
+		pamViewFX.fxStyles.PamStylesManagerFX.getPamStylesManagerFX().styleNode(mainPane, pamViewFX.fxStyles.PamStylesManagerFX.STYLE_SLIDING);
 		mainPane.getStyleClass().add("pane");
 	}
 	

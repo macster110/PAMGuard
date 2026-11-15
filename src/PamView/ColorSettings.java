@@ -29,6 +29,14 @@ public class ColorSettings implements Serializable, Cloneable{
 		 */
 		private boolean windowsLookAndFeel = false;
 
+		/**
+		 * In the JavaFX GUI with the Day scheme, draw the dialogs and sliding settings
+		 * panes light as well as the displays (the "Light" colour mode). False gives
+		 * the original "Light/Dark" mode, with dark dialogs and settings panes, and is
+		 * what settings written by older versions deserialise as.
+		 */
+		private boolean allLightFX = false;
+
 		public ColorSettings() {
 			super();
 			rebuildSchemes(colourBlindPalet);
@@ -136,6 +144,7 @@ public class ColorSettings implements Serializable, Cloneable{
 				if (colourSchemes == null || colourSchemes.size() == 0) {
 					newSettings = new ColorSettings();
 					newSettings.setWindowsLookAndFeel(windowsLookAndFeel);
+					newSettings.setAllLightFX(allLightFX);
 				}
 				return newSettings;
 			} catch (CloneNotSupportedException e) {
@@ -176,6 +185,22 @@ public class ColorSettings implements Serializable, Cloneable{
 		 */
 		public void setWindowsLookAndFeel(boolean windowsLookAndFeel) {
 			this.windowsLookAndFeel = windowsLookAndFeel;
+		}
+
+		/**
+		 * @return true if the JavaFX dialogs and settings panes are light with the Day
+		 *         scheme, rather than dark.
+		 */
+		public boolean isAllLightFX() {
+			return allLightFX;
+		}
+
+		/**
+		 * @param allLightFX true to draw the JavaFX dialogs and settings panes light with
+		 *                   the Day scheme, rather than dark.
+		 */
+		public void setAllLightFX(boolean allLightFX) {
+			this.allLightFX = allLightFX;
 		}
 
 		public String getColourBlindName() {

@@ -1,0 +1,19 @@
+/*
+ * The all light colour mode of the JavaFX GUI. Layered on top of the light Primer
+ * style sheets (primer-light + primer-pamguard) on the main GUI, the dialogs and the
+ * sliding settings panes, which are otherwise always dark. Changes the PAMGuard
+ * colours which primer-pamguard.css defines as dark whatever the theme.
+ *
+ * The block applies to every node under the scene or node the sheet is added to.
+ * '.root' is listed as well as '*' because the Primer sheets set the colours on
+ * '.root', which would otherwise win over '*' on the root node of a scene, e.g.
+ * the background of a dialog.
+ */
+*, .root, .gui-css-root {
+  -fx-darkbackground: -color-bg-default;
+  -fx-darkbackground-trans: rgba(255, 255, 255, 0.93);
+  -fx-pambackground: -color-bg-subtle;
+  -fx-highlight: -color-base-1;
+  -fx-text: -color-fg-default;
+  -fx-icon_col: -color-fg-default;
+}

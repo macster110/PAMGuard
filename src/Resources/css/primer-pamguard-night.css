@@ -1,0 +1,76 @@
+/*
+ * Night mode for the JavaFX GUI. Layered on top of the dark Primer style sheets
+ * (primer-dark + primer-pamguard + primer-pamguard-dark), it turns the grey/blue
+ * dark theme into dim red on black so that the screen does not spoil night vision,
+ * e.g. on the bridge of a ship at night. Only colours are changed.
+ *
+ * The block applies to every node under the scene or node the sheet is added to.
+ * '.root' is listed as well as '*' because the Primer sheets set the colours on
+ * '.root', which would otherwise win over '*' on the root node of a scene, e.g.
+ * the background of a dialog.
+ */
+*, .root, .gui-css-root {
+  -color-dark: #000000;
+  -color-light: #ff5a4a;
+  -color-base-0: #ff6a5a;
+  -color-base-1: #d84a3c;
+  -color-base-2: #b83a2e;
+  -color-base-3: #962e24;
+  -color-base-4: #74241c;
+  -color-base-5: #561a14;
+  -color-base-6: #3c120e;
+  -color-base-7: #2a0c09;
+  -color-base-8: #1a0605;
+  -color-base-9: #0c0202;
+  -color-accent-0: #ffb0a8;
+  -color-accent-1: #ff9086;
+  -color-accent-2: #f87064;
+  -color-accent-3: #e65446;
+  -color-accent-4: #cc3c30;
+  -color-accent-5: #a82a20;
+  -color-accent-6: #861e16;
+  -color-accent-7: #64140e;
+  -color-accent-8: #440c08;
+  -color-accent-9: #2a0604;
+  -color-success-fg: #c86a30;
+  -color-success-emphasis: #8a4418;
+  -color-success-muted: rgba(200, 106, 48, 0.4);
+  -color-success-subtle: rgba(200, 106, 48, 0.15);
+  -color-warning-fg: #d08a30;
+  -color-warning-emphasis: #8a5a14;
+  -color-warning-muted: rgba(208, 138, 48, 0.4);
+  -color-warning-subtle: rgba(208, 138, 48, 0.15);
+  -color-danger-fg: #ff5040;
+  -color-danger-emphasis: #c02818;
+  -color-danger-muted: rgba(255, 80, 64, 0.4);
+  -color-danger-subtle: rgba(255, 80, 64, 0.15);
+  -color-fg-default: #d8483a;
+  -color-fg-muted: #a8382c;
+  -color-fg-subtle: #7c2a20;
+  -color-fg-emphasis: #ff6a5a;
+  -color-bg-default: #000000;
+  -color-bg-overlay: #050101;
+  -color-bg-subtle: #120403;
+  -color-bg-inset: #000000;
+  -color-border-default: #4a140f;
+  -color-border-muted: #320c09;
+  -color-border-subtle: rgba(216, 72, 58, 0.12);
+  -color-shadow-default: #000000;
+  -color-neutral-emphasis-plus: #74241c;
+  -color-neutral-emphasis: #74241c;
+  -color-neutral-muted: rgba(116, 36, 28, 0.4);
+  -color-neutral-subtle: rgba(116, 36, 28, 0.12);
+  -color-accent-fg: #e65446;
+  -color-accent-emphasis: #a82a20;
+  -color-accent-muted: rgba(230, 84, 70, 0.4);
+  -color-accent-subtle: rgba(230, 84, 70, 0.15);
+
+  -fx-pambackground: #0c0202;
+  -fx-darkbackground: -color-bg-default;
+  -fx-darkbackground-trans: rgba(0, 0, 0, 0.92);
+  -fx-highlight: -color-base-6;
+  -fx-text: -color-fg-default;
+  -fx-icon_col: -color-fg-default;
+  -fx-highlight_border_settings: #e65446;
+  -fx-highlight_settings: #e65446;
+}

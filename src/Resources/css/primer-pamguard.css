@@ -371,7 +371,7 @@
  
 ****************************************************************/
 .scroll-pane {
-  -fx-background: #0d1117;
+  -fx-background: -color-bg-default;
   -fx-background-color: transparent;
 }
 

@@ -74,6 +74,17 @@ public class PamAtlantaStyle extends PamDefaultStyle {
 	 */
 	protected String primerPAMGuardDark = "/Resources/css/primer-pamguard-dark.css";
 
+	/**
+	 * Turns the dark sheets into dim red on black for the Night colour mode.
+	 */
+	protected String primerPAMGuardNight = "/Resources/css/primer-pamguard-night.css";
+
+	/**
+	 * Makes the PAMGuard colours which are dark in every theme light, for the Light
+	 * colour mode where the dialogs and settings panes are light too.
+	 */
+	protected String primerPAMGuardLight = "/Resources/css/primer-pamguard-light.css";
+
 	public PamAtlantaStyle() {
 		super.guiCSS = primerlight;
 		super.dialogCSS = primerdark;
@@ -88,9 +99,9 @@ public class PamAtlantaStyle extends PamDefaultStyle {
 	 * JavaFX Settings menu selects - fell through to the light sheet and appeared to
 	 * do nothing at all.
 	 * <p>
-	 * There is no red-on-black Primer sheet, so the Night scheme is drawn with the
-	 * same dark sheets as the Dark scheme rather than being left light. The Swing
-	 * GUI's style ({@link PamDefaultStyle}) does have a night override.
+	 * The Night scheme adds primer-pamguard-night.css on top of the dark sheets to
+	 * make them dim red on black. The Light colour mode adds primer-pamguard-light.css
+	 * and makes the dialogs and sliding panes light too (see {@link FXColourMode}).
 	 */
 	@Override
 	public ArrayList<String> getGUICSS() {
@@ -107,25 +118,57 @@ public class PamAtlantaStyle extends PamDefaultStyle {
 			// recolours the PAMGuard specific parts of primerPAMGuard for a dark background
 			addSheet(cssStyles, primerPAMGuardDark);
 		}
+		else if (FXColourMode.isAllLight()) {
+			addSheet(cssStyles, primerPAMGuardLight);
+		}
+		addNightSheet(cssStyles);
 		return cssStyles;
 	}
 
+	/**
+	 * Dialogs are dark, except in the Light colour mode.
+	 */
 	@Override
 	public ArrayList<String> getDialogCSS() {
-		// the dialogs are always dark, whatever the colour scheme.
 		ArrayList<String> cssStyles = new ArrayList<String>();
+		if (FXColourMode.isAllLight()) {
+			addSheet(cssStyles, primerlight);
+			addSheet(cssStyles, primerPAMGuard);
+			addSheet(cssStyles, primerPAMGuardLight);
+			return cssStyles;
+		}
 		addSheet(cssStyles, primerdark);
 		addSheet(cssStyles, primerPAMGuard);
 		addSheet(cssStyles, primerPAMGuardDark);
+		addNightSheet(cssStyles);
 		return cssStyles;
 	}
 
+	/**
+	 * The sliding panes are dark, except in the Light colour mode - see
+	 * PamDefaultStyle.getSlidingDialogCSS(). They sit inside the main GUI, so in the
+	 * Light mode they only need the light PAMGuard colours.
+	 */
 	@Override
 	public ArrayList<String> getSlidingDialogCSS() {
-		// as are the sliding panes - see PamDefaultStyle.getSlidingDialogCSS().
 		ArrayList<String> cssStyles = new ArrayList<String>();
+		if (FXColourMode.isAllLight()) {
+			addSheet(cssStyles, primerPAMGuardLight);
+			return cssStyles;
+		}
 		addSheet(cssStyles, primerPAMGuardDark);
+		addNightSheet(cssStyles);
 		return cssStyles;
+	}
+
+	/**
+	 * Add the red on black sheet if the Night colour mode is in use. It goes last so
+	 * that it wins over the dark sheets.
+	 */
+	private void addNightSheet(ArrayList<String> cssStyles) {
+		if (FXColourMode.getCurrent() == FXColourMode.NIGHT) {
+			addSheet(cssStyles, primerPAMGuardNight);
+		}
 	}
 
 	/**
@@ -133,6 +176,13 @@ public class PamAtlantaStyle extends PamDefaultStyle {
 	 * and small dialogs which don't add any style sheets of their own and would
 	 * otherwise be drawn with the standard JavaFX (Modena) look.
 	 */
+	@Override
+	public ArrayList<String> getWindowStylesheets() {
+		ArrayList<String> cssStyles = new ArrayList<String>();
+		addNightSheet(cssStyles);
+		return cssStyles;
+	}
+
 	@Override
 	public String getUserAgentStylesheet() {
 		return isDarkScheme() ? primerdark : primerlight;

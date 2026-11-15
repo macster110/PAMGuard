@@ -251,7 +251,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		});
 		
 		
-		hidingPaneLeft.getStylesheets().addAll(pamGuiManagerFX.getPamSettingsCSS());
+		pamViewFX.fxStyles.PamStylesManagerFX.getPamStylesManagerFX().styleNode(hidingPaneLeft, pamViewFX.fxStyles.PamStylesManagerFX.STYLE_SLIDING);
 
 		PamButton showButtonLeft=hidingPaneLeft.getShowButton();
 //		showButtonLeft.setGraphic(PamGlyphDude.createPamGlyph(FontAwesomeIcon.BARS, Color.LIGHTGRAY, PamGuiManagerFX.iconSize));

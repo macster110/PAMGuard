@@ -334,19 +334,11 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		});
 		mediumMenu.getItems().addAll(waterItem, airItem);
 
-		// Dark mode toggle
-		CheckMenuItem darkModeItem = new CheckMenuItem("Dark Mode");
-		setMenuItemGraphic(darkModeItem, PamSettingsMenuPane.ICON_DARK_MODE);
-		ColourScheme currentScheme = PamColors.getInstance().getColourScheme();
-		darkModeItem.setSelected(currentScheme != null && currentScheme.isDark());
-		darkModeItem.selectedProperty().addListener((obs, oldVal, dark) -> {
-			// setColourScheme restyles the JavaFX displays and swaps the Swing look and feel.
-			String scheme = dark ? ColourScheme.DARKSCHEME : ColourScheme.DAYSCHEME;
-			PamColors.getInstance().setColourScheme(scheme);
-		});
+		// Colour scheme: Light, Light/Dark, Dark or Night. Also in General Settings.
+		Menu colourModeMenu = PamGuiActionsFX.createColourModeMenu(true);
 
 		settingsMenu.getItems().addAll(generalSettings, moduleSettings, new SeparatorMenuItem(),
-				mediumMenu, darkModeItem);
+				mediumMenu, colourModeMenu);
 
 		// ── Storage menu ──────────────────────────────────────────────────────
 		Menu storageMenu = new Menu("Storage");

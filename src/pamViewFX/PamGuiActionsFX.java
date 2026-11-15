@@ -34,6 +34,7 @@ import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Window;
 import pamViewFX.fxGlyphs.PamGlyphDude;
+import pamViewFX.fxStyles.FXColourMode;
 import pamViewFX.fxNodes.PamVBox;
 import pamViewFX.fxNodes.pamDialogFX.PamDialogFX;
 
@@ -67,6 +68,8 @@ public class PamGuiActionsFX {
 	public static final String ICON_XML = "mdi2c-code-tags";
 	public static final String ICON_WARNINGS = "mdi2a-alert-circle-outline";
 	public static final String ICON_LOG = "mdi2t-text-box-outline";
+
+	public static final String ICON_COLOUR_MODE = "mdi2t-theme-light-dark";
 
 	/**
 	 * Save settings to a new psfx file.
@@ -334,6 +337,8 @@ public class PamGuiActionsFX {
 		checkLogs.setOnAction(e -> PamSettingManager.getInstance().setCheckLogFileErrors(checkLogs.isSelected()));
 		logMenu.getItems().addAll(openLog, enableLog, checkLogs);
 
+		menuItems.add(createColourModeMenu(withIcons));
+		menuItems.add(new SeparatorMenuItem());
 		menuItems.add(time);
 		menuItems.add(timeZone);
 		menuItems.add(new SeparatorMenuItem());
@@ -344,6 +349,40 @@ public class PamGuiActionsFX {
 		menuItems.add(warnings);
 		menuItems.add(logMenu);
 		return menuItems;
+	}
+
+	/**
+	 * Make the colour scheme menu: Light, Light/Dark, Dark and Night. The current mode
+	 * is ticked each time the menu opens.
+	 * @param withIcon true to give the menu an icon.
+	 * @return the menu.
+	 */
+	public static Menu createColourModeMenu(boolean withIcon) {
+		Menu menu = new Menu("Colour scheme");
+		if (withIcon) {
+			menu.setGraphic(PamGlyphDude.createPamIcon(ICON_COLOUR_MODE, PamGuiManagerFX.iconSize));
+		}
+		javafx.scene.control.ToggleGroup group = new javafx.scene.control.ToggleGroup();
+		for (FXColourMode mode : FXColourMode.values()) {
+			javafx.scene.control.RadioMenuItem item = new javafx.scene.control.RadioMenuItem(mode.getLabel());
+			item.setToggleGroup(group);
+			item.setUserData(mode);
+			item.setOnAction(e -> {
+				if (FXColourMode.getCurrent() != mode) {
+					FXColourMode.setCurrent(mode);
+				}
+			});
+			menu.getItems().add(item);
+		}
+		Runnable tick = () -> {
+			FXColourMode current = FXColourMode.getCurrent();
+			for (MenuItem item : menu.getItems()) {
+				((javafx.scene.control.RadioMenuItem) item).setSelected(item.getUserData() == current);
+			}
+		};
+		tick.run();
+		menu.setOnShowing(e -> tick.run());
+		return menu;
 	}
 
 	private static MenuItem menuItem(String name, String icon, boolean withIcon, String tip) {

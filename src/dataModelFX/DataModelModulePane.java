@@ -140,7 +140,7 @@ public class DataModelModulePane  extends PamBorderPane {
 		name.setMaxWidth(ModuleNodeParams.DEFAULT_WIDTH + 10);
 		name.setMinHeight(32);
 		name.setPrefHeight(32);
-		name.setStyle("-fx-font-size: 11px; -fx-text-fill: white;");
+		name.setStyle("-fx-font-size: 11px; -fx-text-fill: -color-fg-default;");
 		PamVBox tile = new PamVBox(4);
 		tile.setAlignment(javafx.geometry.Pos.TOP_CENTER);
 		tile.getChildren().addAll(rect, name);

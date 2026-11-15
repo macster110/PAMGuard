@@ -39,6 +39,7 @@ import javafx.scene.text.TextAlignment;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import pamViewFX.fxGlyphs.PamGlyphDude;
+import pamViewFX.fxStyles.FXColourMode;
 import pamViewFX.fxNodes.PamButton;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamVBox;
@@ -284,27 +285,30 @@ public class PamSettingsMenuPane extends PamVBox {
 		checkForUpdates.setOnAction(e -> PamGuiActionsFX.checkForUpdates());
 		checkForUpdates.setGraphic(PamGlyphDude.createPamIcon(ICON_UPDATES, PamGuiManagerFX.iconSize));
 
-		// ---------- Dark mode toggle ----------
-		PamToggleSwitch darkModeToggle = new PamToggleSwitch("");
-		// Initialise toggle state from current colour scheme
-		ColourScheme currentScheme = PamColors.getInstance().getColourScheme();
-		darkModeToggle.setSelected(currentScheme != null && currentScheme.isDark());
-
-		darkModeToggle.selectedProperty().addListener((obs, oldVal, dark) -> {
-			// setColourScheme restyles the JavaFX displays and swaps the Swing look and feel.
-			String scheme = dark ? ColourScheme.DARKSCHEME : ColourScheme.DAYSCHEME;
-			PamColors.getInstance().setColourScheme(scheme);
+		// ---------- Colour scheme ----------
+		// Light, Light/Dark, Dark or Night. The same choice is in General Settings.
+		javafx.scene.control.ChoiceBox<FXColourMode> colourModeChoice = new javafx.scene.control.ChoiceBox<>();
+		colourModeChoice.getItems().setAll(FXColourMode.values());
+		colourModeChoice.setValue(FXColourMode.getCurrent());
+		colourModeChoice.setTooltip(new Tooltip("Light, light displays with dark dialogs, dark, or red on black night mode"));
+		colourModeChoice.setOnShowing(e -> colourModeChoice.setValue(FXColourMode.getCurrent()));
+		colourModeChoice.valueProperty().addListener((obs, oldVal, mode) -> {
+			if (mode != null && mode != FXColourMode.getCurrent()) {
+				FXColourMode.setCurrent(mode);
+			}
 		});
+		// keep the choice right if the mode is changed from the menu bar.
+		FXColourMode.modeProperty().addListener((o, a, b) -> colourModeChoice.setValue(b));
 
-		Label darkModeLabel = new Label("Dark Mode");
+		Label darkModeLabel = new Label("Colours");
 		darkModeLabel.setAlignment(Pos.CENTER_LEFT);
 		darkModeLabel.setPadding(new Insets(0, 0, 0, 15));
-		darkModeLabel.setGraphic(PamGlyphDude.createPamIcon(ICON_DARK_MODE, PamGuiManagerFX.iconSize));
+		darkModeLabel.setGraphic(PamGlyphDude.createPamIcon(PamGuiActionsFX.ICON_COLOUR_MODE, PamGuiManagerFX.iconSize));
 
 		PamHBox darkModeToggleBox = new PamHBox();
 		darkModeToggleBox.setAlignment(Pos.CENTER_RIGHT);
 		darkModeToggleBox.setSpacing(5);
-		darkModeToggleBox.getChildren().add(darkModeToggle);
+		darkModeToggleBox.getChildren().add(colourModeChoice);
 		darkModeToggleBox.setMaxWidth(Double.MAX_VALUE);
 
 		PamHBox darkModeBox = new PamHBox(darkModeLabel, darkModeToggleBox);
