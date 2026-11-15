@@ -77,7 +77,7 @@ public class NMEAStringsDisplayFX implements UserDisplayNodeFX {
 
 		status = new Label();
 		// the status goes on the right since the GUI's process controls float over the top left of a tab. 
-		status.setPadding(new Insets(8, 60, 8, 5));
+		status.setPadding(new Insets(8, 80, 8, 5));
 		status.setMaxWidth(Double.MAX_VALUE);
 		status.setAlignment(javafx.geometry.Pos.CENTER_RIGHT);
 
