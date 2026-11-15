@@ -306,12 +306,13 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 	 * then all displays in the controlled unit are asked for a settings pane. If a settings pane is returned which is not the 
 	 */
 	private void showModuleSettings(){
-		PamControlledGUIFX pamControlledGUI=(PamControlledGUIFX) this.pamControlledUnit.getGUI(PamGUIManager.FX);
-		
-		if (pamControlledGUI==null) {
-			System.err.println("PamControlledUnit: " +pamControlledUnit.getUnitType() + " does not have an FX GUI?");
+		if (pamControlledUnit == null) return;
+		if (!(this.pamControlledUnit.getGUI(PamGUIManager.FX) instanceof PamControlledGUIFX)) {
+			// no JavaFX GUI yet, so offer the module's standard (Swing) settings dialogs. 
+			pamViewFX.SwingSettingsFX.showSwingSettings(pamControlledUnit, this.getConnectionNodeBody());
 			return;
 		}
+		PamControlledGUIFX pamControlledGUI=(PamControlledGUIFX) this.pamControlledUnit.getGUI(PamGUIManager.FX);
 
 		//does the module have a dedicated settings pane? If so, show that. 
 		if (pamControlledGUI.getSettingsPane()!=null){

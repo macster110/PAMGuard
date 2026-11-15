@@ -440,7 +440,8 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	public static boolean showModuleSettings(PamControlledUnit controlledUnit) {
 		if (controlledUnit == null) return false;
 		if (!(controlledUnit.getGUI(PamGUIManager.FX) instanceof PamControlledGUIFX)) {
-			PamDialogFX.showWarning("The module " + controlledUnit.getUnitName() + " has no JavaFX settings");
+			// no JavaFX GUI yet, so offer the module's standard (Swing) settings dialogs. 
+			SwingSettingsFX.showSwingSettings(controlledUnit, null);
 			return false;
 		}
 		PamControlledGUIFX pamControlledUnit = (PamControlledGUIFX) controlledUnit.getGUI(PamGUIManager.FX);
@@ -974,8 +975,9 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		for (String name : names) {
 			msg.append("    ").append(name).append("\n");
 		}
-		msg.append("\nThese modules will still process and store data, but their displays and settings are only "
-				+ "available in the standard (Swing) PAMGuard user interface.");
+		msg.append("\nThese modules will still process and store data. Their settings open in the standard (Swing) "
+				+ "PAMGuard dialogs from the settings button on the module in the Data Model, but their displays are "
+				+ "only available in the standard PAMGuard user interface.");
 		if (!hasDisplay) {
 			// offer to add a display so that there is something to look at. 
 			msg.append("\n\nThere are no displays in this configuration. Would you like to add a Time Display now? "
