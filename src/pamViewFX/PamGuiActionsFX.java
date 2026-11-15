@@ -225,24 +225,24 @@ public class PamGuiActionsFX {
 	}
 
 	/**
-	 * Show the global time (PC clock, NTP, GPS time) settings. Swing dialog.
+	 * Show the global time (PC clock, NTP, GPS time) settings.
 	 */
 	public static void showTimeSettings() {
-		SwingUtilities.invokeLater(() -> PamController.getInstance().getGlobalTimeManager().showSettingsDialog(PamController.getMainFrame()));
+		PamController.getInstance().getGlobalTimeManager().showSettingsDialogFX();
 	}
 
 	/**
-	 * Show the display time zone settings. Swing dialog.
+	 * Show the display time zone settings.
 	 */
 	public static void showTimeZoneSettings() {
-		SwingUtilities.invokeLater(() -> CalendarControl.getInstance().showTimeZoneDialog(PamController.getMainFrame()));
+		CalendarControl.getInstance().showTimeZoneDialogFX();
 	}
 
 	/**
-	 * Change the order of modules. Swing dialog.
+	 * Change the order of modules.
 	 */
 	public static void showModuleOrdering() {
-		SwingUtilities.invokeLater(() -> PamController.getInstance().orderModules(PamController.getMainFrame()));
+		PamController.getInstance().orderModules(PamController.getMainFrame());
 	}
 
 	/**

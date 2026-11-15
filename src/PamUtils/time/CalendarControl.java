@@ -53,6 +53,16 @@ public class CalendarControl implements PamSettings{
 		return timeDisplayParameters.timeZone;
 	}
 
+	/**
+	 * Show the JavaFX time zone dialog. Call on the JavaFX thread. 
+	 */
+	public void showTimeZoneDialogFX() {
+		TimeDisplayParameters tzParams = TimeDialogsFX.showTimeZoneDialog(timeDisplayParameters);
+		if (tzParams != null) {
+			timeDisplayParameters = tzParams;
+		}
+	}
+
 	public void showTimeZoneDialog(Window window) {
 		TimeDisplayParameters tzParams = TimeZoneDisplayDialog.showDialog(window, timeDisplayParameters);
 		if (tzParams != null) {

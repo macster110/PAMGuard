@@ -81,6 +81,20 @@ public class GlobalTimeManager implements PamSettings {
 		return menuItem;
 	}
 
+	/**
+	 * Show the JavaFX global time settings dialog. Call on the JavaFX thread. 
+	 * @return true if the settings were changed. 
+	 */
+	public boolean showSettingsDialogFX() {
+		GlobalTimeParameters newSettings = TimeDialogsFX.showGlobalTimeDialog(this);
+		if (newSettings != null) {
+			globalTimeParameters = newSettings;
+			startSystem();
+			return true;
+		}
+		return false;
+	}
+
 	public boolean showSettingsDialog(Window frame) {
 		GlobalTimeParameters newSettings = GlobalTimeDialog.showDialog(frame, this);
 		if (newSettings != null) {

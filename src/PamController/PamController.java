@@ -1078,7 +1078,13 @@ public class PamController implements PamControllerInterface, PamSettings {
 	 */
 	@Override
 	public boolean orderModules(Frame parentFrame) {
-		int[] newOrder = ModuleOrderDialog.showDialog(this, parentFrame);
+		int[] newOrder;
+		if (PamGUIManager.isFX() && javafx.application.Platform.isFxApplicationThread()) {
+			newOrder = ModuleOrderDialogFX.showDialog(this);
+		}
+		else {
+			newOrder = ModuleOrderDialog.showDialog(this, parentFrame);
+		}
 		if (newOrder != null) {
 			// re-order the modules according the new list.
 			pamConfiguration.reOrderModules(newOrder);
