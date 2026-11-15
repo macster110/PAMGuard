@@ -207,6 +207,7 @@ public class Pamguard {
 		}
 		boolean showSplash = true;
 		boolean showStartupDialog = false;
+		boolean fxOption = false;
 		File openFile = null;
 		if (args != null) {
 			int nArgs = args.length;
@@ -313,7 +314,11 @@ public class Pamguard {
 					PamGUIManager.setType(PamGUIManager.SWING);
 				}
 				else if (anArg.equalsIgnoreCase("-fx")) {
-					PamGUIManager.setType(PamGUIManager.FX);
+					/*
+					 * The JavaFX GUI can be used. If the start up dialog is shown it has a switch 
+					 * to choose the JavaFX or Swing GUI, otherwise PAMGuard starts with JavaFX. 
+					 */
+					fxOption = true;
 				}
 				else if (anArg.equalsIgnoreCase("-nogui")) {
 					PamGUIManager.setType(PamGUIManager.NOGUI);
@@ -429,6 +434,8 @@ public class Pamguard {
 					System.out.println("\n--For command line deployment the following options are valid.\n");
 					System.out.println("  -r                           : run as a non GUI application");
 					System.out.println("  -psf <filename>              : use psf settings from filename");
+					System.out.println("  -c                           : choose the run mode and configuration in the start up dialog");
+					System.out.println("  -fx                          : allow the JavaFX interface. The start up dialog gets a switch to choose it");
 					System.out.println("  -port  <value>               : UDP connection port.");
 					System.out.println("  -devDebug  <str>             : Debug String - Used to activate debug messages.");
 					System.out.println("\n--Example command lines.\n");
@@ -464,8 +471,22 @@ public class Pamguard {
 				PamSettingManager.setStartupDialogUsed(true);
 			}
 		}
+		if (fxOption) {
+			if (runMode == PamController.RUN_REMOTE || PamGUIManager.getGUIType() == PamGUIManager.NOGUI) {
+				fxOption = false;
+			}
+			else if (PamSettingManager.remote_psf == null && openFile == null && !PamGUIManager.isFX()) {
+				// nothing says which configuration to use, so let the user choose that and the GUI. 
+				showStartupDialog = true;
+			}
+			else {
+				// the configuration is already known, so go straight to the JavaFX GUI. 
+				PamGUIManager.setType(PamGUIManager.FX);
+				fxOption = false;
+			}
+		}
 		if (showStartupDialog) {
-			runMode = runStartupDialog(runMode);
+			runMode = runStartupDialog(runMode, fxOption);
 		}
 		// any file opened from now on goes to a new instance of PAMGuard.
 		MacOSIntegration.setStartupComplete();
@@ -590,16 +611,17 @@ public class Pamguard {
 	 * and the settings file (normal mode) or database (viewer mode). Exits if the
 	 * user cancels.
 	 * @param runMode - the run mode from the other command line arguments.
+	 * @param offerJavaFX - true to show a switch in the dialog to choose the JavaFX or Swing GUI.
 	 * @return the run mode to use.
 	 */
-	private static int runStartupDialog(int runMode) {
+	private static int runStartupDialog(int runMode, boolean offerJavaFX) {
 		if (runMode == PamController.RUN_REMOTE || PamGUIManager.getGUIType() == PamGUIManager.NOGUI) {
 			// no GUI, so no dialog.
 			return runMode;
 		}
 		StartupSelection selection = null;
 		try {
-			selection = StartupDialogFX.showDialog(PamGUIManager.isFX());
+			selection = StartupDialogFX.showDialog(PamGUIManager.isFX(), offerJavaFX);
 		}
 		catch (Throwable e) {
 			/*
@@ -618,6 +640,9 @@ public class Pamguard {
 			System.exit(0);
 		}
 		PamSettingManager.setStartupDialogUsed(true);
+		if (selection.getJavaFX() != null) {
+			PamGUIManager.setType(selection.getJavaFX() ? PamGUIManager.FX : PamGUIManager.SWING);
+		}
 		if (selection.getDarkMode() != null) {
 			// light or dark mode chosen in the dialog, otherwise keep the saved scheme.
 			PamColors.setStartupScheme(selection.getDarkMode() ? ColourScheme.DARKSCHEME : ColourScheme.DAYSCHEME);

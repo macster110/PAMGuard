@@ -18,6 +18,8 @@ public class StartupSelection {
 
 	private final Boolean darkMode;
 
+	private Boolean javaFX;
+
 	public StartupSelection(int mode, File file) {
 		this(mode, file, null);
 	}
@@ -38,6 +40,20 @@ public class StartupSelection {
 	 * @return true or false if the user chose dark or light mode, or null if they
 	 * didn't, in which case PAMGuard keeps the colour scheme it was last closed with.
 	 */
+	/**
+	 * @return true for the JavaFX GUI, false for Swing, or null if the dialog didn't offer the choice. 
+	 */
+	public Boolean getJavaFX() {
+		return javaFX;
+	}
+
+	/**
+	 * @param javaFX true for the JavaFX GUI, false for Swing, or null if there was no choice. 
+	 */
+	public void setJavaFX(Boolean javaFX) {
+		this.javaFX = javaFX;
+	}
+
 	public Boolean getDarkMode() {
 		return darkMode;
 	}

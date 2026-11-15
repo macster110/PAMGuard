@@ -45,6 +45,7 @@ import javafx.scene.control.Toggle;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
@@ -97,7 +98,14 @@ public class StartupDialogFX {
 
 	private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm");
 
-	private final boolean fxGUI;
+	private boolean fxGUI;
+
+	/**
+	 * True if the dialog has a switch to choose between the JavaFX and Swing GUIs. 
+	 */
+	private final boolean offerJavaFX;
+
+	private PamToggleSwitch javaFXSwitch;
 
 	private final StartupHistory history;
 
@@ -128,9 +136,11 @@ public class StartupDialogFX {
 	 * Create the dialog.
 	 * @param fxGUI - true if PAMGuard will run the JavaFX GUI, false for Swing.
 	 */
-	private StartupDialogFX(boolean fxGUI) {
-		this.fxGUI = fxGUI;
+	private StartupDialogFX(boolean fxGUI, boolean offerJavaFX) {
 		this.history = StartupHistory.getInstance();
+		this.offerJavaFX = offerJavaFX;
+		// if the user can choose the GUI, start with the one they chose last time. 
+		this.fxGUI = offerJavaFX ? history.isJavaFX() : fxGUI;
 		history.importOldRecentLists();
 		createStage();
 	}
@@ -143,17 +153,30 @@ public class StartupDialogFX {
 	 * @return the selected mode and file, or null if the dialog was cancelled.
 	 */
 	public static StartupSelection showDialog(boolean fxGUI) {
+		return showDialog(fxGUI, false);
+	}
+
+	/**
+	 * Show the start up dialog and wait for the user to choose. Can be called from
+	 * any thread - JavaFX is started if it isn't already running.
+	 * @param fxGUI - true if PAMGuard will run with the JavaFX GUI, false for Swing. Ignored 
+	 * if offerJavaFX is true. 
+	 * @param offerJavaFX - true to show a switch to choose between the JavaFX and Swing GUIs. The 
+	 * choice is in {@link StartupSelection#getJavaFX()}. 
+	 * @return the selected mode and file, or null if the dialog was cancelled.
+	 */
+	public static StartupSelection showDialog(boolean fxGUI, boolean offerJavaFX) {
 		FXInitialiser.initialise();
 		// stop the FX thread closing when this window closes, as for the rest of PAMGuard.
 		Platform.setImplicitExit(false);
 		if (Platform.isFxApplicationThread()) {
-			return new StartupDialogFX(fxGUI).showAndWait();
+			return new StartupDialogFX(fxGUI, offerJavaFX).showAndWait();
 		}
 		final StartupSelection[] ans = new StartupSelection[1];
 		final CountDownLatch latch = new CountDownLatch(1);
 		Platform.runLater(() -> {
 			try {
-				ans[0] = new StartupDialogFX(fxGUI).showAndWait();
+				ans[0] = new StartupDialogFX(fxGUI, offerJavaFX).showAndWait();
 			}
 			catch (Exception e) {
 				e.printStackTrace();
@@ -298,6 +321,22 @@ public class StartupDialogFX {
 		openButton.setOnAction(e -> openSelected());
 		openButton.disableProperty().bind(table.getSelectionModel().selectedItemProperty().isNull());
 		HBox footer = new HBox(8, hint, spacer2, cancelButton, openButton);
+		if (offerJavaFX) {
+			// only offered when PAMGuard is started with the -fx option. 
+			javaFXSwitch = new PamToggleSwitch("JavaFX interface");
+			javaFXSwitch.setSelected(fxGUI);
+			javaFXSwitch.setTooltip(new Tooltip("Run PAMGuard with the new JavaFX interface. "
+					+ "Switch off to use the standard (Swing) interface."));
+			javaFXSwitch.selectedProperty().addListener((obs, o, fx) -> {
+				fxGUI = fx;
+				history.setJavaFX(fx);
+				history.save();
+				applyStyle(stage.getScene());
+				table.refresh();
+			});
+			footer.getChildren().add(0, javaFXSwitch);
+			HBox.setMargin(javaFXSwitch, new Insets(0, 12, 0, 0));
+		}
 		footer.setAlignment(Pos.CENTER_LEFT);
 		footer.getStyleClass().add("startup-footer");
 
@@ -809,6 +848,9 @@ public class StartupDialogFX {
 		history.save();
 		Boolean dark = colourSchemeChosen ? history.isDarkMode() : null;
 		result = new StartupSelection(mode, file, dark);
+		if (offerJavaFX) {
+			result.setJavaFX(fxGUI);
+		}
 		stage.close();
 	}
 

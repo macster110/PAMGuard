@@ -47,6 +47,7 @@ public class StartupHistory {
 
 	private static final String LINE_MODE = "MODE";
 	private static final String LINE_DARK = "DARK";
+	private static final String LINE_JAVAFX = "JAVAFX";
 	private static final String LINE_ENTRY = "E";
 	private static final String LINE_HIDDEN = "H";
 
@@ -66,6 +67,11 @@ public class StartupHistory {
 	 * True if the start up dialog is shown in dark mode.
 	 */
 	private boolean darkMode = false;
+
+	/**
+	 * True if the JavaFX GUI was chosen last time the start up dialog offered it. 
+	 */
+	private boolean javaFX = true;
 
 	private boolean loaded = false;
 
@@ -125,6 +131,9 @@ public class StartupHistory {
 		case LINE_DARK:
 			darkMode = "1".equals(bits[1].trim());
 			break;
+		case LINE_JAVAFX:
+			javaFX = "1".equals(bits[1].trim());
+			break;
 		case LINE_MODE:
 			lastMode = Integer.parseInt(bits[1].trim()) == MODE_VIEWER ? MODE_VIEWER : MODE_NORMAL;
 			break;
@@ -156,6 +165,8 @@ public class StartupHistory {
 			writer.write(LINE_MODE + "\t" + lastMode);
 			writer.newLine();
 			writer.write(LINE_DARK + "\t" + (darkMode ? "1" : "0"));
+			writer.newLine();
+			writer.write(LINE_JAVAFX + "\t" + (javaFX ? "1" : "0"));
 			writer.newLine();
 			for (StartupEntry e : entries) {
 				writer.write(String.format("%s\t%d\t%s\t%d\t%s", LINE_ENTRY, e.getMode(), e.isFavourite() ? "1" : "0",
@@ -320,6 +331,18 @@ public class StartupHistory {
 
 	public synchronized void setDarkMode(boolean darkMode) {
 		this.darkMode = darkMode;
+	}
+
+	/**
+	 * @return true if the JavaFX GUI was chosen last time the start up dialog offered it. 
+	 */
+	public synchronized boolean isJavaFX() {
+		load();
+		return javaFX;
+	}
+
+	public synchronized void setJavaFX(boolean javaFX) {
+		this.javaFX = javaFX;
 	}
 
 	public synchronized void setLastMode(int lastMode) {
