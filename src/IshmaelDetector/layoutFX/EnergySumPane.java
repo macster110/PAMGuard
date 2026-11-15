@@ -90,8 +90,11 @@ public class EnergySumPane extends SettingsPane<IshDetParams> {
 	 */
 	private ControlField<Double> shortFilter;
 	
-	public static final double INSET_RIGHT = 170; 
-
+	/**
+	 * Width of the labels. The wider labels suit the JavaFX GUI. The Swing GUI shows this 
+	 * pane in its settings dialog too, so keeps the original width there. 
+	 */
+	public static final double INSET_RIGHT = PamController.PamGUIManager.isFX() ? 170 : 130;
 	public EnergySumPane(EnergySumControl ishEnergyControl) {
 		super(null);
 		this.ishEnergyControl=ishEnergyControl; 

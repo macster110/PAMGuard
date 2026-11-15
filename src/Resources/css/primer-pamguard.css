@@ -20,6 +20,30 @@
     -fx-font-family: "Ubuntu";
 }
 
+/*
+ * The JavaFX GUI uses Primer as the base style of every window, in place of the
+ * standard JavaFX (Modena) style. Some PAMGuard code and third party controls
+ * (e.g. the ControlsFX range slider) use Modena's colour names, so give those
+ * names Primer colours. Without these JavaFX logs "cannot be cast to Paint"
+ * warnings and draws those parts with no colour. 
+ */
+.root, .gui-css-root {
+    -fx-background: -color-bg-default;
+    -fx-control-inner-background: -color-bg-default;
+    -fx-color: -color-bg-subtle;
+    -fx-body-color: -color-bg-subtle;
+    -fx-hover-base: -color-bg-subtle;
+    -fx-pressed-base: -color-bg-inset;
+    -fx-outer-border: -color-border-default;
+    -fx-inner-border: -color-border-muted;
+    -fx-text-box-border: -color-border-default;
+    -fx-shadow-highlight-color: transparent;
+    -fx-text-background-color: -color-fg-default;
+    -fx-mark-color: -color-fg-default;
+    -fx-focus-color: -color-accent-emphasis;
+    -fx-accent: -color-accent-emphasis;
+}
+
 
 /*******************************************************************************
  *                                                                             *

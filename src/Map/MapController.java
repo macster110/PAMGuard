@@ -301,4 +301,12 @@ public class MapController extends PamControlledUnit implements PamSettings {
 		this.mapControlSettings = (MapControlSettings) pamControlledUnitSettings.getSettings();
 		return true;
 	}
+
+	/**
+	 * @return the map process, which holds the map comments. 
+	 */
+	public MapProcess getMapProcess() {
+		return mapProcess;
+	}
+
 }

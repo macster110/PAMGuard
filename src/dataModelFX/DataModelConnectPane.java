@@ -153,11 +153,25 @@ public class DataModelConnectPane extends ConnectionPane {
 			if (autoPlaced) {
 				// modules had no saved positions so lay them out by data flow. 
 				autoPlaced = false;
-				javafx.application.Platform.runLater(this::tidyLayout);
-				// some modules only connect to their data source after everything else has been set up. 
-				javafx.animation.PauseTransition later = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(2));
-				later.setOnFinished(e -> tidyLayout());
-				later.play();
+				javafx.application.Platform.runLater(() -> {
+					tidyLayout();
+					tidiedConnections = getConnectionSignature();
+				});
+				/*
+				 * Some modules (e.g. Whistle and Moan) only connect to their data source some time after 
+				 * everything else has been set up. Keep checking for a while and lay the modules out 
+				 * again whenever the connections change. 
+				 */
+				javafx.animation.Timeline recheck = new javafx.animation.Timeline(
+						new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1), e -> {
+							String connections = getConnectionSignature();
+							if (!connections.equals(tidiedConnections)) {
+								tidiedConnections = connections;
+								tidyLayout();
+							}
+						}));
+				recheck.setCycleCount(20);
+				recheck.play();
 			}
 			break;
 			//			case PamControllerInterface.INITIALIZATION_COMPLETE:
@@ -381,6 +395,45 @@ public class DataModelConnectPane extends ConnectionPane {
 	 * from left to right, each one to the right of the module its data comes from. Modules with no 
 	 * data connections (e.g. the database and displays) are placed in rows underneath. 
 	 */
+	/**
+	 * The module connections when the modules were last laid out automatically. 
+	 */
+	private String tidiedConnections = "";
+
+	/**
+	 * @return a string which lists the data source of every process in every module, which 
+	 * changes when any module connects to a different source. 
+	 */
+	private String getConnectionSignature() {
+		StringBuilder sb = new StringBuilder();
+		PamController pamController = PamController.getInstance();
+		for (int i = 0; i < pamController.getNumControlledUnits(); i++) {
+			PamControlledUnit unit = pamController.getControlledUnit(i);
+			sb.append(unit.getUnitName()).append(':');
+			for (int j = 0; j < unit.getNumPamProcesses(); j++) {
+				PamguardMVC.PamProcess process = unit.getPamProcess(j);
+				if (process != null && process.getParentDataBlock() != null) {
+					sb.append(process.getParentDataBlock().getLongDataName()).append(',');
+				}
+			}
+			sb.append(';');
+		}
+		// and the connections drawn in the data model, which can appear later. 
+		for (ConnectionNode node : getAllConnectionNodes()) {
+			if (!(node instanceof ModuleConnectionNode) || ((ModuleConnectionNode) node).getPamControlledUnit() == null) {
+				continue;
+			}
+			sb.append(((ModuleConnectionNode) node).getPamControlledUnit().getUnitName()).append('<');
+			for (ConnectionNode parent : getParentConnectionNodes((ModuleConnectionNode) node)) {
+				if (parent instanceof ModuleConnectionNode && ((ModuleConnectionNode) parent).getPamControlledUnit() != null) {
+					sb.append(((ModuleConnectionNode) parent).getPamControlledUnit().getUnitName()).append(',');
+				}
+			}
+			sb.append(';');
+		}
+		return sb.toString();
+	}
+
 	public void tidyLayout() {
 		ArrayList<ConnectionNode> nodes = getAllConnectionNodes(); 
 		ArrayList<ModuleConnectionNode> moduleNodes = new ArrayList<ModuleConnectionNode>();

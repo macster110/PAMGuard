@@ -304,4 +304,15 @@ public class PamDefaultStyle {
 		return cssStyles;
 	}
 
+	/**
+	 * The style sheet to use as the JavaFX user agent style sheet, i.e. the base
+	 * style of every JavaFX window. Only used by the JavaFX GUI.
+	 *
+	 * @return the user agent style sheet, or null to leave the JavaFX default
+	 *         (Modena) alone, which is what the Swing GUI needs.
+	 */
+	public String getUserAgentStylesheet() {
+		return null;
+	}
+
 }

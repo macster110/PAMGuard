@@ -30,11 +30,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 
+import PamController.PamGUIManager;
 import PamView.ColourScheme;
 import PamView.PamColors;
 
@@ -190,6 +192,42 @@ public class PamStylesManagerFX {
 	 */
 	public void setCurStyle(PamDefaultStyle newStyle) {
 		curStyle = newStyle;
+		updateUserAgentStylesheet();
+	}
+
+	/**
+	 * The user agent style sheet last set, so that it's only changed when needed.
+	 */
+	private String userAgentSheet;
+
+	/**
+	 * In the JavaFX GUI, make the current style the base style of every JavaFX
+	 * window. Without this, alerts and other windows which don't add the PAMGuard
+	 * style sheets themselves are drawn with the standard JavaFX (Modena) look.
+	 * Nothing changes in the Swing GUI, where JavaFX panes inside Swing dialogs
+	 * keep the default user agent style sheet.
+	 */
+	private void updateUserAgentStylesheet() {
+		if (!PamGUIManager.isFX() || curStyle == null) {
+			return;
+		}
+		String sheet = curStyle.getUserAgentStylesheet();
+		if (sheet == null || sheet.equals(userAgentSheet)) {
+			return;
+		}
+		userAgentSheet = sheet;
+		if (Platform.isFxApplicationThread()) {
+			Application.setUserAgentStylesheet(sheet);
+		}
+		else {
+			try {
+				Platform.runLater(() -> Application.setUserAgentStylesheet(sheet));
+			}
+			catch (IllegalStateException e) {
+				// JavaFX toolkit not started yet - it'll be set when the GUI starts.
+				userAgentSheet = null;
+			}
+		}
 	}
 	
 	/**
@@ -289,6 +327,7 @@ public class PamStylesManagerFX {
 			}
 			return;
 		}
+		updateUserAgentStylesheet();
 		/*
 		 * Copy the entries out before touching anything: applying a style can trigger
 		 * layout, which mustn't run while the weak map is locked.

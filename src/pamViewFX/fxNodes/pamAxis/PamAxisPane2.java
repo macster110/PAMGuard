@@ -201,7 +201,12 @@ public class PamAxisPane2 extends StackPane {
 		}
 		
 		//set the tick marks
-		axis.tickUnitProperty().bind(pamAxisFX.maxValProperty().subtract(pamAxisFX.minValProperty()).divide(10));
+		if (Double.isNaN(fixedTickUnit)) {
+			axis.tickUnitProperty().bind(pamAxisFX.maxValProperty().subtract(pamAxisFX.minValProperty()).divide(10));
+		}
+		else {
+			axis.setTickUnit(fixedTickUnit);
+		}
 		
 		//cramp labels?
 		axis.lowerBoundProperty().addListener((obsVal, oldVal, newVal)->{
@@ -217,6 +222,41 @@ public class PamAxisPane2 extends StackPane {
 	}
 	
 	
+	/**
+	 * Fixed spacing between tick marks, or NaN for the default of a tenth of the axis range. 
+	 */
+	private double fixedTickUnit = Double.NaN;
+
+	/**
+	 * Optional formatter for the tick labels. Null for plain numbers. 
+	 */
+	private java.util.function.DoubleFunction<String> labelFormatter;
+
+	/**
+	 * Set a fixed spacing between tick marks.
+	 * @param tickUnit - the spacing in axis units, or NaN to use a tenth of the axis range (the default). 
+	 */
+	public void setTickUnit(double tickUnit) {
+		if (Double.compare(tickUnit, fixedTickUnit) == 0) {
+			return;
+		}
+		fixedTickUnit = tickUnit;
+		setNumberAxisBinding();
+	}
+
+	/**
+	 * Set a formatter for the tick labels, e.g. to show times in minutes or hours. 
+	 * @param labelFormatter - the formatter, or null for plain numbers (the default). 
+	 */
+	public void setLabelFormatter(java.util.function.DoubleFunction<String> labelFormatter) {
+		this.labelFormatter = labelFormatter;
+		for (int i=0; i<axis.length; i++) {
+			if (axis[i] != null) {
+				axis[i].requestAxisLayout();
+			}
+		}
+	}
+
 	/**
 	 * Formats numbers on the axis. Actually quite hard - for example we want dB not to have a decimal points for ICI. 
 	 * @author Jamie Macaulay
@@ -251,6 +291,9 @@ public class PamAxisPane2 extends StackPane {
 				
 //				if (labelScale == 0 || labelScale == 1.) {
 				//System.out.println("Axis values: " + value); 
+					if (labelFormatter != null) {
+						return labelFormatter.apply(reverseAxis.get() ? -value.doubleValue() : value.doubleValue());
+					}
 					if (!reverseAxis.get()) return formatter.format(value);
 					else return formatter.format(-value.doubleValue());
 //				}

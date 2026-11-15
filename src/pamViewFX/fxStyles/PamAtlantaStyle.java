@@ -128,4 +128,14 @@ public class PamAtlantaStyle extends PamDefaultStyle {
 		return cssStyles;
 	}
 
+	/**
+	 * The JavaFX GUI uses the Primer theme for every window, including the alerts
+	 * and small dialogs which don't add any style sheets of their own and would
+	 * otherwise be drawn with the standard JavaFX (Modena) look.
+	 */
+	@Override
+	public String getUserAgentStylesheet() {
+		return isDarkScheme() ? primerdark : primerlight;
+	}
+
 }

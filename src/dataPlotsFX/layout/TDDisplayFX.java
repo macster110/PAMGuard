@@ -279,12 +279,23 @@ public class TDDisplayFX extends PamBorderPane {
 		addGUICSS(showButton);
 
 		//create the time axis for the display. 
-		timeAxis = new PamAxisFX(0, 1, 0, 1, 0, tdParametersFX.visibleTimeRange/1000., PamAxis.ABOVE_LEFT, null, PamAxis.LABEL_NEAR_CENTRE, null);
+		timeAxis = new PamAxisFX(0, 1, 0, 1, 0, tdParametersFX.visibleTimeRange/1000., PamAxis.ABOVE_LEFT, null, PamAxis.LABEL_NEAR_CENTRE, null) {
+			@Override
+			protected String formatValue(double val) {
+				if (timeAxisLabelUnit == 0) {
+					return super.formatValue(val);
+				}
+				return formatTimeAxisValue(val);
+			}
+		};
 		//timeScrollerFX.getTimeRangeSpinner().setTime(tdParametersFX.visibleTimeRange);
 		timeAxis.setCrampLabels(true);
 
 		//create the pane which holds the time axis
 		timeAxisPane=new PamAxisPane2(timeAxis, Side.TOP);
+		// tick spacing for long time ranges depends on the width. 
+		timeAxisPane.widthProperty().addListener((obs, o, n) -> setTimeAxisInterval());
+		timeAxisPane.setLabelFormatter(this::formatTimeAxisValue);
 		timeStamp=new Label();
 		MenuItem copyTime = new MenuItem("Copy date/time");
 		copyTime.setOnAction(e -> {
@@ -973,11 +984,77 @@ public class TDDisplayFX extends PamBorderPane {
 	}
 
 	/**
+	 * 0 to label the time axis in seconds, 60 for minutes or 3600 for hours. 
+	 */
+	private int timeAxisLabelUnit = 0;
+
+	/**
+	 * Tick intervals in seconds used when the time axis is labelled in minutes or hours. 
+	 */
+	private static final double[] TIME_INTERVALS = {60, 120, 300, 600, 900, 1200, 1800, 3600, 7200, 10800, 
+			14400, 21600, 43200, 86400, 172800, 604800};
+
+	/**
+	 * For long time ranges (over 10 minutes) put the time axis ticks on whole minutes or hours 
+	 * and label them as such. Shorter ranges keep the automatic ticks in seconds. 
+	 */
+	/**
+	 * Number format for the time axis labels when they are in seconds. 
+	 */
+	private final java.text.DecimalFormat secondsFormat = new java.text.DecimalFormat("#.##");
+
+	/**
+	 * Label for a value on the time axis. Long time ranges are labelled in minutes
+	 * or hours rather than in thousands of seconds. 
+	 * @param val - time in seconds from the start of the display.
+	 * @return the label.
+	 */
+	private String formatTimeAxisValue(double val) {
+		if (timeAxisLabelUnit == 0) {
+			return secondsFormat.format(val);
+		}
+		long secs = Math.round(val);
+		if (timeAxisLabelUnit == 3600) {
+			long h = secs / 3600, m = (secs % 3600) / 60;
+			return m == 0 ? h + "h" : String.format("%dh%02d", h, m);
+		}
+		return (secs / 60) + "m";
+	}
+
+	private void setTimeAxisInterval() {
+		double visSecs = tdParametersFX.visibleTimeRange / 1000.;
+		if (visSecs <= 600) {
+			timeAxisLabelUnit = 0;
+			timeAxis.setInterval(PamAxisFX.INTERVAL_AUTO);
+			if (timeAxisPane != null) {
+				timeAxisPane.setTickUnit(Double.NaN);
+			}
+			return;
+		}
+		double width = timeAxisPane == null ? 0 : timeAxisPane.getWidth();
+		if (width < 100) width = 800;
+		double minInterval = visSecs / Math.max(2, width / 80.);
+		double interval = TIME_INTERVALS[TIME_INTERVALS.length - 1];
+		for (double t : TIME_INTERVALS) {
+			if (t >= minInterval) {
+				interval = t;
+				break;
+			}
+		}
+		timeAxisLabelUnit = visSecs >= 7200 ? 3600 : 60;
+		timeAxis.setInterval(interval);
+		if (timeAxisPane != null) {
+			timeAxisPane.setTickUnit(interval);
+		}
+	}
+
+	/**
 	 * Set the time axis range based on visible range. 
 	 */
 	private void setTimeAxisRange(){
 		if (timeAxis!=null){
 			timeAxis.setRange(0, tdParametersFX.visibleTimeRange/1000.);
+			setTimeAxisInterval();
 			timeAxisPane.layout();
 			//timeAxisPane.repaint();
 		}

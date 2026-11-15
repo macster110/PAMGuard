@@ -180,6 +180,14 @@ public class MapDisplayFX extends PamBorderPane implements UserDisplayNodeFX, Pa
 		// settings
 		createSettingsPane();
 
+		// double click to add a map comment, as on the Swing map. 
+		mapCanvas.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, e -> {
+			if (e.getButton() == MouseButton.PRIMARY && e.getClickCount() == 2 && !e.isControlDown() 
+					&& !mapCanvas.isMeasureMode() && e.isStillSincePress()) {
+				addMapComment(mapCanvas.getProjector().panel2LL(e.getX(), e.getY()));
+			}
+		});
+
 		mapCanvas.addMapCanvasListener(new MapCanvasFX.MapCanvasListener() {
 			@Override
 			public void mouseMoved(LatLong latLong) {
@@ -233,9 +241,125 @@ public class MapDisplayFX extends PamBorderPane implements UserDisplayNodeFX, Pa
 		measureButton.selectedProperty().addListener((obs, o, n) -> mapCanvas.setMeasureMode(n));
 		measureButton.setPrefSize(32, 32);
 
-		PamVBox vBox = new PamVBox(zoomIn, zoomOut, centre, north, measureButton);
+		PamButton comment = createMapButton("mdi2c-comment-plus-outline", "Add a comment at the centre of the map. "
+				+ "\nYou can also double click on the map to add a comment there.");
+		comment.setOnAction(e -> addMapComment(mapCanvas.getMapCentre()));
+
+		PamVBox vBox = new PamVBox(zoomIn, zoomOut, centre, north, measureButton, comment, createTimeSlider());
 		vBox.setSpacing(4);
 		return vBox;
+	}
+
+	/**
+	 * Slider which sets the maximum time detection data are shown for, overriding the 
+	 * other settings. The same as the hidden slider on the Swing map. It's log scaled: 
+	 * the top shows all data and the bottom shows none. 
+	 */
+	private javafx.scene.Node createTimeSlider() {
+		javafx.scene.control.Slider slider = new javafx.scene.control.Slider(0, 1, 1);
+		slider.setOrientation(Orientation.VERTICAL);
+		slider.setPrefHeight(140);
+		slider.setMaxWidth(32);
+		Label timeLabel = new Label("All");
+		timeLabel.setStyle("-fx-text-fill: #202020; -fx-font-size: 10px;");
+		timeLabel.setMinWidth(Region.USE_PREF_SIZE);
+		slider.valueProperty().addListener((obs, o, n) -> {
+			double pos = n.doubleValue();
+			int maxTime = Math.max(1, simpleMap.getMapParameters().getDataShowTime());
+			if (pos >= 0.999) {
+				simpleMap.setHiddenSliderTime(null);
+				timeLabel.setText("All");
+			}
+			else if (pos <= 0.001) {
+				simpleMap.setHiddenSliderTime(0);
+				timeLabel.setText("None");
+			}
+			else {
+				int secs = (int) Math.max(1, Math.round(Math.exp(pos * Math.log(maxTime + 1.)) - 1));
+				simpleMap.setHiddenSliderTime(secs);
+				timeLabel.setText(shortDuration(secs));
+			}
+			mapCanvas.repaint(false);
+		});
+		Tooltip tip = new Tooltip("Maximum display time for all detection data on the map. "
+				+ "This overrides the other display time settings. Slide to the top to show all data.");
+		slider.setTooltip(tip);
+		timeLabel.setTooltip(tip);
+		PamVBox box = new PamVBox(PamGlyphDude.createPamIcon("mdi2c-clock-outline", PamGuiManagerFX.iconSize), slider, timeLabel);
+		box.setAlignment(Pos.CENTER);
+		box.setSpacing(2);
+		box.setPadding(new Insets(4, 0, 4, 0));
+		box.setMaxWidth(32);
+		box.setStyle("-fx-background-color: rgba(255,255,255,0.8); -fx-background-radius: 5;");
+		return box;
+	}
+
+	private static String shortDuration(int secs) {
+		if (secs < 120) return secs + "s";
+		if (secs < 7200) return Math.round(secs / 60.) + "m";
+		return String.format("%.1fh", secs / 3600.);
+	}
+
+	/**
+	 * Ask for a comment and add it to the map at the given position. 
+	 * @param latLong position of the comment. 
+	 */
+	private void addMapComment(LatLong latLong) {
+		if (latLong == null) {
+			return;
+		}
+		javafx.scene.control.TextInputDialog dialog = new javafx.scene.control.TextInputDialog();
+		dialog.setTitle("Map comment");
+		dialog.setHeaderText(null);
+		dialog.setContentText("Comment at " + latLong.formatLatitude() + ", " + latLong.formatLongitude());
+		dialog.getDialogPane().getStylesheets().addAll(
+				PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());
+		if (getScene() != null) {
+			dialog.initOwner(getScene().getWindow());
+		}
+		dialog.getEditor().setPrefColumnCount(40);
+		dialog.getEditor().textProperty().addListener((obs, o, n) -> {
+			if (n != null && n.length() > Map.MapComment.MAXCOMMENTLENGTH) {
+				dialog.getEditor().setText(n.substring(0, Map.MapComment.MAXCOMMENTLENGTH));
+			}
+		});
+		java.util.Optional<String> result = dialog.showAndWait();
+		if (result.isPresent() && result.get().trim().length() > 0) {
+			Map.MapComment mapComment = new Map.MapComment(mapCanvas.getMapTime(), latLong, result.get().trim());
+			showMapComments();
+			mapController.getMapProcess().getMapCommentDataBlock().addPamData(mapComment);
+			mapCanvas.repaint(false);
+		}
+	}
+
+	/**
+	 * Make sure map comments are drawn on the map and kept for as long as the map
+	 * shows data. Otherwise a comment the user has just added could disappear
+	 * straight away, because nothing asks for the comment data to be kept.
+	 */
+	private void showMapComments() {
+		try {
+			PamguardMVC.PamDataBlock commentBlock = mapController.getMapProcess().getMapCommentDataBlock();
+			Map.MapDetectionData detData = simpleMap.getMapDetectionsManager().findDetectionData(commentBlock);
+			if (detData == null) {
+				return;
+			}
+			boolean changed = false;
+			if (!detData.select) {
+				detData.select = true;
+				changed = true;
+			}
+			if (detData.getDisplayMilliseconds() <= 0 && !detData.allAvailable) {
+				detData.setDisplayMilliseconds(Math.max(1, simpleMap.getMapParameters().getDataShowTime()) * 1000L);
+				changed = true;
+			}
+			if (changed) {
+				simpleMap.getMapPanel().updateObservers();
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 	private PamButton createMapButton(String icon, String tip) {
@@ -433,7 +557,10 @@ public class MapDisplayFX extends PamBorderPane implements UserDisplayNodeFX, Pa
 		overlays.setOnAction(e -> {
 			showSettings(0);
 		});
-		contextMenu.getItems().addAll(options, overlays, new SeparatorMenuItem());
+		LatLong commentPos = mapCanvas.getLastMouseLatLong();
+		MenuItem addComment = new MenuItem("Add map comment here...");
+		addComment.setOnAction(e -> addMapComment(commentPos != null ? commentPos : mapCanvas.getMapCentre()));
+		contextMenu.getItems().addAll(options, overlays, addComment, new SeparatorMenuItem());
 
 		simpleMap.getMapDetectionsManager().createBlockList();
 		ArrayList<MapDetectionData> mddList = simpleMap.getMapDetectionsManager().getMapDetectionDatas();

@@ -298,6 +298,10 @@ public class WarnOnceDialogFX {
 				dontShowAgainThisSess = new CheckBox();
 				dontShowAgainThisSess.setText("Don't show again this session");
 
+				// don't let the check boxes be cut short when a style has wider controls. 
+				dontShowAgain.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+				dontShowAgainThisSess.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+
 				checkBoxPane = new PamHBox(); 
 				checkBoxPane.getChildren().addAll(dontShowAgain, dontShowAgainThisSess); 
 				checkBoxPane.setSpacing(15); 
@@ -308,6 +312,14 @@ public class WarnOnceDialogFX {
 		});
 		
 		alert.getDialogPane().getButtonTypes().addAll(buttonTypes);
+		// nor the buttons, and let the dialog grow to fit them all. 
+		for (ButtonType buttonType : buttonTypes) {
+			Node button = alert.getDialogPane().lookupButton(buttonType);
+			if (button instanceof javafx.scene.layout.Region) {
+				((javafx.scene.layout.Region) button).setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
+			}
+		}
+		alert.getDialogPane().setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
 		
 		
 		alert.getDialogPane().setContentText(htmlToText(message));

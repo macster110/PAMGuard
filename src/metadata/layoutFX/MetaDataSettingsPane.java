@@ -305,11 +305,11 @@ public class MetaDataSettingsPane extends SettingsPane<PamguardMetaData> {
 		textArea.setPrefRowCount(prefRows);
 		textArea.setWrapText(true);
 		textArea.setTooltip(new Tooltip(tooltipText));
-		// ensure the text area background matches the dark-themed text fields
-		textArea.setStyle(
-			"-fx-control-inner-background: -color-bg-default; " +
-			"-fx-text-fill: -color-fg-default;"
-		);
+		/*
+		 * No inline colours here: they referred to Atlanta theme colours which aren't defined 
+		 * in the other themes, which broke the text area's scroll bar styling (CSS warnings). 
+		 * The dialog style sheets colour text areas to match the text fields. 
+		 */
 		return textArea;
 	}
 
