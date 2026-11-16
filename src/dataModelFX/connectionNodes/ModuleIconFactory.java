@@ -196,13 +196,21 @@ public class ModuleIconFactory {
 		}
 		applyNightEffect(iconNode, pamViewFX.fxStyles.FXColourMode.getCurrent());
 		pamViewFX.fxStyles.FXColourMode.modeProperty().addListener((obs, oldVal, newVal) -> applyNightEffect(iconNode, newVal));
+		// the red covers just the icon, so redo it if the icon changes size. 
+		iconNode.layoutBoundsProperty().addListener((obs, oldVal, newVal) -> applyNightEffect(iconNode, pamViewFX.fxStyles.FXColourMode.getCurrent()));
 		return iconNode;
 	}
 
 	private static void applyNightEffect(Node iconNode, pamViewFX.fxStyles.FXColourMode mode) {
 		if (mode == pamViewFX.fxStyles.FXColourMode.NIGHT) {
-			// paint red wherever the icon is drawn, keeping its shape and transparency. 
-			javafx.scene.effect.ColorInput red = new javafx.scene.effect.ColorInput(-1000, -1000, 3000, 3000, NIGHT_ICON_COLOUR);
+			/*
+			 * Paint red wherever the icon is drawn, keeping its shape and transparency. The 
+			 * red must only cover the icon: a bigger area makes the icon's bounds bigger, so 
+			 * it takes mouse clicks far from the module. 
+			 */
+			javafx.geometry.Bounds b = iconNode.getLayoutBounds();
+			javafx.scene.effect.ColorInput red = new javafx.scene.effect.ColorInput(b.getMinX(), b.getMinY(), 
+					Math.max(1, b.getWidth()), Math.max(1, b.getHeight()), NIGHT_ICON_COLOUR);
 			iconNode.setEffect(new javafx.scene.effect.Blend(javafx.scene.effect.BlendMode.SRC_ATOP, null, red));
 		}
 		else {
