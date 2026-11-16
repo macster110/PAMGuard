@@ -525,6 +525,9 @@ public class DetectionGroupDisplay extends PamBorderPane {
 	 */
 	public boolean setDetectionPlot(String plotName) {
 	
+		if (currentDataInfo == null) {
+			return false;
+		}
 		//set the current detection plot based in the name
 		boolean setOk = currentDataInfo.setCurrentDetectionPlot(plotName);
 		

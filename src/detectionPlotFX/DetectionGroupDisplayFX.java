@@ -235,7 +235,13 @@ public class DetectionGroupDisplayFX extends DetectionGroupDisplay  implements U
 		 * one type of detection to another e.g. whistle to click, then the click does not revert to showing a waveform instead 
 		 * of spectrum. 
 		 */
-		if (currentDetection!=null) {
+		/*
+		 * There may be no data info, or no plot in it, e.g. if the last detection was one this 
+		 * display can't show (several detection displays can be connected to the time display). 
+		 */
+		if (currentDetection!=null && currentDetection.getParentDataBlock()!=null
+				&& this.getDetectionDisplay().getCurrentDataInfo()!=null
+				&& this.getDetectionDisplay().getCurrentDataInfo().getCurrentDetectionPlot()!=null) {
 			//save the current selected detection plot for the particular type of data unit.
 			String detectionPlotName = 	this.getDetectionDisplay().getCurrentDataInfo().getCurrentDetectionPlot().getName();
 			//			System.out.println("SET CURRENT DETECTION PLOT TO USE IS: " + detectionPlotName);
