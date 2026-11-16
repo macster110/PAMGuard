@@ -36,6 +36,43 @@ public class LtsaProcess extends PamProcess {
 //		addOutputDataBlock(longerLtsaDataBlock);
 	}
 
+	/**
+	 * The LTSA takes FFT data, so it can be connected to an FFT module, e.g. in the JavaFX 
+	 * data model. 
+	 */
+	@Override
+	public java.util.ArrayList<Class<? extends PamDataUnit>> getCompatibleDataUnits() {
+		java.util.ArrayList<Class<? extends PamDataUnit>> list = new java.util.ArrayList<Class<? extends PamDataUnit>>();
+		list.add(FFTDataUnit.class);
+		return list;
+	}
+
+	/**
+	 * When the source is changed from outside the module (e.g. by connecting modules in the 
+	 * JavaFX data model) remember it in the settings, otherwise the next set up would put the 
+	 * old source back. Nothing changes when the source is the one already in the settings. 
+	 */
+	@Override
+	public void setParentDataBlock(PamguardMVC.PamDataBlock newParentDataBlock, boolean reThread) {
+		super.setParentDataBlock(newParentDataBlock, reThread);
+		if (!(newParentDataBlock instanceof FFTDataBlock) || newParentDataBlock instanceof LtsaDataBlock) {
+			return;
+		}
+		LtsaParameters params = ltsaControl.getLtsaParameters();
+		String name = newParentDataBlock.getLongDataName();
+		if (name == null || name.equals(params.dataSource)) {
+			return;
+		}
+		LtsaParameters newParams = params.clone();
+		newParams.dataSource = name;
+		int available = newParentDataBlock.getSequenceMap();
+		if (newParams.channelMap == 0 || (newParams.channelMap & ~available) != 0) {
+			// measure all the channels of the new source. 
+			newParams.channelMap = available;
+		}
+		ltsaControl.setLtsaParameters(newParams);
+	}
+
 	@Override
 	public void prepareProcess() {
 		super.prepareProcess();

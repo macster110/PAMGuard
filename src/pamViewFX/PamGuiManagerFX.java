@@ -952,7 +952,8 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	}
 
 	/**
-	 * When the user adds an LTSA module, add a Time Display which shows the LTSA over a long time range. 
+	 * When the user adds an LTSA module, start it measuring all channels of an FFT source. It's up to the 
+	 * user to add a Time Display to show it. 
 	 */
 	private void checkNewLtsaModule() {
 		ArrayList<PamControlledUnit> ltsas = pamController.findControlledUnits(ltsa.LtsaControl.class);
@@ -962,9 +963,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 			return;
 		}
 		ltsa.LtsaControl ltsaControl = (ltsa.LtsaControl) ltsas.get(ltsas.size() - 1);
-		javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.millis(750));
-		wait.setOnFinished(e -> addLtsaDisplay(ltsaControl));
-		wait.play();
+		setDefaultLtsaSource(ltsaControl);
 	}
 
 	/**
@@ -979,6 +978,34 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	private String nextDisplayTabName;
 
 	/**
+	 * A new LTSA measures nothing until channels are chosen, so start it with all channels of 
+	 * its FFT source (or the first FFT data found). 
+	 * @param ltsaControl - the LTSA module. 
+	 */
+	private void setDefaultLtsaSource(ltsa.LtsaControl ltsaControl) {
+		// a new LTSA measures nothing until channels are chosen, so start with all channels of its FFT source. 
+		ltsa.LtsaParameters ltsaParams = ltsaControl.getLtsaParameters();
+		if (ltsaParams.channelMap == 0) {
+			PamguardMVC.PamDataBlock<?> fftSource = ltsaParams.dataSource == null ? null : 
+				pamController.getFFTDataBlock(ltsaParams.dataSource);
+			if (fftSource == null) {
+				for (PamguardMVC.PamDataBlock<?> block : pamController.getFFTDataBlocks()) {
+					if (!(block instanceof ltsa.LtsaDataBlock)) {
+						fftSource = block;
+						break;
+					}
+				}
+			}
+			if (fftSource != null && !(fftSource instanceof ltsa.LtsaDataBlock)) {
+				ltsa.LtsaParameters newParams = ltsaParams.clone();
+				newParams.dataSource = fftSource.getLongDataName();
+				newParams.channelMap = fftSource.getSequenceMap();
+				ltsaControl.setLtsaParameters(newParams);
+			}
+		}
+	}
+
+	/**
 	 * Add a Time Display which shows an LTSA. 
 	 * @param ltsaControl - the LTSA module. 
 	 * @return true if a display was added. 
@@ -990,26 +1017,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 			while (pamController.findControlledUnit(dataPlotsFX.TDDisplayController.class, name) != null) {
 				name = ltsaControl.getUnitName() + " Display " + (i++);
 			}
-			// a new LTSA measures nothing until channels are chosen, so start with all channels of its FFT source. 
-			ltsa.LtsaParameters ltsaParams = ltsaControl.getLtsaParameters();
-			if (ltsaParams.channelMap == 0) {
-				PamguardMVC.PamDataBlock<?> fftSource = ltsaParams.dataSource == null ? null : 
-					pamController.getFFTDataBlock(ltsaParams.dataSource);
-				if (fftSource == null) {
-					for (PamguardMVC.PamDataBlock<?> block : pamController.getFFTDataBlocks()) {
-						if (!(block instanceof ltsa.LtsaDataBlock)) {
-							fftSource = block;
-							break;
-						}
-					}
-				}
-				if (fftSource != null && !(fftSource instanceof ltsa.LtsaDataBlock)) {
-					ltsa.LtsaParameters newParams = ltsaParams.clone();
-					newParams.dataSource = fftSource.getLongDataName();
-					newParams.channelMap = fftSource.getSequenceMap();
-					ltsaControl.setLtsaParameters(newParams);
-				}
-			}
+			setDefaultLtsaSource(ltsaControl);
 			// the LTSA display gets a tab of its own. 
 			nextDisplayTabName = ltsaControl.getUnitName();
 			java.util.function.Supplier<dataPlotsFX.layout.TDDisplayFX> display = PamAutoConfigUtils.addTimeDisplay(name);
