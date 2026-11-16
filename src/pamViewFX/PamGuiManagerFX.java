@@ -235,8 +235,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		sceneRoot.setSpacing(0);
 		sceneRoot.setPadding(javafx.geometry.Insets.EMPTY);
 		PamVBox.setVgrow(stages.get(0), javafx.scene.layout.Priority.ALWAYS);
-		String _os = System.getProperty("os.name", "").toLowerCase();
-		if (_os.contains("mac")) {
+		if (screenMenuBar) {
 			systemMenuBar.setMinHeight(0); //needed or we end up with a little bar at the top of the window
 		}
 		//on macOS the menu bar moves to the top of the screen, on Windows and Linux it sits at the top of the window. 
@@ -265,14 +264,32 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 	 * the call entirely to keep the node graph clean.
 	 */
 	private static void setMenuItemGraphic(MenuItem item, String iconCode) {
-		if (!IS_MACOS) {
+		if (!screenMenuBar) {
 			item.setGraphic(PamGlyphDude.createPamIcon(iconCode, iconSize));
 		}
 	}
 
+	/**
+	 * True if the menus are in the macOS menu bar at the top of the screen rather
+	 * than at the top of the PAMGuard window.
+	 */
+	private static boolean screenMenuBar = IS_MACOS;
+
+	/**
+	 * Can the menus go in the macOS menu bar at the top of the screen? Not if
+	 * JavaFX was started from Swing (a JFXPanel), which happens when the start up
+	 * dialog is shown: the Swing toolkit then owns the macOS menu bar and the
+	 * JavaFX menus never appear there. They go at the top of the window instead,
+	 * as on Windows and Linux.
+	 */
+	private static boolean canUseScreenMenuBar() {
+		return IS_MACOS && !PamView.FXInitialiser.haveRun;
+	}
+
 	private MenuBar buildSystemMenuBar() {
+		screenMenuBar = canUseScreenMenuBar();
 		MenuBar menuBar = new MenuBar();
-		menuBar.setUseSystemMenuBar(true);
+		menuBar.setUseSystemMenuBar(screenMenuBar);
 
 		// ── File menu ─────────────────────────────────────────────────────────
 		Menu fileMenu = new Menu("File");
@@ -294,7 +311,7 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 		Menu generalSettings = new Menu("General Settings");
 		setMenuItemGraphic(generalSettings, PamSettingsMenuPane.ICON_GENERAL_SETTINGS);
 		// General settings opens via the first PamGuiFX if available
-		PamGuiActionsFX.createGeneralSettingsItems(generalSettings.getItems(), !IS_MACOS);
+		PamGuiActionsFX.createGeneralSettingsItems(generalSettings.getItems(), !screenMenuBar);
 
 		// Module Settings submenu — populated dynamically when the menu is shown
 		Menu moduleSettings = new Menu("Module Settings");
