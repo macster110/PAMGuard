@@ -95,6 +95,8 @@ public class DataModelModulePane  extends PamBorderPane {
 		StackPane holder = new StackPane(searchField);
 		holder.setPadding(new Insets(8, 10, 8, 10));
 		PamStylesManagerFX.getPamStylesManagerFX().styleNode(holder, PamStylesManagerFX.STYLE_SLIDING);
+		// same background as the module list below it, so the search box doesn't sit on a light strip. 
+		holder.setStyle("-fx-background-color: -color-bg-default;");
 		return holder;
 	}
 

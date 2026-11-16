@@ -35,6 +35,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Modality;
@@ -211,7 +212,7 @@ public class ExportPaneFX {
 		root.getChildren().add(createExportSettingsPane());
 		root.getChildren().add(createDataOptionsPane());
 		root.getChildren().add(createDataBlocksPane());
-		root.getChildren().add(createProgressPane());
+		createProgressPane(); // progress is shown in the loading bar at the top of the window
 		root.getChildren().add(createButtonPane());
 
 		ScrollPane scrollPane = new ScrollPane(root);
@@ -234,8 +235,7 @@ public class ExportPaneFX {
 
 		// --- Format toggle buttons ---
 		HBox formatRow = new HBox(5);
-		formatRow.setAlignment(Pos.CENTER_LEFT);
-		formatRow.getChildren().add(new Label("Format:"));
+		formatRow.setAlignment(Pos.CENTER);
 
 		exportFormatGroup = new ToggleGroup();
 		int nExporters = exportManager.getNumExporters();
@@ -386,6 +386,8 @@ public class ExportPaneFX {
 		buttonBox.setPadding(new Insets(5, 0, 0, 0));
 
 		startButton = new Button("Export");
+		startButton.getStyleClass().add("accent");
+		startButton.setDefaultButton(true);
 		startButton.setOnAction(e -> startExport());
 
 		closeButton = new Button("Close");
@@ -446,7 +448,7 @@ public class ExportPaneFX {
 			HBox row = new HBox(8);
 			row.setAlignment(Pos.CENTER_LEFT);
 
-			CheckBox cb = new CheckBox(task.getName());
+			PamToggleSwitch cb = new PamToggleSwitch(task.getName());
 			cb.setSelected(task.isDoRun());
 			cb.setDisable(!task.canRun());
 
@@ -473,7 +475,10 @@ public class ExportPaneFX {
 						"Data selector for " + task.getName()));
 				settingsBtn.setOnAction(e -> task.callSettings());
 				entry.settingsButton = settingsBtn;
-				row.getChildren().addAll(cb, settingsBtn);
+				// settings buttons line up on the right. 
+				javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
+				HBox.setHgrow(spacer, Priority.ALWAYS);
+				row.getChildren().addAll(cb, spacer, settingsBtn);
 			} else {
 				row.getChildren().add(cb);
 			}
@@ -851,6 +856,7 @@ public class ExportPaneFX {
 		public void setTaskStatus(TaskMonitorData data) {
 			Platform.runLater(() -> {
 				updateProgressUI(data);
+				sendLoadProgress(data.taskStatus == TaskStatus.CRASHED || data.taskStatus == TaskStatus.INTERRUPTED);
 
 				if (data.taskStatus == TaskStatus.COMPLETE && !chainStarted) {
 					completeActiveTasks++;
@@ -864,6 +870,7 @@ public class ExportPaneFX {
 						statusLabel.setText("Export complete");
 						globalProgress.setProgress(1.0);
 						loadedProgress.setProgress(1.0);
+						sendLoadProgress(true);
 						enableControls();
 					}
 				} else if (data.taskStatus == TaskStatus.CRASHED
@@ -926,15 +933,66 @@ public class ExportPaneFX {
 	}
 
 	/**
+	 * Name of the export in the loading bar at the top of the PAMGuard window. A
+	 * constant, since the loading bar matches updates to tasks by name.
+	 */
+	private static final String LOAD_TASK_NAME = "Exporting data";
+
+	/**
+	 * Show the export progress in the loading bar at the top of the PAMGuard
+	 * window, the same place as the progress of data loading.
+	 * @param done - true when the export has finished, so the bar is removed.
+	 */
+	private void sendLoadProgress(boolean done) {
+		pamViewFX.PamGuiManagerFX gui = pamViewFX.PamGuiManagerFX.getInstance();
+		if (gui == null) {
+			return;
+		}
+		final double all = globalProgress.getProgress();
+		final double file = loadedProgress.getProgress();
+		final String status = statusLabel.getText();
+		final String fileText = currentFileLabel.getText();
+		pamViewFX.pamTask.PamTaskUpdate update = new pamViewFX.pamTask.PamTaskUpdate() {
+			@Override
+			public String getName() {
+				return LOAD_TASK_NAME;
+			}
+
+			@Override
+			public double getProgress() {
+				return all;
+			}
+
+			@Override
+			public double getProgress2() {
+				return file;
+			}
+
+			@Override
+			public String getProgressString() {
+				return status;
+			}
+
+			@Override
+			public String getProgressString2() {
+				return fileText == null ? "" : fileText.trim();
+			}
+		};
+		update.setDualProgressUpdate(true);
+		update.setStatus(done ? pamViewFX.pamTask.PamTaskUpdate.STATUS_DONE : pamViewFX.pamTask.PamTaskUpdate.STATUS_ANALYSING_FILES);
+		gui.notifyLoadProgress(update);
+	}
+
+	/**
 	 * Associates an export task with its check box and optional settings
 	 * button.
 	 */
 	private static class TaskCheckBoxEntry {
 		final OfflineTask task;
-		final CheckBox checkBox;
+		final PamToggleSwitch checkBox;
 		Button settingsButton;
 
-		TaskCheckBoxEntry(OfflineTask task, CheckBox checkBox) {
+		TaskCheckBoxEntry(OfflineTask task, PamToggleSwitch checkBox) {
 			this.task = task;
 			this.checkBox = checkBox;
 		}

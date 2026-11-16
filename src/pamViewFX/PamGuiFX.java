@@ -995,6 +995,8 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		// apply the standard dark background used by settings panes
 		leftPaneWrapper.setStyle("-fx-background-color: -fx-darkbackground");
 		leftPaneWrapper.getChildren().setAll(content);
+		// the hide button takes the user back to PAMGuard, so make it stand out as the way back. 
+		setLeftBackButtonAccent(true);
 		showingCustomLeftContent = true;
 		restoringLeftPane = false;
 		hidingPaneLeft.showHidePane(true);
@@ -1049,11 +1051,32 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 	 * onClose callback of the reprocess / export panes) or indirectly
 	 * via {@link #scheduleLeftPaneRestore()}.
 	 */
+	/**
+	 * Show the left pane's hide button as a blue (accent) button when it acts as
+	 * the back button of the export and reprocessing panes. 
+	 * @param accent - true for a blue button, false for the normal transparent one.
+	 */
+	private void setLeftBackButtonAccent(boolean accent) {
+		PamButton backButton = hidingPaneLeft.getHideButton();
+		if (backButton == null) return;
+		if (accent) {
+			backButton.setStyle("-fx-background-color: -color-accent-emphasis; -fx-background-radius: 0 5 5 0;");
+			backButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", Color.WHITE, PamGuiManagerFX.iconSize));
+			backButton.setTooltip(new javafx.scene.control.Tooltip("Back"));
+		}
+		else {
+			backButton.setStyle("");
+			backButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", PamGuiManagerFX.iconSize));
+			backButton.setTooltip(null);
+		}
+	}
+
 	private void restoreLeftPane() {
 		if (restoringLeftPane) {
 			return;
 		}
 		restoringLeftPane = true;
+		setLeftBackButtonAccent(false);
 
 		mainTabPane.setDisable(false);
 		if (sharedToolbar != null) {
