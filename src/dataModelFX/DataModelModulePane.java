@@ -418,8 +418,12 @@ public class DataModelModulePane  extends PamBorderPane {
 			Rectangle rect=new Rectangle(width,height);
 			rect.setArcWidth(corner);
 			rect.setArcHeight(corner);
-			rect.setFill(new Color(ModuleNodeParams.DEFAULT_COLOUR[0],
-					ModuleNodeParams.DEFAULT_COLOUR[1],ModuleNodeParams.DEFAULT_COLOUR[2],1));
+			Color normal = new Color(ModuleNodeParams.DEFAULT_COLOUR[0],
+					ModuleNodeParams.DEFAULT_COLOUR[1],ModuleNodeParams.DEFAULT_COLOUR[2],1);
+			rect.setFill(ModuleIconFactory.getModuleColour(normal));
+			// dark boxes in night mode. 
+			pamViewFX.fxStyles.FXColourMode.modeProperty().addListener((obs, oldVal, newVal) -> 
+				rect.setFill(ModuleIconFactory.getModuleColour(normal)));
 			return rect;
 		}
 		

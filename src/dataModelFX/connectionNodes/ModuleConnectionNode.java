@@ -180,7 +180,10 @@ public class ModuleConnectionNode extends StandardConnectionNode implements PAMC
 		this.setAllowBranchSockets(false); 
 		
 		this.getConnectionNodeBody().setPrefSize(connectionPane.getModuleWidth(), connectionPane.getModuleHeight());	
-		this.getConnectionNodeBody().setBackground(new Background(new BackgroundFill(moduleBackground,CornerRadii.EMPTY,Insets.EMPTY)));		
+		this.getConnectionNodeBody().setBackground(new Background(new BackgroundFill(ModuleIconFactory.getModuleColour(moduleBackground),CornerRadii.EMPTY,Insets.EMPTY)));		
+		// dark boxes in night mode. 
+		pamViewFX.fxStyles.FXColourMode.modeProperty().addListener((obs, oldVal, newVal) -> 
+			this.getConnectionNodeBody().setBackground(new Background(new BackgroundFill(ModuleIconFactory.getModuleColour(moduleBackground),CornerRadii.EMPTY,Insets.EMPTY))));
 		
 		//add connection listener 
 		this.addConnectionListener((shape, foundShape, type)->{

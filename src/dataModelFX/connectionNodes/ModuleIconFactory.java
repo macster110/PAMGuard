@@ -162,8 +162,53 @@ public class ModuleIconFactory {
 		}
 		
 		long time2 = System.currentTimeMillis();
-		return iconNode;
+		return nightStyle(iconNode);
 	}; 
+
+	/**
+	 * Colour of the module icons in night mode. 
+	 */
+	public static final Color NIGHT_ICON_COLOUR = Color.rgb(200, 35, 35);
+
+	/**
+	 * Colour of the module boxes in night mode. 
+	 */
+	public static final Color NIGHT_MODULE_COLOUR = Color.rgb(32, 26, 26);
+
+	/**
+	 * Get the background colour for a module box, which is dark in night mode. 
+	 * @param normal - the colour in the other modes.
+	 * @return the colour to use now. 
+	 */
+	public static Color getModuleColour(Color normal) {
+		return pamViewFX.fxStyles.FXColourMode.getCurrent() == pamViewFX.fxStyles.FXColourMode.NIGHT ? NIGHT_MODULE_COLOUR : normal; 
+	}
+
+	/**
+	 * Make an icon red in night mode, whatever it is made of (SVG, glyph or image), 
+	 * and keep it in step when the colour mode changes. 
+	 * @param iconNode - the icon.
+	 * @return the same icon. 
+	 */
+	public static Node nightStyle(Node iconNode) {
+		if (iconNode == null) {
+			return null;
+		}
+		applyNightEffect(iconNode, pamViewFX.fxStyles.FXColourMode.getCurrent());
+		pamViewFX.fxStyles.FXColourMode.modeProperty().addListener((obs, oldVal, newVal) -> applyNightEffect(iconNode, newVal));
+		return iconNode;
+	}
+
+	private static void applyNightEffect(Node iconNode, pamViewFX.fxStyles.FXColourMode mode) {
+		if (mode == pamViewFX.fxStyles.FXColourMode.NIGHT) {
+			// paint red wherever the icon is drawn, keeping its shape and transparency. 
+			javafx.scene.effect.ColorInput red = new javafx.scene.effect.ColorInput(-1000, -1000, 3000, 3000, NIGHT_ICON_COLOUR);
+			iconNode.setEffect(new javafx.scene.effect.Blend(javafx.scene.effect.BlendMode.SRC_ATOP, null, red));
+		}
+		else {
+			iconNode.setEffect(null);
+		}
+	}
 	
 	/**
 	 * Get an SVG icon.
@@ -230,7 +275,7 @@ public class ModuleIconFactory {
 	public Node getModuleNode(String className) {
 		ModuleIcon icon = getModuleIcon(className); 
 		// a generic icon for modules which don't have their own, rather than a blank box. 
-		if (icon==null) return PamGlyphDude.createModuleIcon("mdi2p-puzzle-outline"); 
+		if (icon==null) return nightStyle(PamGlyphDude.createModuleIcon("mdi2p-puzzle-outline")); 
 		else return getModuleNode(icon); 
 	}
 
