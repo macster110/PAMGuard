@@ -36,7 +36,7 @@ public class ModuleIconFactory {
 	public enum ModuleIcon {
 		DATAMAP, NMEA, GPS, MAP, SOUND_AQ, SOUND_OUTPUT, FFT, FILTER, CLICK, CLICK_TRAIN, RECORDER, WHISTLE_MOAN,
 		NOISE_BAND, NOISE_FILT, DATABASE, BINARY, TIME_DISPLAY, DETECTION_DISPLAY, ARRAY, DEEP_LEARNING, MATCHED_CLICK_CLASSIFIER,
-		DECIMATOR, CPOD, TETHYS, ISHMAEL_ENERGY, ISHMAEL_SPEC_CORR, ISHMAEL_MATCHED_FILTER, ISHMAEL_LOCATOR, DEEP_WHISTLE, CLIP_GENERATOR, CLIP_DISPLAY
+		DECIMATOR, CPOD, TETHYS, ISHMAEL_ENERGY, ISHMAEL_SPEC_CORR, ISHMAEL_MATCHED_FILTER, ISHMAEL_LOCATOR, DEEP_WHISTLE, CLIP_GENERATOR, CLIP_DISPLAY, LTSA
 	}
 
 	/**
@@ -132,6 +132,10 @@ public class ModuleIconFactory {
 		case CPOD:
 			//CPOD and FPOD data are read from the loggers' SD cards. 
 			iconNode = PamGlyphDude.createModuleIcon("mdi2s-sd"); 
+			break;
+		case LTSA:
+			// a long term spectrogram: bands of energy over a long time. 
+			iconNode = getSVGIcon("/Resources/modules/ltsa.svg"); 
 			break;
 		case ISHMAEL_ENERGY:
 			iconNode = getSVGIcon("/Resources/modules/ishmael_energy_sum.svg"); 
@@ -306,6 +310,9 @@ public class ModuleIconFactory {
 			break;
 		case "Map.MapController":
 			icon=ModuleIcon.MAP;
+			break;
+		case "ltsa.LtsaControl":
+			icon=ModuleIcon.LTSA;
 			break;
 		case "SoundRecorder.RecorderControl":
 			icon=ModuleIcon.RECORDER;
