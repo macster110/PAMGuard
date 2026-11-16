@@ -78,7 +78,7 @@ public class ClipCanvasFX extends Region {
 	/**
 	 * Maximum number of image pixels kept in memory.
 	 */
-	private static final long MAX_CACHE_PIXELS = 40_000_000L;
+	private static final long MAX_CACHE_PIXELS = 24_000_000L;
 
 	/**
 	 * Height in pixels of the thumbnail images used when the display is zoomed out.
@@ -278,16 +278,99 @@ public class ClipCanvasFX extends Region {
 	}
 
 	/**
-	 * Replace all clips, e.g. when new data are loaded in viewer mode.
+	 * Replace all clips, e.g. when the viewer scroll bar moves. Clips which are
+	 * already in the display keep their images, so spectrograms are only made for
+	 * new clips. Clips are matched by data source and UID since data reloaded from
+	 * file are new objects holding the same sound.
 	 * @param clips - the clips in display order.
 	 */
 	public void setClips(Collection<PamDataUnit> clips) {
-		clearClips();
+		java.util.HashMap<String, ClipItem> old = new java.util.HashMap<String, ClipItem>();
+		for (ClipItem item : allItems) {
+			old.put(itemKey(item.clip), item);
+		}
+		ArrayList<ClipItem> newItems = new ArrayList<ClipItem>(clips.size());
+		for (PamDataUnit clip : clips) {
+			ClipItem item = old.remove(itemKey(clip));
+			if (item == null) {
+				item = new ClipItem(clip);
+			}
+			else if (item.clip != clip) {
+				item.setClip(clip);
+			}
+			item.shown = clipDisplay.shouldShow(clip);
+			newItems.add(item);
+		}
+		// free the images of clips which are no longer shown.
+		for (ClipItem item : old.values()) {
+			forgetImage(item);
+			item.thumb = null;
+			if (item == lastClickedItem) {
+				lastClickedItem = null;
+			}
+			if (item == hoverItem) {
+				hoverItem = null;
+			}
+		}
+		allItems = newItems;
+		rebuildShown();
+	}
+
+	private static String itemKey(PamDataUnit clip) {
+		return System.identityHashCode(clip.getParentDataBlock()) + "_" + clip.getUID() + "_"
+				+ clip.getChannelBitmap() + "_" + clip.getTimeMilliseconds();
+	}
+
+	/**
+	 * Get the data units in the display, in display order.
+	 * @return a list of data units.
+	 */
+	public List<PamDataUnit> getClips() {
+		ArrayList<PamDataUnit> clips = new ArrayList<PamDataUnit>(allItems.size());
+		for (ClipItem item : allItems) {
+			clips.add(item.clip);
+		}
+		return clips;
+	}
+
+	/**
+	 * Remove all clips from one data source.
+	 * @param dataBlock - the data source.
+	 */
+	public void removeClipsFrom(PamDataBlock<?> dataBlock) {
+		boolean changed = false;
+		for (ClipItem item : new ArrayList<ClipItem>(allItems)) {
+			if (item.clip.getParentDataBlock() == dataBlock) {
+				removeItem(item);
+				if (item == hoverItem) {
+					hoverItem = null;
+				}
+				changed = true;
+			}
+		}
+		if (changed) {
+			rebuildShown();
+		}
+	}
+
+	/**
+	 * Add clips, e.g. from a new data source, putting them in time order amongst the
+	 * clips already in the display.
+	 * @param clips - the clips to add.
+	 * @param newLast - true if new clips are shown at the end of the display.
+	 */
+	public void addClipsInTimeOrder(List<PamDataUnit> clips, boolean newLast) {
+		if (clips == null || clips.isEmpty()) {
+			return;
+		}
 		for (PamDataUnit clip : clips) {
 			ClipItem item = new ClipItem(clip);
 			item.shown = clipDisplay.shouldShow(clip);
 			allItems.add(item);
 		}
+		// sort is stable and the existing list is already in time order, so this is cheap.
+		java.util.Comparator<ClipItem> c = (a, b) -> Long.compare(a.clip.getTimeMilliseconds(), b.clip.getTimeMilliseconds());
+		allItems.sort(newLast ? c : c.reversed());
 		rebuildShown();
 	}
 
@@ -1157,7 +1240,7 @@ public class ClipCanvasFX extends Region {
 	 */
 	private class ClipItem {
 
-		final PamDataUnit clip;
+		volatile PamDataUnit clip;
 
 		final int channel;
 
@@ -1205,6 +1288,16 @@ public class ClipCanvasFX extends Region {
 
 		boolean hasFullImage() {
 			return image != null && imageSettingsKey.equals(imageKey);
+		}
+
+		/**
+		 * Swap the data unit for another holding the same sound, e.g. after data
+		 * are reloaded in viewer mode. The images are kept.
+		 */
+		void setClip(PamDataUnit newClip) {
+			this.clip = newClip;
+			triggerSearched = false;
+			trigger = null;
 		}
 
 		ClipItem(PamDataUnit clip) {

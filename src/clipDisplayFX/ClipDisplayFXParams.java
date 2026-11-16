@@ -38,6 +38,23 @@ public class ClipDisplayFXParams implements Serializable, Cloneable {
 	public String dataSourceName;
 
 	/**
+	 * Long names of all of the data blocks shown on the display. If null, the 
+	 * display uses {@link #dataSourceName}, i.e. settings from before the display
+	 * could show more than one source. 
+	 */
+	public java.util.ArrayList<String> dataSourceNames;
+
+	/**
+	 * Length of the time window shown in viewer mode, in milliseconds. 
+	 */
+	public long viewerVisibleMillis = DEFAULT_VIEWER_MILLIS;
+
+	/**
+	 * Default length of the time window shown in viewer mode. 
+	 */
+	public static final long DEFAULT_VIEWER_MILLIS = 60000L;
+
+	/**
 	 * Position of the display.
 	 */
 	public UserDisplayNodeParams displayParams = new UserDisplayNodeParams();
@@ -53,6 +70,9 @@ public class ClipDisplayFXParams implements Serializable, Cloneable {
 		try {
 			ClipDisplayFXParams p = (ClipDisplayFXParams) super.clone();
 			p.clipParams = clipParams == null ? new ClipDisplayParameters() : clipParams.copy();
+			if (dataSourceNames != null) {
+				p.dataSourceNames = new java.util.ArrayList<String>(dataSourceNames);
+			}
 			return p;
 		}
 		catch (CloneNotSupportedException e) {

@@ -82,7 +82,9 @@ import userDisplayFX.UserDisplayNodeParams;
 /**
  * JavaFX clip display. Shows any data which holds raw sound, e.g. clips from the clip
  * generator, clicks from the click detector or detections from the deep learning
- * classifier. Clips are drawn as spectrogram tiles on one large canvas which
+ * classifier. Several data sources can be shown together, in time order. In viewer
+ * mode only the data within the time window of the scroll bar are shown and
+ * spectrogram images are kept when the window moves, so only new clips are drawn. Clips are drawn as spectrogram tiles on one large canvas which
  * can be smoothly zoomed in and out (ctrl + mouse wheel, pinch, +/- keys or the zoom
  * buttons) so that thousands of clips can be seen at once or individual clips examined
  * in detail. Has all the features of the Swing clip display: spectrogram and colour
@@ -101,15 +103,14 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	private ClipDisplayControlFX displayControl;
 
 	/**
-	 * The data block shown on the display. 
+	 * The data blocks shown on the display. 
 	 */
-	@SuppressWarnings("rawtypes")
-	private PamDataBlock sourceBlock;
+	private final ArrayList<PamDataBlock<?>> sourceBlocks = new ArrayList<PamDataBlock<?>>();
 
 	/**
 	 * Lets the user choose the data shown on the display.
 	 */
-	private ChoiceBox<PamDataBlock<?>> sourceChoice;
+	private PamVBox sourceList;
 
 	/**
 	 * Holds the data selector, which depends on the data source.
@@ -168,9 +169,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 
 	private boolean settingControls;
 
-	private DynamicSettingsPane<Boolean> dataSelectPane;
-
-	private FXSymbolOptionsPane<?> symbolOptionsPane;
+	private final ArrayList<DynamicSettingsPane<Boolean>> dataSelectPanes = new ArrayList<DynamicSettingsPane<Boolean>>();
 
 	private boolean viewerReloadPending;
 
@@ -444,7 +443,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	}
 
 	/**
-	 * Show the symbol options for the current data source, or hide the tab if it has none.
+	 * Show the symbol options for the current data sources, or hide the tab if none have any.
 	 */
 	private void updateSymbolTab() {
 		Node symbolNode = createSymbolPane();
@@ -458,32 +457,47 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		}
 	}
 
+	/**
+	 * Make the symbol options, one set for each data source which has a symbol manager.
+	 */
 	private Node createSymbolPane() {
-		symbolOptionsPane = null;
-		if (sourceBlock == null) {
-			return null;
-		}
-		PamSymbolManager<?> symbolManager = sourceBlock.getPamSymbolManager();
-		if (symbolManager == null) {
-			return null;
-		}
-		try {
-			symbolOptionsPane = symbolManager.getFXOptionsPane(getUniqueName(), projector);
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
-		if (symbolOptionsPane == null) {
-			return null;
-		}
-		symbolOptionsPane.addSettingsListener(() -> {
-			symbolOptionsPane.getParams(null);
-			clipCanvas.repaint();
-		});
-		PamVBox box = new PamVBox(title("Clip border colours"), symbolOptionsPane.getContentNode());
+		PamVBox box = new PamVBox(title("Clip border colours"));
 		box.setSpacing(5);
 		box.setPadding(new Insets(5));
-		return box;
+		int n = 0;
+		for (PamDataBlock<?> block : sourceBlocks) {
+			PamSymbolManager<?> symbolManager = block.getPamSymbolManager();
+			if (symbolManager == null) {
+				continue;
+			}
+			FXSymbolOptionsPane<?> pane = null;
+			try {
+				pane = symbolManager.getFXOptionsPane(getUniqueName(), projector);
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+			}
+			if (pane == null) {
+				continue;
+			}
+			final FXSymbolOptionsPane<?> fPane = pane;
+			fPane.addSettingsListener(() -> {
+				fPane.getParams(null);
+				clipCanvas.repaint();
+			});
+			if (sourceBlocks.size() > 1) {
+				box.getChildren().add(subTitle(block.getDataName()));
+			}
+			box.getChildren().add(fPane.getContentNode());
+			n++;
+		}
+		return n == 0 ? null : box;
+	}
+
+	private Label subTitle(String text) {
+		Label label = new Label(text);
+		label.setStyle("-fx-font-weight: bold;");
+		return label;
 	}
 
 	private Node createDataPane() {
@@ -491,29 +505,13 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		box.setSpacing(5);
 		box.setPadding(new Insets(5));
 
-		sourceChoice = new ChoiceBox<PamDataBlock<?>>();
-		sourceChoice.setMaxWidth(Double.MAX_VALUE);
-		sourceChoice.setTooltip(new Tooltip("Any data which holds raw sound can be shown, e.g. clips, clicks or deep learning detections"));
-		sourceChoice.setConverter(new javafx.util.StringConverter<PamDataBlock<?>>() {
-			@Override
-			public String toString(PamDataBlock<?> block) {
-				return block == null ? "No data source" : block.getLongDataName();
-			}
-
-			@Override
-			public PamDataBlock<?> fromString(String string) {
-				return null;
-			}
-		});
+		sourceList = new PamVBox();
+		sourceList.setSpacing(4);
+		Label help = new Label("Tick the data to show. Anything which holds raw sound can be shown, e.g. clips, clicks or deep learning detections.");
+		help.setWrapText(true);
+		help.setStyle("-fx-font-size: 11; -fx-opacity: 0.8;");
 		updateSourceChoice();
-		sourceChoice.setOnShowing(e -> updateSourceChoice());
-		sourceChoice.valueProperty().addListener((o, a, b) -> {
-			if (settingControls || b == null || b == sourceBlock) {
-				return;
-			}
-			displayControl.setSourceDataBlock(b);
-		});
-		box.getChildren().addAll(title("Data source"), sourceChoice);
+		box.getChildren().addAll(title("Data sources"), help, sourceList);
 
 		dataSelectHolder = new PamVBox();
 		dataSelectHolder.setSpacing(5);
@@ -537,130 +535,206 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	}
 
 	/**
-	 * Put the compatible data blocks in the data source list.
+	 * Put a tick box for every data block which holds raw sound in the data source list.
 	 */
 	private void updateSourceChoice() {
-		if (sourceChoice == null) {
+		if (sourceList == null) {
 			return;
 		}
-		boolean wasSetting = settingControls;
-		settingControls = true;
 		ArrayList<PamDataBlock<?>> blocks = ClipDisplayControlFX.getRawClipBlocks();
-		if (sourceBlock != null && !blocks.contains(sourceBlock)) {
-			blocks.add(0, sourceBlock);
+		for (PamDataBlock<?> block : sourceBlocks) {
+			if (!blocks.contains(block)) {
+				blocks.add(block);
+			}
 		}
-		if (!blocks.equals(sourceChoice.getItems())) {
-			sourceChoice.getItems().setAll(blocks);
+		sourceList.getChildren().clear();
+		if (blocks.isEmpty()) {
+			sourceList.getChildren().add(new Label("No data which holds raw sound"));
+			return;
 		}
-		sourceChoice.setValue(sourceBlock);
-		settingControls = wasSetting;
+		for (PamDataBlock<?> block : blocks) {
+			CheckBox cb = new CheckBox(block.getLongDataName());
+			cb.setWrapText(true);
+			cb.setSelected(sourceBlocks.contains(block));
+			cb.selectedProperty().addListener((o, a, b) -> {
+				if (settingControls) {
+					return;
+				}
+				ArrayList<PamDataBlock<?>> newList = new ArrayList<PamDataBlock<?>>(sourceBlocks);
+				if (b && !newList.contains(block)) {
+					newList.add(block);
+				}
+				else if (!b) {
+					newList.remove(block);
+				}
+				displayControl.setSourceDataBlocks(newList);
+			});
+			sourceList.getChildren().add(cb);
+		}
 	}
 
 	/**
-	 * Show the data selector of the current data source.
+	 * Show the data selectors of the current data sources.
 	 */
 	private void updateDataSelectPane() {
 		dataSelectHolder.getChildren().clear();
-		dataSelectPane = null;
-		DataSelector ds = getDataSelector();
-		if (ds != null) {
+		dataSelectPanes.clear();
+		for (PamDataBlock<?> block : sourceBlocks) {
+			DataSelector ds = getDataSelector(block);
+			if (ds == null) {
+				continue;
+			}
+			DynamicSettingsPane<Boolean> pane = null;
 			try {
-				dataSelectPane = ds.getDialogPaneFX();
+				pane = ds.getDialogPaneFX();
 			}
 			catch (Exception e) {
 				e.printStackTrace();
 			}
-		}
-		if (dataSelectPane != null) {
-			dataSelectPane.setParams(true);
-			final DynamicSettingsPane<Boolean> pane = dataSelectPane;
-			pane.addSettingsListener(() -> {
-				pane.getParams(true);
+			if (pane == null) {
+				continue;
+			}
+			pane.setParams(true);
+			final DynamicSettingsPane<Boolean> fPane = pane;
+			fPane.addSettingsListener(() -> {
+				fPane.getParams(true);
 				clipCanvas.updateShownClips();
 				updateStatus();
 			});
-			dataSelectHolder.getChildren().addAll(title("Data selection"), pane.getContentNode());
+			dataSelectPanes.add(fPane);
+			String name = sourceBlocks.size() > 1 ? "Data selection: " + block.getDataName() : "Data selection";
+			dataSelectHolder.getChildren().addAll(title(name), fPane.getContentNode());
 		}
 	}
 
 	/**
-	 * Get the data block shown on the display.
+	 * Get the first data block shown on the display.
 	 * @return the data block, or null.
 	 */
 	public PamDataBlock<?> getSourceDataBlock() {
-		return sourceBlock;
+		return sourceBlocks.isEmpty() ? null : sourceBlocks.get(0);
+	}
+
+	/**
+	 * Get all of the data blocks shown on the display.
+	 * @return a copy of the list of data blocks.
+	 */
+	public ArrayList<PamDataBlock<?>> getSourceDataBlocks() {
+		return new ArrayList<PamDataBlock<?>>(sourceBlocks);
 	}
 
 	/**
 	 * Set the data shown on the display. Must be called on the FX thread.
 	 * @param dataBlock - any data block whose data units hold raw sound, or null.
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings("rawtypes")
 	public void setSourceDataBlock(PamDataBlock dataBlock) {
-		if (dataBlock == sourceBlock) {
+		ArrayList<PamDataBlock> list = new ArrayList<PamDataBlock>();
+		if (dataBlock != null) {
+			list.add(dataBlock);
+		}
+		setSourceDataBlocks(list);
+	}
+
+	/**
+	 * Set the data shown on the display. Only the clips of sources which are added or
+	 * removed change, so the images of the other clips are kept. Must be called on the
+	 * FX thread.
+	 * @param dataBlocks - data blocks whose data units hold raw sound.
+	 */
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public void setSourceDataBlocks(List<? extends PamDataBlock> dataBlocks) {
+		ArrayList<PamDataBlock<?>> newBlocks = new ArrayList<PamDataBlock<?>>();
+		if (dataBlocks != null) {
+			for (PamDataBlock block : dataBlocks) {
+				if (block != null && !newBlocks.contains(block)) {
+					newBlocks.add(block);
+				}
+			}
+		}
+		if (newBlocks.equals(sourceBlocks)) {
 			updateSourceChoice();
 			return;
 		}
-		if (sourceBlock != null) {
-			sourceBlock.deleteObserver(clipObserver);
+		ArrayList<PamDataBlock<?>> removed = new ArrayList<PamDataBlock<?>>(sourceBlocks);
+		removed.removeAll(newBlocks);
+		ArrayList<PamDataBlock<?>> added = new ArrayList<PamDataBlock<?>>(newBlocks);
+		added.removeAll(sourceBlocks);
+
+		for (PamDataBlock block : removed) {
+			block.deleteObserver(clipObserver);
 			if (viewerScroller != null) {
-				viewerScroller.removeDataBlock(sourceBlock);
+				viewerScroller.removeDataBlock(block);
+			}
+			clipCanvas.removeClipsFrom(block);
+		}
+		sourceBlocks.clear();
+		sourceBlocks.addAll(newBlocks);
+		params.dataSourceNames = new ArrayList<String>();
+		for (PamDataBlock<?> block : sourceBlocks) {
+			params.dataSourceNames.add(block.getLongDataName());
+		}
+		params.dataSourceName = sourceBlocks.isEmpty() ? null : sourceBlocks.get(0).getLongDataName();
+		for (PamDataBlock block : added) {
+			block.addObserver(clipObserver);
+			if (viewerScroller != null) {
+				viewerScroller.addDataBlock(block);
 			}
 		}
-		sourceBlock = dataBlock;
-		newClips.clear();
-		clipCanvas.clearClips();
+		// drop queued clips from sources which are no longer shown.
+		newClips.removeIf(u -> !sourceBlocks.contains(u.getParentDataBlock()));
 		knownChannelSources = 0;
-		if (sourceBlock != null) {
-			params.dataSourceName = sourceBlock.getLongDataName();
-			sourceBlock.addObserver(clipObserver);
-			if (viewerScroller != null) {
-				viewerScroller.addDataBlock(sourceBlock);
-			}
+		for (PamDataUnit u : clipCanvas.getClips()) {
+			knownChannelSources |= u.getChannelBitmap();
 		}
+
 		updateSourceChoice();
 		updateSymbolTab();
 		updateDataSelectPane();
-		updateChannelChoice();
 		sayValues();
 		if (isViewer()) {
 			loadViewerClips();
 		}
 		else {
-			loadExistingClips();
+			for (PamDataBlock block : added) {
+				loadExistingClips(block);
+			}
+			trimClips();
 		}
+		updateChannelChoice();
 		updateStatus();
 	}
 
 	/**
-	 * Show the data already held by the data source, e.g. when the source is changed
+	 * Show the data already held by a data source, e.g. when the source is added
 	 * whilst PAMGuard is running.
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private void loadExistingClips() {
-		if (sourceBlock == null) {
+	private void loadExistingClips(PamDataBlock block) {
+		if (block == null) {
 			return;
 		}
 		ArrayList<PamDataUnit> units;
-		synchronized (sourceBlock.getSynchLock()) {
-			units = new ArrayList<PamDataUnit>(sourceBlock.getDataCopy());
+		synchronized (block.getSynchLock()) {
+			units = new ArrayList<PamDataUnit>(block.getDataCopy());
 		}
 		if (units.isEmpty()) {
 			return;
 		}
 		for (PamDataUnit unit : units) {
 			knownChannelSources |= unit.getChannelBitmap();
-			if (unit instanceof ClipDataUnit && ((ClipDataUnit) unit).getTriggerDataUnit() == null) {
-				((ClipDataUnit) unit).setTriggerDataUnit(((ClipDataUnit) unit).findTriggerDataUnit());
-			}
+			findTrigger(unit);
 		}
-		if (!params.clipParams.getNewClipOrder()) {
-			// newest first
-			java.util.Collections.reverse(units);
+		clipCanvas.addClipsInTimeOrder(units, params.clipParams.getNewClipOrder());
+	}
+
+	/**
+	 * Find the data unit which triggered a clip, so it can be drawn on the clip.
+	 */
+	private static void findTrigger(PamDataUnit<?, ?> unit) {
+		if (unit instanceof ClipDataUnit && ((ClipDataUnit) unit).getTriggerDataUnit() == null) {
+			((ClipDataUnit) unit).setTriggerDataUnit(((ClipDataUnit) unit).findTriggerDataUnit());
 		}
-		clipCanvas.addClips(units, false);
-		updateChannelChoice();
-		trimClips();
 	}
 
 	private void updateChannelChoice() {
@@ -836,7 +910,11 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	}
 
 	private float getSampleRate() {
-		return sourceBlock == null ? 0 : sourceBlock.getSampleRate();
+		float sr = 0;
+		for (PamDataBlock<?> block : sourceBlocks) {
+			sr = Math.max(sr, block.getSampleRate());
+		}
+		return sr;
 	}
 
 	private void makeColourArray() {
@@ -848,7 +926,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		int shown = clipCanvas.getNumShownClips();
 		int sel = clipCanvas.getSelectedClips().size();
 		String str = shown == n ? String.format("%d clips", n) : String.format("%d of %d clips shown", shown, n);
-		if (sourceBlock == null) {
+		if (sourceBlocks.isEmpty()) {
 			str = "No data source: pick one in the display options";
 		}
 		if (sel > 0) {
@@ -865,55 +943,74 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 
 	private void createViewerScroller() {
 		viewerScroller = new AcousticScrollerFX(getUniqueName(), Orientation.HORIZONTAL, 100, 3600L * 1000L, true);
-		if (sourceBlock != null) {
-			viewerScroller.addDataBlock(sourceBlock);
+		for (PamDataBlock<?> block : sourceBlocks) {
+			viewerScroller.addDataBlock(block);
 		}
+		// the window shown can be changed by dragging the edges of the scroll box or typing a 
+		// time in it. Only clips within the window are shown.
+		viewerScroller.setVisibleMillis(getViewerVisibleMillis());
+		viewerScroller.addRangeObserver((oldVal, newVal) -> {
+			if (newVal >= 1000) {
+				params.viewerVisibleMillis = newVal;
+			}
+			scheduleViewerReload();
+		});
 		viewerScroller.addObserver(new PamScrollObserver() {
 			@Override
 			public void scrollValueChanged(AbstractPamScroller abstractPamScroller) {
-				loadViewerClips();
+				// the scroller can send lots of these whilst being dragged, so only reload once.
+				scheduleViewerReload();
 			}
 
 			@Override
 			public void scrollRangeChanged(AbstractPamScroller absPamScroller) {
-				loadViewerClips();
+				scheduleViewerReload();
 			}
 		});
 		this.setBottom(viewerScroller.getNode());
 	}
 
 	/**
-	 * Show the clips within the visible part of the viewer scroll bar.
+	 * Show the clips of all sources within the visible part of the viewer scroll bar.
+	 * Clips which were already shown keep their images, so moving the scroller only
+	 * makes spectrograms for the clips which have come into view.
 	 */
 	private void loadViewerClips() {
 		viewerReloadPending = false;
-		PamDataBlock<?> dataBlock = sourceBlock;
-		if (dataBlock == null) {
-			return;
-		}
 		long t1 = Long.MIN_VALUE, t2 = Long.MAX_VALUE;
 		if (viewerScroller != null && viewerScroller.getVisibleAmount() > 0) {
 			t1 = viewerScroller.getValueMillis();
 			t2 = t1 + viewerScroller.getVisibleAmount();
 		}
 		ArrayList<PamDataUnit> clips = new ArrayList<PamDataUnit>();
-		synchronized (dataBlock.getSynchLock()) {
-			ArrayList<? extends PamDataUnit> all = dataBlock.getDataCopy();
-			for (PamDataUnit clip : all) {
-				long t = clip.getTimeMilliseconds();
-				if (t >= t1 && t <= t2) {
-					clips.add(clip);
+		for (PamDataBlock<?> dataBlock : sourceBlocks) {
+			synchronized (dataBlock.getSynchLock()) {
+				ArrayList<? extends PamDataUnit> all = dataBlock.getDataCopy();
+				for (PamDataUnit clip : all) {
+					long t = clip.getTimeMilliseconds();
+					if (t >= t1 && t <= t2) {
+						clips.add(clip);
+					}
 				}
 			}
 		}
-		for (PamDataUnit clip : clips) {
-			knownChannelSources |= clip.getChannelBitmap();
-			if (clip instanceof ClipDataUnit && ((ClipDataUnit) clip).getTriggerDataUnit() == null) {
-				((ClipDataUnit) clip).setTriggerDataUnit(((ClipDataUnit) clip).findTriggerDataUnit());
-			}
+		clips.sort((a, b) -> Long.compare(a.getTimeMilliseconds(), b.getTimeMilliseconds()));
+		if (!params.clipParams.getNewClipOrder()) {
+			java.util.Collections.reverse(clips);
 		}
+		int map = 0;
+		for (PamDataUnit clip : clips) {
+			map |= clip.getChannelBitmap();
+			findTrigger(clip);
+		}
+		knownChannelSources = map;
 		clipCanvas.setClips(clips);
+		updateChannelChoice();
 		updateStatus();
+	}
+
+	private long getViewerVisibleMillis() {
+		return params.viewerVisibleMillis > 0 ? params.viewerVisibleMillis : ClipDisplayFXParams.DEFAULT_VIEWER_MILLIS;
 	}
 
 	private void scheduleViewerReload() {
@@ -942,7 +1039,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 
 		@Override
 		public void addData(PamObservable o, PamDataUnit dataUnit) {
-			if (o != sourceBlock) {
+			if (!sourceBlocks.contains(o)) {
 				return;
 			}
 			PamDataUnit clip = dataUnit;
@@ -1038,18 +1135,18 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		if (params.displayChannels > 0 && (params.displayChannels & clip.getChannelBitmap()) == 0) {
 			return false;
 		}
-		DataSelector ds = getDataSelector();
+		DataSelector ds = getDataSelector(clip.getParentDataBlock());
 		if (ds != null && ds.scoreData(clip) <= 0) {
 			return false;
 		}
 		return true;
 	}
 
-	private DataSelector getDataSelector() {
-		if (sourceBlock == null) {
+	private DataSelector getDataSelector(PamDataBlock<?> block) {
+		if (block == null) {
 			return null;
 		}
-		return sourceBlock.getDataSelector(getUniqueName(), false);
+		return block.getDataSelector(getUniqueName(), false);
 	}
 
 	/*
@@ -1087,11 +1184,17 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		return clipCanvas;
 	}
 
-	public PamSymbolChooser getSymbolChooser() {
-		if (sourceBlock == null) {
+	/**
+	 * Get the symbol chooser of the data source of a clip.
+	 * @param clip - the clip, or null for the first data source.
+	 * @return the symbol chooser, or null.
+	 */
+	public PamSymbolChooser getSymbolChooser(PamDataUnit clip) {
+		PamDataBlock<?> block = clip == null ? getSourceDataBlock() : clip.getParentDataBlock();
+		if (block == null) {
 			return null;
 		}
-		PamSymbolManager<?> symbolManager = sourceBlock.getPamSymbolManager();
+		PamSymbolManager<?> symbolManager = block.getPamSymbolManager();
 		if (symbolManager == null) {
 			return null;
 		}
@@ -1104,7 +1207,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	 * @return the symbol, or null.
 	 */
 	public PamSymbol getBorderSymbol(PamDataUnit clip) {
-		PamSymbolChooser chooser = getSymbolChooser();
+		PamSymbolChooser chooser = getSymbolChooser(clip);
 		if (chooser == null) {
 			return null;
 		}
@@ -1177,7 +1280,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 			// clip menu items from the data block, e.g. play, as in the Swing display.
 			int nUnitItems = 0;
 			try {
-				List<JMenuItem> unitItems = sourceBlock == null ? null : sourceBlock.getDataUnitMenuItems(null, null, clip);
+				List<JMenuItem> unitItems = clip.getParentDataBlock() == null ? null : clip.getParentDataBlock().getDataUnitMenuItems(null, null, clip);
 				if (unitItems != null) {
 					for (JMenuItem jItem : unitItems) {
 						MenuItem fxItem = PamUtilsFX.swingMenuItemToFX(jItem);
@@ -1212,7 +1315,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		}
 
 		// border colours
-		PamSymbolChooser chooser = getSymbolChooser();
+		PamSymbolChooser chooser = getSymbolChooser(clip);
 		if (chooser instanceof StandardSymbolChooser) {
 			try {
 				ArrayList<JMenuItem> colItems = ((StandardSymbolChooser) chooser).getQuickMenuItems(
@@ -1235,7 +1338,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		}
 
 		// data selection
-		if (dataSelectPane != null) {
+		if (!dataSelectPanes.isEmpty()) {
 			MenuItem dsItem = new MenuItem("Data selection ...");
 			dsItem.setGraphic(PamGlyphDude.createPamIcon("mdi2f-filter-outline", PamGuiManagerFX.iconSize));
 			dsItem.setOnAction(a -> showSettings("Data"));
@@ -1361,8 +1464,10 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	@Override
 	public void closeNode() {
 		// called when the module is removed, so stop watching for new clips. 
-		if (sourceBlock != null && clipObserver != null) {
-			sourceBlock.deleteObserver(clipObserver);
+		if (clipObserver != null) {
+			for (PamDataBlock<?> block : sourceBlocks) {
+				block.deleteObserver(clipObserver);
+			}
 		}
 		clipCanvas.dispose();
 		OverlayMarkProviders.singleInstance().removeProvider(marker);
@@ -1381,6 +1486,13 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		case PamControllerInterface.OFFLINE_DATA_LOADED:
 		case PamControllerInterface.DATA_LOAD_COMPLETE:
 			if (isViewer()) {
+				Platform.runLater(() -> {
+					// the scroller can lose the window length when its range is first set.
+					if (viewerScroller != null && viewerScroller.getVisibleAmount() < 1000
+							&& viewerScroller.getRangeMillis() > viewerScroller.getVisibleAmount()) {
+						viewerScroller.setVisibleMillis(Math.min(getViewerVisibleMillis(), viewerScroller.getRangeMillis()));
+					}
+				});
 				scheduleViewerReload();
 			}
 			break;
