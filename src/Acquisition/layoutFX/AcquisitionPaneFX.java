@@ -691,7 +691,9 @@ public class AcquisitionPaneFX extends SettingsPane<AcquisitionParameters>{
 		
 		// Get the new status bar pane from the DAQ system
 		DAQSettingsPane<?> daqPane = currentDaqSystem2.getDAQSpecificPane(this);
-		if (daqPane != null) {
+		// the status bar (e.g. file progress) only means anything when acquiring data, not in viewer mode.
+		boolean viewer = PamController.PamController.getInstance().getRunMode() == PamController.PamController.RUN_PAMVIEW;
+		if (daqPane != null && !viewer) {
 			Pane statusPane = daqPane.getStatusBarPane();
 			if (statusPane != null) {
 				currentStatusBarPane = statusPane;

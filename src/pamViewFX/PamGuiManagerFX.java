@@ -277,13 +277,14 @@ public class PamGuiManagerFX implements PAMControllerGUI, PamSettings {
 
 	/**
 	 * Can the menus go in the macOS menu bar at the top of the screen? Not if
-	 * JavaFX was started from Swing (a JFXPanel), which happens when the start up
-	 * dialog is shown: the Swing toolkit then owns the macOS menu bar and the
-	 * JavaFX menus never appear there. They go at the top of the window instead,
+	 * JavaFX was started from Swing (a JFXPanel): the Swing toolkit then owns the
+	 * macOS menu bar and the JavaFX menus never appear there. The start up dialog
+	 * starts JavaFX on its own when the JavaFX GUI may follow, so this should only
+	 * happen if something else started JavaFX from Swing first. They go at the top of the window instead,
 	 * as on Windows and Linux.
 	 */
 	private static boolean canUseScreenMenuBar() {
-		return IS_MACOS && !PamView.FXInitialiser.haveRun;
+		return IS_MACOS && !PamView.FXInitialiser.isStartedFromSwing();
 	}
 
 	private MenuBar buildSystemMenuBar() {

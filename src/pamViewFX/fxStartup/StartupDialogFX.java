@@ -166,7 +166,11 @@ public class StartupDialogFX {
 	 * @return the selected mode and file, or null if the dialog was cancelled.
 	 */
 	public static StartupSelection showDialog(boolean fxGUI, boolean offerJavaFX) {
-		FXInitialiser.initialise();
+		/*
+		 * If the JavaFX GUI may follow, start JavaFX on its own rather than from Swing so
+		 * that, on macOS, the menus can go in the menu bar at the top of the screen.
+		 */
+		FXInitialiser.initialise(fxGUI || offerJavaFX);
 		// stop the FX thread closing when this window closes, as for the rest of PAMGuard.
 		Platform.setImplicitExit(false);
 		if (Platform.isFxApplicationThread()) {

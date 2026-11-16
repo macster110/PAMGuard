@@ -341,8 +341,10 @@
 .menu-item > .right-container {
   -fx-padding: 0 0 0 0.5em;
 }
+/* a translucent grey which works on both the light and the dark backgrounds
+   (-color-base-7 is dark grey in the light Primer sheet). */
 .menu-item:focused {
-  -fx-background-color: -color-base-7, -color-base-7;
+  -fx-background-color: -color-neutral-muted, -color-neutral-muted;
 }
 .menu-item:disabled {
   -fx-opacity: 0.4;
