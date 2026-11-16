@@ -1060,7 +1060,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		PamButton backButton = hidingPaneLeft.getHideButton();
 		if (backButton == null) return;
 		if (accent) {
-			backButton.setStyle("-fx-background-color: -color-accent-emphasis; -fx-background-radius: 0 5 5 0;");
+			backButton.setStyle("-fx-background-color: -color-accent-emphasis; -fx-background-radius: 5 0 0 5;");
 			backButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chevron-left", Color.WHITE, PamGuiManagerFX.iconSize));
 			backButton.setTooltip(new javafx.scene.control.Tooltip("Back"));
 		}

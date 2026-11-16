@@ -14,7 +14,6 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
@@ -25,6 +24,8 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -73,7 +74,7 @@ public class OfflineProcessPaneFX {
 	/**
 	 * Delete old data check box.
 	 */
-	private CheckBox deleteOldDataCheck;
+	private PamToggleSwitch deleteOldDataCheck;
 
 	/**
 	 * Notes text area.
@@ -225,7 +226,8 @@ public class OfflineProcessPaneFX {
 		root.getChildren().add(createDataOptionsPane());
 		root.getChildren().add(createTasksPane());
 		root.getChildren().add(createNotesPane());
-		root.getChildren().add(createProgressPane());
+		// progress is shown in the loading bar at the top of the window.
+		createProgressPane();
 		root.getChildren().add(createButtonPane());
 
 		ScrollPane scrollPane = new ScrollPane(root);
@@ -276,7 +278,7 @@ public class OfflineProcessPaneFX {
 		dateSelectionPane.setManaged(false);
 		content.getChildren().add(dateSelectionPane);
 
-		deleteOldDataCheck = new CheckBox("Delete old database entries");
+		deleteOldDataCheck = new PamToggleSwitch("Delete old database entries");
 		deleteOldDataCheck.setTooltip(new Tooltip(
 				"Delete old data entries in the corresponding database table\n"
 						+ "(Binary file data will always be overwritten)"));
@@ -363,6 +365,8 @@ public class OfflineProcessPaneFX {
 		buttonBox.setPadding(new Insets(5, 0, 0, 0));
 
 		startButton = new Button("Start");
+		startButton.getStyleClass().add("accent");
+		startButton.setDefaultButton(true);
 		startButton.setOnAction(e -> startProcessing());
 
 		closeButton = new Button("Close");
@@ -568,6 +572,7 @@ public class OfflineProcessPaneFX {
 				globalProgress.setProgress(1.0);
 				loadedProgress.setProgress(1.0);
 				enableControls();
+				sendLoadProgress(true);
 			});
 			return;
 		}
@@ -648,6 +653,8 @@ public class OfflineProcessPaneFX {
 		public void setTaskStatus(TaskMonitorData taskMonitorData) {
 			Platform.runLater(() -> {
 				updateProgressUI(taskMonitorData);
+				sendLoadProgress(taskMonitorData.taskStatus == TaskStatus.CRASHED
+						|| taskMonitorData.taskStatus == TaskStatus.INTERRUPTED);
 
 				if (taskMonitorData.taskStatus == TaskStatus.COMPLETE
 						|| taskMonitorData.taskStatus == TaskStatus.CRASHED
@@ -730,6 +737,7 @@ public class OfflineProcessPaneFX {
 				currentStatus = TaskStatus.COMPLETE;
 				statusLabel.setText("All tasks complete");
 				enableControls();
+				sendLoadProgress(true);
 			}
 		}
 	}
@@ -770,7 +778,7 @@ public class OfflineProcessPaneFX {
 				HBox row = new HBox(8);
 				row.setAlignment(Pos.CENTER_LEFT);
 
-				CheckBox cb = new CheckBox(task.getName());
+				PamToggleSwitch cb = new PamToggleSwitch(task.getName());
 				cb.setSelected(task.isDoRun());
 				cb.setDisable(!task.canRun());
 
@@ -803,7 +811,9 @@ public class OfflineProcessPaneFX {
 						task.callSettings();
 					});
 					cbEntry.settingsButton = settingsBtn;
-					row.getChildren().addAll(cb, settingsBtn);
+					Region spacer = new Region();
+					HBox.setHgrow(spacer, Priority.ALWAYS);
+					row.getChildren().addAll(cb, spacer, settingsBtn);
 				} else {
 					row.getChildren().add(cb);
 				}
@@ -820,15 +830,62 @@ public class OfflineProcessPaneFX {
 		}
 	}
 
+	private static final String LOAD_TASK_NAME = "Offline processing";
+
+	/**
+	 * Show the processing progress in the loading bar at the top of the PAMGuard
+	 * window, the same place as the progress of data loading.
+	 * @param done - true when processing has finished, so the bar is removed.
+	 */
+	private void sendLoadProgress(boolean done) {
+		pamViewFX.PamGuiManagerFX gui = pamViewFX.PamGuiManagerFX.getInstance();
+		if (gui == null) {
+			return;
+		}
+		final double all = globalProgress.getProgress();
+		final double file = loadedProgress.getProgress();
+		final String status = statusLabel.getText();
+		final String fileText = currentFileLabel.getText();
+		pamViewFX.pamTask.PamTaskUpdate update = new pamViewFX.pamTask.PamTaskUpdate() {
+			@Override
+			public String getName() {
+				return LOAD_TASK_NAME;
+			}
+
+			@Override
+			public double getProgress() {
+				return all;
+			}
+
+			@Override
+			public double getProgress2() {
+				return file;
+			}
+
+			@Override
+			public String getProgressString() {
+				return status;
+			}
+
+			@Override
+			public String getProgressString2() {
+				return fileText == null ? "" : fileText.trim();
+			}
+		};
+		update.setDualProgressUpdate(true);
+		update.setStatus(done ? pamViewFX.pamTask.PamTaskUpdate.STATUS_DONE : pamViewFX.pamTask.PamTaskUpdate.STATUS_ANALYSING_FILES);
+		gui.notifyLoadProgress(update);
+	}
+
 	/**
 	 * Associates a task with its UI check box and optional settings button.
 	 */
 	private static class TaskCheckBoxEntry {
 		final OfflineTask task;
-		final CheckBox checkBox;
+		final PamToggleSwitch checkBox;
 		Button settingsButton;
 
-		TaskCheckBoxEntry(OfflineTask task, CheckBox checkBox) {
+		TaskCheckBoxEntry(OfflineTask task, PamToggleSwitch checkBox) {
 			this.task = task;
 			this.checkBox = checkBox;
 		}

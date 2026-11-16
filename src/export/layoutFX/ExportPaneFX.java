@@ -209,8 +209,8 @@ public class ExportPaneFX {
 		VBox root = new VBox(10);
 		root.setPadding(new Insets(10));
 
-		root.getChildren().add(createExportSettingsPane());
 		root.getChildren().add(createDataOptionsPane());
+		root.getChildren().add(createExportSettingsPane());
 		root.getChildren().add(createDataBlocksPane());
 		createProgressPane(); // progress is shown in the loading bar at the top of the window
 		root.getChildren().add(createButtonPane());
@@ -252,7 +252,6 @@ public class ExportPaneFX {
 			exportFormatButtons[i] = tb;
 			formatRow.getChildren().add(tb);
 		}
-		content.getChildren().add(formatRow);
 
 		// --- Export folder ---
 		HBox folderRow = new HBox(5);
@@ -285,6 +284,9 @@ public class ExportPaneFX {
 		// --- Extra exporter options ---
 		extraOptionsContainer = new VBox();
 		content.getChildren().add(extraOptionsContainer);
+
+		// format buttons at the bottom of the export settings. 
+		content.getChildren().add(formatRow);
 
 		VBox titledPane = section("Export Settings", content);
 		return titledPane;
