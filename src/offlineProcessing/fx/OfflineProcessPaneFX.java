@@ -21,7 +21,6 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TitledPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -240,7 +239,7 @@ public class OfflineProcessPaneFX {
 	 * Create the data options pane (data selection combo, delete old data, date
 	 * fields).
 	 */
-	private TitledPane createDataOptionsPane() {
+	private VBox createDataOptionsPane() {
 		VBox content = new VBox(5);
 		content.setPadding(new Insets(5));
 
@@ -283,8 +282,7 @@ public class OfflineProcessPaneFX {
 						+ "(Binary file data will always be overwritten)"));
 		content.getChildren().add(deleteOldDataCheck);
 
-		TitledPane titledPane = new TitledPane("Data Options", content);
-		titledPane.setCollapsible(false);
+		VBox titledPane = section("Data Options", content);
 		return titledPane;
 	}
 
@@ -301,34 +299,32 @@ public class OfflineProcessPaneFX {
 	/**
 	 * Create the tasks pane which will contain all task groups.
 	 */
-	private TitledPane createTasksPane() {
+	private VBox createTasksPane() {
 		taskGroupContainer = new VBox(5);
 		taskGroupContainer.setPadding(new Insets(5));
 
-		TitledPane titledPane = new TitledPane("Tasks", taskGroupContainer);
-		titledPane.setCollapsible(false);
+		VBox titledPane = section("Tasks", taskGroupContainer);
 		return titledPane;
 	}
 
 	/**
 	 * Create the notes pane.
 	 */
-	private TitledPane createNotesPane() {
+	private VBox createNotesPane() {
 		notesArea = new TextArea();
 		notesArea.setPrefRowCount(2);
 		notesArea.setPromptText(
 				"Notes to add to database record of completed tasks");
 		notesArea.setWrapText(true);
 
-		TitledPane titledPane = new TitledPane("Notes", notesArea);
-		titledPane.setCollapsible(false);
+		VBox titledPane = section("Notes", notesArea);
 		return titledPane;
 	}
 
 	/**
 	 * Create the progress pane.
 	 */
-	private TitledPane createProgressPane() {
+	private VBox createProgressPane() {
 		VBox content = new VBox(5);
 		content.setPadding(new Insets(5));
 
@@ -354,8 +350,7 @@ public class OfflineProcessPaneFX {
 		content.getChildren().addAll(statusLabel, currentFileLabel,
 				progressGrid);
 
-		TitledPane titledPane = new TitledPane("Progress", content);
-		titledPane.setCollapsible(false);
+		VBox titledPane = section("Progress", content);
 		return titledPane;
 	}
 
@@ -762,7 +757,7 @@ public class OfflineProcessPaneFX {
 
 		/**
 		 * Create the UI node for this task group: a collapsible
-		 * TitledPane containing a check box row for each task.
+		 * heading and a check box row for each task.
 		 */
 		private Node createNode() {
 			VBox content = new VBox(3);
@@ -800,7 +795,8 @@ public class OfflineProcessPaneFX {
 						task, cb);
 
 				if (task.hasSettings()) {
-					Button settingsBtn = new Button("\u2699"); // gear symbol
+					Button settingsBtn = new Button();
+					settingsBtn.setGraphic(pamViewFX.fxGlyphs.PamGlyphDude.createPamIcon("mdi2c-cog", pamViewFX.PamGuiManagerFX.iconSize));
 					settingsBtn.setTooltip(new Tooltip(
 							"Settings for " + task.getName()));
 					settingsBtn.setOnAction(e -> {
@@ -816,9 +812,10 @@ public class OfflineProcessPaneFX {
 				content.getChildren().add(row);
 			}
 
-			TitledPane titledPane = new TitledPane(label, content);
-			titledPane.setExpanded(true);
-			titledPane.setCollapsible(true);
+			// a smaller heading than the sections, as these sit inside the Tasks section. 
+			Label groupLabel = new Label(label);
+			groupLabel.setStyle("-fx-font-weight: bold;");
+			VBox titledPane = new VBox(3, groupLabel, content);
 			return titledPane;
 		}
 	}
@@ -836,4 +833,20 @@ public class OfflineProcessPaneFX {
 			this.checkBox = checkBox;
 		}
 	}
+
+	/**
+	 * A section of the pane: a bold title above its content, the same layout as
+	 * the other settings panes (rather than a titled pane). 
+	 * @param title - the section title.
+	 * @param content - the content of the section.
+	 * @return the section. 
+	 */
+	private static VBox section(String title, Node content) {
+		Label label = new Label(title);
+		pamViewFX.PamGuiManagerFX.titleFont2style(label);
+		VBox box = new VBox(5, label, content);
+		VBox.setMargin(content, new Insets(0, 0, 0, 5));
+		return box;
+	}
+
 }

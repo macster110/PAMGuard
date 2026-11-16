@@ -29,4 +29,19 @@ public class TabInfo implements Serializable {
 	 */
 	public String tabName = null;
 
+	/**
+	 * True to draw a border round each display in the tab.
+	 */
+	public boolean showDisplayBorders = false;
+
+	/**
+	 * Colour of the display borders, as a web colour string, e.g. "#808080".
+	 */
+	public String displayBorderColour = "#808080";
+
+	/**
+	 * Width of the display borders in pixels.
+	 */
+	public double displayBorderWidth = 2;
+
 }

@@ -239,7 +239,8 @@ public class DetectionGroupDisplay extends PamBorderPane {
 			PamTabPane settingsPane = new PamTabPane(); 
 			//this has to be before removing the heading button
 			settingsPane.setAddTabButton(false);
-			settingsPane.setTabMinHeight(60);
+			// keep the tab headers compact so the settings get most of the space. 
+			settingsPane.setTabMinHeight(30);
 			settingsPane.setMinHeight(100);
 			
 //			settingsPane.getStyleClass().add(Styles.TABS_FLOATING);
@@ -292,7 +293,7 @@ public class DetectionGroupDisplay extends PamBorderPane {
 			hidingPane.getHideButton().prefHeightProperty().bind(settingsPane.tabMinHeightProperty());
 			
 			//set the show button to be slight larger
-			hidingPane.getShowButton().setPrefHeight(60.);
+			hidingPane.getShowButton().setPrefHeight(30.);
 			
 			//now everything to pane. 
 			detectionDisplayHolder.getChildren().add(detectionDisplay);

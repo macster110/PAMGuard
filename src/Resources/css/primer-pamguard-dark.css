@@ -318,3 +318,21 @@
 }
 
 
+
+/* Acoustic scroller: a light grey rectangle shows up on a dark background. */
+*, .root, .gui-css-root {
+    -pam-scroller-body:    rgba(190,190,190,0.30);
+    -pam-scroller-handle:  rgba(215,215,215,0.65);
+    -pam-scroller-grip:    rgba(40,40,40,0.9);
+}
+
+/* The left hand menu strip of the time display's advanced pop up menu
+   (TDMenuPane). The pop up is a window of its own which only has the sliding
+   pane style sheets, so the rule has to be here. */
+.pam-menu-pane {
+    -fx-background-color: -color-bg-default;
+}
+
+.pam-menu-pane .label {
+    -fx-text-fill: -color-fg-default;
+}

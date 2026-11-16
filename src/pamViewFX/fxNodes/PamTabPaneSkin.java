@@ -193,16 +193,20 @@ public class PamTabPaneSkin extends TabPaneSkin {
 			toolbarHeight = snapSizeY(toolbarRegion.prefHeight(w));
 		}
 		
-		if (cachedContentArea == null) {
-			cachedContentArea = (StackPane) pamTabPane.lookup(".tab-content-area");
-		}
-		
-		// Set top padding on the content area to reserve space for the toolbar.
-		// The base skin will lay out the tab content below this padding.
-		if (cachedContentArea != null) {
-			Insets currentPadding = cachedContentArea.getPadding();
+		/*
+		 * Each tab has its own content area, so the padding goes on all of them.
+		 * Looking up only the first one left every other tab's content (and the
+		 * first tab's, once the tabs had been rebuilt) running up underneath the
+		 * toolbar.
+		 */
+		for (javafx.scene.Node node : getChildren()) {
+			if (!(node instanceof StackPane) || !node.getStyleClass().contains("tab-content-area")) {
+				continue;
+			}
+			StackPane contentArea = (StackPane) node;
+			Insets currentPadding = contentArea.getPadding();
 			if (currentPadding.getTop() != toolbarHeight) {
-				cachedContentArea.setPadding(new Insets(
+				contentArea.setPadding(new Insets(
 						toolbarHeight, 
 						currentPadding.getRight(), 
 						currentPadding.getBottom(), 

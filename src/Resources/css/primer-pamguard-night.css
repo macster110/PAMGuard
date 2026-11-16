@@ -74,3 +74,10 @@
   -fx-highlight_border_settings: #e65446;
   -fx-highlight_settings: #e65446;
 }
+
+/* Acoustic scroller in red for night use. */
+*, .root, .gui-css-root {
+    -pam-scroller-body:    rgba(200,80,80,0.28);
+    -pam-scroller-handle:  rgba(224,74,74,0.65);
+    -pam-scroller-grip:    rgba(20,20,20,0.9);
+}

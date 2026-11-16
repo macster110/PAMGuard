@@ -599,6 +599,73 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 		 * that sits between the tab headers and the tab content for all tabs.
 		 * @param pamGuiFX - the PamGuiFX this toolbar belongs to.
 		 */
+		/**
+		 * Menu items to draw a border round each display in the selected tab, with
+		 * a choice of border colour and thickness. 
+		 * @return the menu items.
+		 */
+		private java.util.List<MenuItem> createDisplayBorderItems() {
+			javafx.scene.control.CheckMenuItem showBorders = new javafx.scene.control.CheckMenuItem("Display borders");
+
+			javafx.scene.control.ColorPicker colourPicker = new javafx.scene.control.ColorPicker(Color.web("#808080"));
+			colourPicker.setTooltip(new javafx.scene.control.Tooltip("Border colour"));
+			colourPicker.setPrefWidth(110);
+
+			javafx.scene.control.Spinner<Double> widthSpinner = new javafx.scene.control.Spinner<Double>(0.5, 20, 2, 0.5);
+			widthSpinner.setEditable(true);
+			widthSpinner.setPrefWidth(80);
+			widthSpinner.setTooltip(new javafx.scene.control.Tooltip("Border thickness (pixels)"));
+
+			PamHBox styleBox = new PamHBox();
+			styleBox.setSpacing(5);
+			styleBox.setAlignment(Pos.CENTER_LEFT);
+			styleBox.getChildren().addAll(new javafx.scene.control.Label("Border"), colourPicker, widthSpinner);
+			javafx.scene.control.CustomMenuItem styleItem = new javafx.scene.control.CustomMenuItem(styleBox);
+			styleItem.setHideOnClick(false);
+
+			boolean[] updating = new boolean[1];
+			Runnable apply = () -> {
+				if (updating[0]) return;
+				PamGuiTabFX selectedTab = getSelectedTab();
+				if (selectedTab == null) return;
+				Color c = colourPicker.getValue();
+				String web = String.format("#%02x%02x%02x", (int) Math.round(c.getRed() * 255), 
+						(int) Math.round(c.getGreen() * 255), (int) Math.round(c.getBlue() * 255));
+				selectedTab.setDisplayBorders(showBorders.isSelected(), web, widthSpinner.getValue());
+			};
+			showBorders.selectedProperty().addListener((obs, o, n) -> {
+				styleBox.setDisable(!n);
+				apply.run();
+			});
+			colourPicker.valueProperty().addListener((obs, o, n) -> apply.run());
+			widthSpinner.valueProperty().addListener((obs, o, n) -> apply.run());
+
+			// show the settings of the tab which is selected when the menu opens. 
+			autoSortChoice.setOnShowing(e -> {
+				PamGuiTabFX selectedTab = getSelectedTab();
+				if (selectedTab == null || selectedTab.getTabInfo() == null) return;
+				TabInfo info = selectedTab.getTabInfo();
+				updating[0] = true;
+				showBorders.setSelected(info.showDisplayBorders);
+				try {
+					colourPicker.setValue(Color.web(info.displayBorderColour));
+				}
+				catch (Exception ex) {
+					colourPicker.setValue(Color.web("#808080"));
+				}
+				widthSpinner.getValueFactory().setValue(info.displayBorderWidth);
+				styleBox.setDisable(!info.showDisplayBorders);
+				updating[0] = false;
+			});
+			styleBox.setDisable(true);
+
+			java.util.List<MenuItem> items = new java.util.ArrayList<MenuItem>();
+			items.add(new javafx.scene.control.SeparatorMenuItem());
+			items.add(showBorders);
+			items.add(styleItem);
+			return items;
+		}
+
 		public ToolBarPane(PamGuiFX pamGuiFX){
 			super();
 			
@@ -662,6 +729,7 @@ public class PamGuiFX extends StackPane implements PamViewInterface {
 			});
 			
 			autoSortChoice.getItems().addAll(tile, vertical, horizontal); 
+			autoSortChoice.getItems().addAll(createDisplayBorderItems());
 			
 			rightHBox.getChildren().addAll(editWindows, autoSortChoice);
 

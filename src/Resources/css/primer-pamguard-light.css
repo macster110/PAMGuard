@@ -17,3 +17,14 @@
   -fx-text: -color-fg-default;
   -fx-icon_col: -color-fg-default;
 }
+
+/* The left hand menu strip of the time display's advanced pop up menu
+   (TDMenuPane). The pop up is a window of its own which only has the sliding
+   pane style sheets, so the rule has to be here. */
+.pam-menu-pane {
+    -fx-background-color: -color-bg-default;
+}
+
+.pam-menu-pane .label {
+    -fx-text-fill: -color-fg-default;
+}

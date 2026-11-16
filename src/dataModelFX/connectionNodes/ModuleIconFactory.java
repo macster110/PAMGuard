@@ -134,13 +134,13 @@ public class ModuleIconFactory {
 			iconNode = PamGlyphDude.createModuleIcon("mdi2s-sd"); 
 			break;
 		case ISHMAEL_ENERGY:
-			iconNode = PamGlyphDude.createModuleIcon("mdi2s-sigma"); 
+			iconNode = getSVGIcon("/Resources/modules/ishmael_energy_sum.svg"); 
 			break;
 		case ISHMAEL_SPEC_CORR:
-			iconNode = PamGlyphDude.createModuleIcon("mdi2c-chart-bell-curve"); 
+			iconNode = getSVGIcon("/Resources/modules/ishmael_spec_corr.svg"); 
 			break;
 		case ISHMAEL_MATCHED_FILTER:
-			iconNode = PamGlyphDude.createModuleIcon("mdi2w-waveform"); 
+			iconNode = getSVGIcon("/Resources/modules/ishmael_matched_filter.svg"); 
 			break;
 		case DEEP_WHISTLE:
 			iconNode = PamGlyphDude.createModuleIcon("mdi2b-brain"); 

@@ -295,7 +295,7 @@
 
 
 .split-menu-button .label {
-  -fx-text-fill: white;
+  -fx-text-fill: -fx-text;
   -fx-background-color: -fx-darkbackground;
   -fx-border-radius: 5;
 }
@@ -484,4 +484,71 @@
   -fx-background-color: -color-accent-6;
   -fx-border-color: -color-accent-6;
   -fx-text-fill: white;
+}
+
+/*******************************************************************************
+ *                                                                             *
+ *  Acoustic scroller (the time scroller under the time display)               *
+ *                                                                             *
+ ******************************************************************************/
+
+/* A grey visible-range rectangle and handles, as in the Swing GUI, so the
+   scroller is easy to see and grab. Dark and night colours are in the dark and
+   night sheets. */
+*, .root, .gui-css-root {
+    -pam-scroller-body:    rgba(70,70,70,0.45);
+    -pam-scroller-handle:  rgba(40,40,40,0.75);
+    -pam-scroller-grip:    rgba(235,235,235,0.9);
+}
+
+.pam-scroller-body {
+    -fx-background-color: -pam-scroller-body;
+}
+
+.pam-scroller-handle {
+    -fx-background-color: -pam-scroller-handle;
+}
+
+.pam-scroller-grip {
+    -fx-stroke: -pam-scroller-grip;
+}
+
+.pam-scroller-drag-icon {
+    -fx-background-color: -pam-scroller-handle;
+    -fx-background-radius: 3;
+}
+
+.pam-scroller-drag-glyph {
+    -fx-icon-color: -pam-scroller-grip;
+}
+
+/*******************************************************************************
+ *                                                                             *
+ *  Time display advanced pop up menu (TDMenuPane)                             *
+ *                                                                             *
+ ******************************************************************************/
+
+/* The left hand menu strip of the pop up menu. It carries the sliding pane
+   style sheets, so this takes the dark colours in the Light/Dark, Dark and
+   Night modes like the other sliding panes, and the light ones in Light mode.
+   Without it the strip had no background of its own and stayed light. */
+.pam-menu-pane {
+    -fx-background-color: -color-bg-default;
+}
+
+.pam-menu-pane .label,
+.pam-menu-pane .button,
+.pam-menu-pane .toggle-button {
+    -fx-text-fill: -color-fg-default;
+}
+
+.pam-menu-pane .button,
+.pam-menu-pane .toggle-button,
+.pam-menu-pane .menu-button,
+.pam-menu-pane .split-menu-button {
+    -fx-alignment: center-left;
+}
+
+.pam-menu-pane .icon-button {
+    -fx-alignment: center;
 }

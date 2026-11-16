@@ -1,5 +1,9 @@
 package clipDisplayFX;
 
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import pamViewFX.fxNodes.flipPane.PamFlipPane;
+import javafx.scene.control.MenuButton;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,6 +72,8 @@ import pamViewFX.fxNodes.PamScrollPane;
 import pamViewFX.fxNodes.PamSpinner;
 import pamViewFX.fxNodes.PamVBox;
 import pamViewFX.fxNodes.comboBox.ColorComboBox;
+import pamViewFX.fxNodes.sliders.ColourRangeSlider;
+import pamViewFX.fxNodes.utilsFX.ColourArray.ColourArrayType;
 import pamViewFX.fxNodes.hidingPane.HidingPane;
 import pamViewFX.fxNodes.internalNode.PamInternalPane;
 import pamViewFX.fxNodes.pamScrollers.acousticScroller.AcousticScrollerFX;
@@ -115,7 +121,6 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	/**
 	 * Holds the data selector, which depends on the data source.
 	 */
-	private PamVBox dataSelectHolder;
 
 	private Tab symbolTab;
 
@@ -149,9 +154,14 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	/**
 	 * Display controls.
 	 */
-	private Slider minAmplitude, ampRange, maxFreq;
+	private Slider maxFreq;
 
-	private Label minAmpLabel, ampRangeLabel, maxFreqLabel, fftResLabel;
+	/**
+	 * Colour map bar with the amplitude range of the colour scale. 
+	 */
+	private ColourRangeSlider colourSlider;
+
+	private Label ampRangeLabel, maxFreqLabel, fftResLabel;
 
 	private ChoiceBox<Integer> fftLength;
 
@@ -159,7 +169,6 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 
 	private ColorComboBox colourBox;
 
-	private Region colourBar;
 
 	private CheckBox showTrigger, newClipsLast, fullSummary;
 
@@ -169,7 +178,18 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 
 	private boolean settingControls;
 
-	private final ArrayList<DynamicSettingsPane<Boolean>> dataSelectPanes = new ArrayList<DynamicSettingsPane<Boolean>>();
+	private final java.util.HashMap<PamDataBlock<?>, DynamicSettingsPane<Boolean>> dataSelectPanes = new java.util.HashMap<PamDataBlock<?>, DynamicSettingsPane<Boolean>>();
+
+	/**
+	 * Buttons to add and remove data sources. 
+	 */
+	private MenuButton addSourceButton, removeSourceButton;
+
+	/**
+	 * Flip pane with the data sources on the front and the data selection of one of
+	 * them on the back. 
+	 */
+	private PamFlipPane dataFlipPane;
 
 	private boolean viewerReloadPending;
 
@@ -315,29 +335,31 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		specGrid.setVgap(5);
 		int row = 0;
 
-		minAmplitude = new Slider(0, 200, 50);
-		minAmplitude.setPrefWidth(150);
-		minAmplitude.setMajorTickUnit(50);
-		minAmplitude.setMinorTickCount(4);
-		minAmplitude.setSnapToTicks(true);
-		minAmplitude.setShowTickMarks(true);
-		minAmplitude.setShowTickLabels(true);
-		minAmplitude.setTooltip(new Tooltip("Amplitude shown at the bottom of the colour scale"));
-		specGrid.add(new Label("Min amplitude"), 0, row);
-		specGrid.add(minAmplitude, 1, row);
-		specGrid.add(minAmpLabel = new Label(), 2, row++);
+		/*
+		 * Colour map and amplitude range, using the same colour bar slider as the
+		 * spectrogram in the time display: drag the ends to set the amplitudes at
+		 * the bottom and top of the colour scale. 
+		 */
+		colourBox = new ColorComboBox(ColorComboBox.COLOUR_ARRAY_BOX);
+		colourBox.setPrefWidth(150);
+		specGrid.add(new Label("Colours"), 0, row);
+		specGrid.add(colourBox, 1, row++);
 
-		ampRange = new Slider(40, 200, 70);
-		ampRange.setPrefWidth(150);
-		ampRange.setMajorTickUnit(40);
-		ampRange.setMinorTickCount(3);
-		ampRange.setSnapToTicks(true);
-		ampRange.setShowTickMarks(true);
-		ampRange.setShowTickLabels(true);
-		ampRange.setTooltip(new Tooltip("Range of amplitudes shown on the colour scale"));
-		specGrid.add(new Label("Range"), 0, row);
-		specGrid.add(ampRange, 1, row);
-		specGrid.add(ampRangeLabel = new Label(), 2, row++);
+		colourSlider = new ColourRangeSlider(Orientation.HORIZONTAL);
+		colourSlider.setMin(0);
+		colourSlider.setMax(250);
+		colourSlider.setLowValue(50);
+		colourSlider.setHighValue(120);
+		colourSlider.setShowTickMarks(true);
+		colourSlider.setShowTickLabels(true);
+		colourSlider.setMajorTickUnit(50);
+		colourSlider.setPrefWidth(220);
+		colourSlider.setTooltip(new Tooltip("Amplitudes (dB) at the bottom and top of the colour scale. "
+				+ "Drag either end, or the bar to move both."));
+		specGrid.add(new Label("Amplitude"), 0, row);
+		specGrid.add(colourSlider, 1, row, 2, 1);
+		row++;
+		specGrid.add(ampRangeLabel = new Label(), 1, row++, 2, 1);
 
 		fftLength = new ChoiceBox<Integer>();
 		for (int i = 4; i <= 15; i++) {
@@ -350,14 +372,6 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		fftResLabel.setTooltip(new Tooltip("WARNING: This may vary if some data units have decimated data displayed"));
 		specGrid.add(fftResLabel, 0, row++, 3, 1);
 
-		colourBox = new ColorComboBox(ColorComboBox.COLOUR_ARRAY_BOX);
-		colourBox.setPrefWidth(150);
-		specGrid.add(new Label("Colours"), 0, row);
-		specGrid.add(colourBox, 1, row++);
-		colourBar = new Region();
-		colourBar.setPrefHeight(12);
-		colourBar.setMinHeight(12);
-		specGrid.add(colourBar, 0, row++, 3, 1);
 
 		showTrigger = new CheckBox("Overlay trigger data");
 		showTrigger.setTooltip(new Tooltip("Draw the detection which triggered each clip on top of the clip, e.g. a whistle contour"));
@@ -420,8 +434,8 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		vBox.getChildren().add(help);
 
 		// listeners
-		minAmplitude.valueProperty().addListener((o, a, b) -> controlChanged(true));
-		ampRange.valueProperty().addListener((o, a, b) -> controlChanged(true));
+		colourSlider.lowValueProperty().addListener((o, a, b) -> controlChanged(true));
+		colourSlider.highValueProperty().addListener((o, a, b) -> controlChanged(true));
 		fftLength.valueProperty().addListener((o, a, b) -> controlChanged(true));
 		colourBox.valueProperty().addListener((o, a, b) -> controlChanged(true));
 		hScale.valueProperty().addListener((o, a, b) -> controlChanged(true));
@@ -505,18 +519,24 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		box.setSpacing(5);
 		box.setPadding(new Insets(5));
 
+		// add and remove buttons, as for the plots in the time display. 
+		addSourceButton = new MenuButton("Data");
+		addSourceButton.setGraphic(PamGlyphDude.createPamIcon("mdi2p-plus", PamGuiManagerFX.iconSize));
+		addSourceButton.setTooltip(new Tooltip("Add data to the display"));
+		removeSourceButton = new MenuButton("Data");
+		removeSourceButton.setGraphic(PamGlyphDude.createPamIcon("mdi2m-minus", PamGuiManagerFX.iconSize));
+		removeSourceButton.setTooltip(new Tooltip("Remove data from the display"));
+		PamHBox buttons = new PamHBox(addSourceButton, removeSourceButton);
+		buttons.setSpacing(5);
+
 		sourceList = new PamVBox();
 		sourceList.setSpacing(4);
-		Label help = new Label("Tick the data to show. Anything which holds raw sound can be shown, e.g. clips, clicks or deep learning detections.");
+		Label help = new Label("Anything which holds raw sound can be shown, e.g. clips, clicks or deep learning detections. "
+				+ "Use the cog to choose which of the data are shown.");
 		help.setWrapText(true);
 		help.setStyle("-fx-font-size: 11; -fx-opacity: 0.8;");
 		updateSourceChoice();
-		box.getChildren().addAll(title("Data sources"), help, sourceList);
-
-		dataSelectHolder = new PamVBox();
-		dataSelectHolder.setSpacing(5);
-		box.getChildren().add(dataSelectHolder);
-		updateDataSelectPane();
+		box.getChildren().addAll(title("Data sources"), buttons, sourceList, help);
 
 		channelChoice = new ChoiceBox<String>();
 		channelChoice.setTooltip(new Tooltip("Only show clips from a single channel"));
@@ -531,79 +551,137 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 			setDisplayChannels(ind <= 0 || chans == null || ind > chans.length ? 0 : 1 << chans[ind - 1]);
 		});
 		box.getChildren().addAll(title("Channels"), channelChoice);
-		return box;
+
+		// the data selection of a source is shown on the back of a flip pane. 
+		dataFlipPane = new PamFlipPane();
+		dataFlipPane.setFrontContent(box);
+		dataFlipPane.getPreAdvLabel().setText("");
+		dataFlipPane.getPostAdvLabel().setText("data selection");
+		dataFlipPane.setAdvLabelEditable(false);
+		return dataFlipPane;
 	}
 
 	/**
-	 * Put a tick box for every data block which holds raw sound in the data source list.
+	 * Update the list of data sources and the add and remove menus.
 	 */
 	private void updateSourceChoice() {
 		if (sourceList == null) {
 			return;
 		}
 		ArrayList<PamDataBlock<?>> blocks = ClipDisplayControlFX.getRawClipBlocks();
-		for (PamDataBlock<?> block : sourceBlocks) {
-			if (!blocks.contains(block)) {
-				blocks.add(block);
-			}
-		}
-		sourceList.getChildren().clear();
-		if (blocks.isEmpty()) {
-			sourceList.getChildren().add(new Label("No data which holds raw sound"));
-			return;
-		}
+
+		addSourceButton.getItems().clear();
 		for (PamDataBlock<?> block : blocks) {
-			CheckBox cb = new CheckBox(block.getLongDataName());
-			cb.setWrapText(true);
-			cb.setSelected(sourceBlocks.contains(block));
-			cb.selectedProperty().addListener((o, a, b) -> {
-				if (settingControls) {
-					return;
-				}
+			if (sourceBlocks.contains(block)) {
+				continue;
+			}
+			MenuItem item = new MenuItem(block.getLongDataName());
+			item.setOnAction(e -> {
 				ArrayList<PamDataBlock<?>> newList = new ArrayList<PamDataBlock<?>>(sourceBlocks);
-				if (b && !newList.contains(block)) {
-					newList.add(block);
-				}
-				else if (!b) {
-					newList.remove(block);
-				}
+				newList.add(block);
 				displayControl.setSourceDataBlocks(newList);
 			});
-			sourceList.getChildren().add(cb);
+			addSourceButton.getItems().add(item);
+		}
+		addSourceButton.setDisable(addSourceButton.getItems().isEmpty());
+
+		removeSourceButton.getItems().clear();
+		for (PamDataBlock<?> block : sourceBlocks) {
+			MenuItem item = new MenuItem(block.getLongDataName());
+			item.setOnAction(e -> {
+				ArrayList<PamDataBlock<?>> newList = new ArrayList<PamDataBlock<?>>(sourceBlocks);
+				newList.remove(block);
+				displayControl.setSourceDataBlocks(newList);
+			});
+			removeSourceButton.getItems().add(item);
+		}
+		removeSourceButton.setDisable(removeSourceButton.getItems().isEmpty());
+
+		sourceList.getChildren().clear();
+		if (sourceBlocks.isEmpty()) {
+			Label none = new Label(blocks.isEmpty() ? "No data which holds raw sound" : "No data shown. Press + to add data.");
+			none.setWrapText(true);
+			sourceList.getChildren().add(none);
+			return;
+		}
+		for (PamDataBlock<?> block : sourceBlocks) {
+			Label name = new Label(block.getLongDataName());
+			name.setWrapText(true);
+			name.setMaxWidth(Double.MAX_VALUE);
+			HBox.setHgrow(name, Priority.ALWAYS);
+			PamHBox row = new PamHBox(name);
+			row.setSpacing(5);
+			row.setAlignment(Pos.CENTER_LEFT);
+			if (getDataSelectPane(block) != null) {
+				PamButton cog = new PamButton();
+				cog.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
+				cog.setTooltip(new Tooltip("Choose which " + block.getDataName() + " data are shown"));
+				cog.setOnAction(e -> showDataSelection(block));
+				row.getChildren().add(cog);
+			}
+			sourceList.getChildren().add(row);
 		}
 	}
 
 	/**
-	 * Show the data selectors of the current data sources.
+	 * Show the data selection of a data source on the back of the flip pane. 
+	 * @param block - the data source.
+	 */
+	private void showDataSelection(PamDataBlock<?> block) {
+		DynamicSettingsPane<Boolean> pane = getDataSelectPane(block);
+		if (pane == null || dataFlipPane == null) {
+			return;
+		}
+		PamScrollPane scroll = new PamScrollPane(pane.getContentNode());
+		scroll.setFitToWidth(true);
+		scroll.setHbarPolicy(ScrollBarPolicy.NEVER);
+		dataFlipPane.setAdvPaneContent(scroll);
+		dataFlipPane.getAdvLabel().setText(block.getDataName() + " ");
+		dataFlipPane.flipToBack();
+	}
+
+	/**
+	 * Get the data selection pane of a data source, making it if needed. 
+	 * @param block - the data source.
+	 * @return the pane, or null if the data have no data selector.
+	 */
+	private DynamicSettingsPane<Boolean> getDataSelectPane(PamDataBlock<?> block) {
+		DynamicSettingsPane<Boolean> pane = dataSelectPanes.get(block);
+		if (pane != null) {
+			return pane;
+		}
+		DataSelector ds = getDataSelector(block);
+		if (ds == null) {
+			return null;
+		}
+		try {
+			pane = ds.getDialogPaneFX();
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+		if (pane == null) {
+			return null;
+		}
+		pane.setParams(true);
+		final DynamicSettingsPane<Boolean> fPane = pane;
+		fPane.addSettingsListener(() -> {
+			fPane.getParams(true);
+			clipCanvas.updateShownClips();
+			updateStatus();
+		});
+		dataSelectPanes.put(block, fPane);
+		return fPane;
+	}
+
+	/**
+	 * Forget the data selection panes of sources which are no longer shown, and go
+	 * back to the list of sources if the one being edited has gone.
 	 */
 	private void updateDataSelectPane() {
-		dataSelectHolder.getChildren().clear();
-		dataSelectPanes.clear();
-		for (PamDataBlock<?> block : sourceBlocks) {
-			DataSelector ds = getDataSelector(block);
-			if (ds == null) {
-				continue;
-			}
-			DynamicSettingsPane<Boolean> pane = null;
-			try {
-				pane = ds.getDialogPaneFX();
-			}
-			catch (Exception e) {
-				e.printStackTrace();
-			}
-			if (pane == null) {
-				continue;
-			}
-			pane.setParams(true);
-			final DynamicSettingsPane<Boolean> fPane = pane;
-			fPane.addSettingsListener(() -> {
-				fPane.getParams(true);
-				clipCanvas.updateShownClips();
-				updateStatus();
-			});
-			dataSelectPanes.add(fPane);
-			String name = sourceBlocks.size() > 1 ? "Data selection: " + block.getDataName() : "Data selection";
-			dataSelectHolder.getChildren().addAll(title(name), fPane.getContentNode());
+		dataSelectPanes.keySet().removeIf(b -> !sourceBlocks.contains(b));
+		if (dataFlipPane != null && !dataFlipPane.isShowingFront()) {
+			dataFlipPane.flipToFront();
 		}
 	}
 
@@ -775,8 +853,10 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	private void setControls() {
 		settingControls = true;
 		ClipDisplayParameters p = params.clipParams;
-		minAmplitude.setValue(p.amlitudeMinVal);
-		ampRange.setValue(p.amplitudeRangeVal);
+		colourSlider.setMax(Math.max(colourSlider.getMax(), p.amlitudeMinVal + p.amplitudeRangeVal));
+		colourSlider.setHighValue(p.amlitudeMinVal + p.amplitudeRangeVal);
+		colourSlider.setLowValue(p.amlitudeMinVal);
+		colourSlider.setHighValue(p.amlitudeMinVal + p.amplitudeRangeVal);
 		fftLength.setValue(1 << p.getLogFFTLength());
 		colourBox.setValue(p.getColourMap().toString());
 		hScale.setValue(nearest(p.imageHScale));
@@ -809,8 +889,8 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 	 */
 	private void getControls() {
 		ClipDisplayParameters p = params.clipParams;
-		p.amlitudeMinVal = minAmplitude.getValue();
-		p.amplitudeRangeVal = ampRange.getValue();
+		p.amlitudeMinVal = Math.round(colourSlider.getLowValue());
+		p.amplitudeRangeVal = Math.max(1, Math.round(colourSlider.getHighValue()) - p.amlitudeMinVal);
 		if (fftLength.getValue() != null) {
 			p.setLogFFTLength(Integer.numberOfTrailingZeros(fftLength.getValue()));
 		}
@@ -872,8 +952,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 
 	private void sayValues() {
 		ClipDisplayParameters p = params.clipParams;
-		minAmpLabel.setText(String.format("%3.0f dB", p.amlitudeMinVal));
-		ampRangeLabel.setText(String.format("%3.0f dB", p.amplitudeRangeVal));
+		ampRangeLabel.setText(String.format("%3.0f to %3.0f dB", p.amlitudeMinVal, p.amlitudeMinVal + p.amplitudeRangeVal));
 		float sr = getSampleRate();
 		if (sr > 0) {
 			int fftLen = 1 << p.getLogFFTLength();
@@ -887,26 +966,16 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 			fftResLabel.setText(" ");
 			maxFreqLabel.setText(String.format("%3.2f × Nyquist", p.frequencyScale));
 		}
-		colourBar.setStyle("-fx-background-color: " + getColourGradient() + "; -fx-background-radius: 3;");
-	}
-
-	/**
-	 * Make a CSS gradient from the colours used for the clip images, low amplitudes on the left.
-	 */
-	private String getColourGradient() {
-		if (colourArray == null) {
-			makeColourArray();
+		// the colour box holds the names of the Swing colour maps, so match on the name. 
+		ColourArray.ColourArrayType swingType = getColourType(colourBox.getValue());
+		if (swingType != null) {
+			for (ColourArrayType fxType : ColourArrayType.values()) {
+				if (fxType.toString().equalsIgnoreCase(swingType.toString())) {
+					colourSlider.setColourArrayType(fxType);
+					break;
+				}
+			}
 		}
-		java.awt.Color[] cols = colourArray.getColours();
-		StringBuilder sb = new StringBuilder("linear-gradient(to right");
-		int nStops = 12;
-		for (int i = 0; i <= nStops; i++) {
-			int ind = Math.min(cols.length - 1, i * (cols.length - 1) / nStops);
-			java.awt.Color c = cols[ind];
-			sb.append(String.format(", #%02x%02x%02x %d%%", c.getRed(), c.getGreen(), c.getBlue(), i * 100 / nStops));
-		}
-		sb.append(")");
-		return sb.toString();
 	}
 
 	private float getSampleRate() {
@@ -1338,7 +1407,7 @@ public class ClipDisplayFX extends PamBorderPane implements UserDisplayNodeFX, P
 		}
 
 		// data selection
-		if (!dataSelectPanes.isEmpty()) {
+		if (!sourceBlocks.isEmpty()) {
 			MenuItem dsItem = new MenuItem("Data selection ...");
 			dsItem.setGraphic(PamGlyphDude.createPamIcon("mdi2f-filter-outline", PamGuiManagerFX.iconSize));
 			dsItem.setOnAction(a -> showSettings("Data"));

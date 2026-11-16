@@ -28,7 +28,6 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.SpinnerValueFactory;
 import javafx.scene.control.TextField;
-import javafx.scene.control.TitledPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
@@ -229,7 +228,7 @@ public class ExportPaneFX {
 	/**
 	 * Create the export settings pane: format selection, folder, file size.
 	 */
-	private TitledPane createExportSettingsPane() {
+	private VBox createExportSettingsPane() {
 		VBox content = new VBox(8);
 		content.setPadding(new Insets(5));
 
@@ -287,15 +286,14 @@ public class ExportPaneFX {
 		extraOptionsContainer = new VBox();
 		content.getChildren().add(extraOptionsContainer);
 
-		TitledPane titledPane = new TitledPane("Export Settings", content);
-		titledPane.setCollapsible(false);
+		VBox titledPane = section("Export Settings", content);
 		return titledPane;
 	}
 
 	/**
 	 * Create the data options pane.
 	 */
-	private TitledPane createDataOptionsPane() {
+	private VBox createDataOptionsPane() {
 		VBox content = new VBox(5);
 		content.setPadding(new Insets(5));
 
@@ -331,27 +329,25 @@ public class ExportPaneFX {
 		dateSelectionPane.setManaged(false);
 		content.getChildren().add(dateSelectionPane);
 
-		TitledPane titledPane = new TitledPane("Data Options", content);
-		titledPane.setCollapsible(false);
+		VBox titledPane = section("Data Options", content);
 		return titledPane;
 	}
 
 	/**
 	 * Create the data blocks (tasks) pane.
 	 */
-	private TitledPane createDataBlocksPane() {
+	private VBox createDataBlocksPane() {
 		dataBlockContainer = new VBox(3);
 		dataBlockContainer.setPadding(new Insets(5));
 
-		TitledPane titledPane = new TitledPane("Export Data", dataBlockContainer);
-		titledPane.setCollapsible(false);
+		VBox titledPane = section("Export Data", dataBlockContainer);
 		return titledPane;
 	}
 
 	/**
 	 * Create the progress pane.
 	 */
-	private TitledPane createProgressPane() {
+	private VBox createProgressPane() {
 		VBox content = new VBox(5);
 		content.setPadding(new Insets(5));
 
@@ -377,8 +373,7 @@ public class ExportPaneFX {
 		content.getChildren().addAll(statusLabel, currentFileLabel,
 				progressGrid);
 
-		TitledPane titledPane = new TitledPane("Progress", content);
-		titledPane.setCollapsible(false);
+		VBox titledPane = section("Progress", content);
 		return titledPane;
 	}
 
@@ -472,7 +467,8 @@ public class ExportPaneFX {
 			TaskCheckBoxEntry entry = new TaskCheckBoxEntry(task, cb);
 
 			if (task.hasSettings()) {
-				Button settingsBtn = new Button("\u2699");
+				Button settingsBtn = new Button();
+					settingsBtn.setGraphic(pamViewFX.fxGlyphs.PamGlyphDude.createPamIcon("mdi2c-cog", pamViewFX.PamGuiManagerFX.iconSize));
 				settingsBtn.setTooltip(new Tooltip(
 						"Data selector for " + task.getName()));
 				settingsBtn.setOnAction(e -> task.callSettings());
@@ -943,4 +939,20 @@ public class ExportPaneFX {
 			this.checkBox = checkBox;
 		}
 	}
+
+	/**
+	 * A section of the pane: a bold title above its content, the same layout as
+	 * the other settings panes (rather than a titled pane). 
+	 * @param title - the section title.
+	 * @param content - the content of the section.
+	 * @return the section. 
+	 */
+	private static VBox section(String title, Node content) {
+		Label label = new Label(title);
+		pamViewFX.PamGuiManagerFX.titleFont2style(label);
+		VBox box = new VBox(5, label, content);
+		VBox.setMargin(content, new Insets(0, 0, 0, 5));
+		return box;
+	}
+
 }

@@ -303,6 +303,7 @@ public class PamGuiTabFX extends PamTabFX {
 		PamGuiInternalPane newInternalPane=new PamGuiInternalPane(pane, holder);
 		holder.getChildren().add(newInternalPane);
 		internalPanes.add(newInternalPane);
+		applyDisplayBorder(newInternalPane);
 		autoSortPanes(sortType);
 		return newInternalPane;
 	}
@@ -327,12 +328,13 @@ public class PamGuiTabFX extends PamTabFX {
 		
 		PamGuiInternalPane newInternalPane=new PamGuiInternalPane(userDisplayNodeFX, holder);
 		
-		//bind the drag pad to the height of the shared toolbar so that it is always below the toolbar.
-		newInternalPane.dragPadNorthProperty().bind(pamGui.getSharedToolbar().heightProperty());
+		// no drag pad is needed above the displays: the tab pane already starts the tab
+		// content below the shared toolbar. 
 		
 		if (!userDisplayNodeFX.isResizeableDisplay()) newInternalPane.showResizeControls(false);
 		holder.getChildren().add(newInternalPane);
 		internalPanes.add(newInternalPane);
+		applyDisplayBorder(newInternalPane);
 		autoSortPanes(sortType);
 		return newInternalPane;
 	}
@@ -643,6 +645,38 @@ public class PamGuiTabFX extends PamTabFX {
 			this.mainPane=null; 
 		}
 		
+	}
+
+	/**
+	 * Show or hide a border round each display in the tab.
+	 * @param show - true to draw the borders.
+	 * @param colour - border colour, as a web colour string, e.g. "#808080".
+	 * @param width - border width in pixels.
+	 */
+	public void setDisplayBorders(boolean show, String colour, double width) {
+		tabInfo.showDisplayBorders = show;
+		if (colour != null) tabInfo.displayBorderColour = colour;
+		tabInfo.displayBorderWidth = Math.max(0, width);
+		for (PamGuiInternalPane internalPane : internalPanes) {
+			applyDisplayBorder(internalPane);
+		}
+	}
+
+	/**
+	 * Draw (or remove) the border round one display, from the tab settings.
+	 * @param internalPane - the pane holding the display.
+	 */
+	private void applyDisplayBorder(PamGuiInternalPane internalPane) {
+		Region region = internalPane.getInternalRegion();
+		if (region == null) return;
+		if (tabInfo.showDisplayBorders && tabInfo.displayBorderWidth > 0) {
+			String colour = tabInfo.displayBorderColour == null ? "#808080" : tabInfo.displayBorderColour;
+			region.setStyle(String.format("-fx-border-color: %s; -fx-border-width: %s;", 
+					colour, Double.toString(tabInfo.displayBorderWidth)));
+		}
+		else {
+			region.setStyle("");
+		}
 	}
 
 	/**
