@@ -687,7 +687,14 @@ public class MapCanvasFX extends Pane {
 		double h = getHeight();
 		for (int i = 0; i <= nTest; i++) {
 			double v = min + (max - min) * i / nTest;
-			Coordinate3d c = isLat ? projector.getCoord3d(fixedValue, v, 0) : projector.getCoord3d(v, fixedValue, 0);
+			// if/else rather than ?: as the Eclipse compiler made code for the ?: which fails verification.
+			Coordinate3d c;
+			if (isLat) {
+				c = projector.getCoord3d(fixedValue, v, 0);
+			}
+			else {
+				c = projector.getCoord3d(v, fixedValue, 0);
+			}
 			if (c.x >= 0 && c.x < w && c.y >= 0 && c.y < h) {
 				int textWidth = g.getFontMetrics().stringWidth(text);
 				// keep latitude labels clear of the map controls on the left.

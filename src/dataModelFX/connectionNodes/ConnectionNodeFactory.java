@@ -81,8 +81,6 @@ public class ConnectionNodeFactory {
 				System.err.println("Error adding module: The controlled unit is null ");
 			}
 
-			//NOW 
-			System.err.println("Error adding module: The controlled unit is null ");
 
 
 			//DOUBLE CHECK - 
