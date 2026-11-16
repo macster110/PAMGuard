@@ -243,7 +243,7 @@ public class ExportPaneFX {
 		for (int i = 0; i < nExporters; i++) {
 			PamDataUnitExporter exporter = exportManager.getExporter(i);
 			ToggleButton tb = new ToggleButton();
-			tb.setGraphic(PamGlyphDude.createPamIcon(exporter.getIconString(), 20));
+			tb.setGraphic(PamGlyphDude.createPamIcon(exporter.getIconString(), 28));
 			tb.setTooltip(new Tooltip("Export to " + exporter.getName()
 					+ " file (." + exporter.getFileExtension() + ")"));
 			tb.setToggleGroup(exportFormatGroup);
@@ -293,6 +293,24 @@ public class ExportPaneFX {
 	}
 
 	/**
+	 * A small information icon which explains the data options when the mouse is
+	 * over it.
+	 */
+	private Node createDataInfoIcon() {
+		Label info = new Label();
+		info.setGraphic(pamViewFX.fxGlyphs.PamGlyphDude.createPamIcon("mdi2i-information-outline", pamViewFX.PamGuiManagerFX.iconSize));
+		Tooltip tip = new Tooltip(
+				"Loaded Data: export only the data currently loaded in the viewer.\n"
+				+ "All Data: export all data in the project.\n"
+				+ "New Data: export data after the end of the last completed run.\n"
+				+ "Select Data: export data between a start and end time.");
+		tip.setShowDelay(javafx.util.Duration.millis(100));
+		tip.setShowDuration(javafx.util.Duration.INDEFINITE);
+		info.setTooltip(tip);
+		return info;
+	}
+
+	/**
 	 * Create the data options pane.
 	 */
 	private VBox createDataOptionsPane() {
@@ -301,7 +319,6 @@ public class ExportPaneFX {
 
 		HBox dataSelRow = new HBox(10);
 		dataSelRow.setAlignment(Pos.CENTER_LEFT);
-		dataSelRow.getChildren().add(new Label("Data:"));
 		dataSelectionCombo = new ComboBox<>();
 		dataSelectionCombo.getItems().addAll(
 				"Loaded Data", "All Data", "New Data", "Select Data");
@@ -309,7 +326,7 @@ public class ExportPaneFX {
 		dataSelectionCombo.setOnAction(e -> onDataSelectionChanged());
 		HBox.setHgrow(dataSelectionCombo, Priority.ALWAYS);
 		dataSelectionCombo.setMaxWidth(Double.MAX_VALUE);
-		dataSelRow.getChildren().add(dataSelectionCombo);
+		dataSelRow.getChildren().addAll(dataSelectionCombo, createDataInfoIcon());
 		content.getChildren().add(dataSelRow);
 
 		// Date fields for "Select Data".
