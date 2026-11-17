@@ -292,6 +292,15 @@ public class DetectionGroupDisplay extends PamBorderPane {
 			
 			hidingPane.getHideButton().prefHeightProperty().bind(settingsPane.tabMinHeightProperty());
 			
+			/*
+			 * The hide button fills the tab header from top to bottom. The hidden side
+			 * pane nudges its hide button down a few pixels and the button has rounded
+			 * corners, which left it as a short rounded box in the header, so take the
+			 * offset off and square the corners so it sits flush with the tab pane.
+			 */
+			hidingPane.getHideButton().setTranslateY(0);
+			hidingPane.getHideButton().setStyle("-fx-background-radius: 0; -fx-border-radius: 0; -fx-background-insets: 0;");
+			
 			//set the show button to be slight larger
 			hidingPane.getShowButton().setPrefHeight(30.);
 			
