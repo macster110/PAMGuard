@@ -6,6 +6,7 @@ import PamController.PamController;
 import PamModel.PamModuleInfo;
 import dataModelFX.ConnectionNodeParams.PAMConnectionNodeType;
 import dataModelFX.connectionNodes.ModuleIconFactory;
+import dataModelFX.connectionNodes.ModuleToolTipFactory;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.event.EventHandler;
@@ -348,8 +349,7 @@ public class DataModelModulePane  extends PamBorderPane {
 			}
 		});
 
-		Tooltip tp = new Tooltip(pamModuleInfo.getDefaultName());
-		tp.getStyleClass().removeAll(tp.getStyleClass());
+		Tooltip tp = ModuleToolTipFactory.getToolTip(pamModuleInfo);
 		Tooltip.install(rect, tp);
 
 		return rect;

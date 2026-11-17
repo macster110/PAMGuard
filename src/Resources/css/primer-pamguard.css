@@ -554,3 +554,46 @@
 .pam-menu-pane .icon-button {
     -fx-alignment: center;
 }
+
+/*******************************************************************************
+ *                                                                             *
+ *  Module tool tips in the data model (ModuleToolTipFactory)                  *
+ *                                                                             *
+ ******************************************************************************/
+
+/* Primer draws tool tips at 85% opacity, which made the module tool tips hard to
+   read over the module icons and connection lines. These are fully opaque and use
+   the theme's colours, so they follow the Light, Light/Dark, Dark and Night modes. */
+.tooltip.module-tooltip {
+    -fx-opacity: 1;
+    -fx-background-color: -color-border-default, -color-bg-default;
+    -fx-background-insets: 0, 1px;
+    -fx-background-radius: 6px;
+    -fx-padding: 10px 12px 10px 12px;
+    /* Primer's shadow is light in the dark themes, which drew a bright halo round
+       the tool tip (bad for night vision in the Night mode). */
+    -fx-effect: dropshadow(three-pass-box, rgba(0, 0, 0, 0.35), 8px, 0.2, 0, 2);
+}
+
+.tooltip.module-tooltip .label {
+    -fx-text-fill: -color-fg-default;
+}
+
+.tooltip.module-tooltip .module-tooltip-title {
+    -fx-font-weight: bold;
+    -fx-font-size: 1.15em;
+}
+
+.tooltip.module-tooltip .module-tooltip-subtitle,
+.tooltip.module-tooltip .module-tooltip-key,
+.tooltip.module-tooltip .module-tooltip-hint {
+    -fx-text-fill: -color-fg-muted;
+}
+
+.tooltip.module-tooltip .module-tooltip-key {
+    -fx-font-weight: bold;
+}
+
+.tooltip.module-tooltip .module-tooltip-hint {
+    -fx-font-style: italic;
+}
