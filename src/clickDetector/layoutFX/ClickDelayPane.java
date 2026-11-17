@@ -1,6 +1,7 @@
 package clickDetector.layoutFX;
 
 import Localiser.DelayMeasurementParams;
+import Localiser.algorithms.timeDelayLocalisers.bearingLoc.DelayOptionsPaneFX;
 import PamController.SettingsPane;
 import PamView.PamSymbol;
 import clickDetector.ClickControl;
@@ -12,7 +13,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.Pane;
-import javafx.scene.paint.Color;
 import pamViewFX.PamGuiManagerFX;
 import pamViewFX.fxGlyphs.PamGlyphDude;
 import pamViewFX.fxNodes.PamBorderPane;
@@ -20,6 +20,7 @@ import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamSymbolFX;
 import pamViewFX.fxNodes.PamTilePane;
 import pamViewFX.fxNodes.PamVBox;
+import pamViewFX.fxNodes.utilityPanes.SettingsDialog;
 
 
 /**
@@ -76,6 +77,16 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 	
 	private PamBorderPane mainPane; 
 
+	/**
+	 * Delay measurement options, shown in a dialog from each type's settings button. 
+	 */
+	private DelayOptionsPaneFX delayOptionsPane;
+
+	/**
+	 * Names of each type, for dialog titles. 
+	 */
+	private String[] typeNameStrings;
+
 	public ClickDelayPane(ClickControl clickControl){
 		super(null);
 		this.clickControl = clickControl;
@@ -113,6 +124,7 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 		useDefault = new CheckBox[nTypes];
 		typeSettings = new Label[nTypes];
 		typeChange = new Button[nTypes];
+		typeNameStrings = new String[nTypes];
 		delayParams = new DelayMeasurementParams[nTypes];
 		delayParams[0] = clickParameters.getDelayMeasurementParams(0, true);
 		for (int i = 1; i < nTypes; i++) {
@@ -140,6 +152,7 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 				typeName = clickIdentifier.getSpeciesName(typesList[i]);
 			}
 			
+			typeNameStrings[i] = typeName;
 			Label typeNameTitle = new Label(typeName);
 			
 			//create check box and settings button
@@ -160,7 +173,8 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 			}
 			
 //			typeChange[i] = new Button("",PamGlyphDude.createPamGlyph(MaterialIcon.SETTINGS,Color.WHITE, PamGuiManagerFX.iconSize));
-			typeChange[i] = new Button("",PamGlyphDude.createPamIcon("mdi2c-cog",Color.WHITE, PamGuiManagerFX.iconSize));
+			typeChange[i] = new Button("",PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
+			typeChange[i].setTooltip(new javafx.scene.control.Tooltip("Change the delay measurement settings for " + typeName));
 			typeChange[i].getStyleClass().add("icon-button");
 			typeChange[i].setOnAction((action)->{
 				settingsButtonPress(typeIndex);
@@ -276,13 +290,25 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 	}
 	
 	void settingsButtonPress(int typeIndex) {
-//		DelayMeasurementParams dmp = getParamsForIndex(typeIndex, true);
-//		dmp = DelayOptionsDialog.showDialog(dmp);
-//		if (dmp != null) {
-//			delayParams[typeIndex] = dmp;
-//			saySettings(typeIndex);
-//			enableControls();
-//		}
+		DelayMeasurementParams dmp = getParamsForIndex(typeIndex, true);
+		if (dmp == null) {
+			return;
+		}
+		if (delayOptionsPane == null) {
+			delayOptionsPane = new DelayOptionsPaneFX();
+		}
+		if (clickControl.getClickDetector() != null && clickControl.getClickDetector().getSampleRate() > 0) {
+			delayOptionsPane.setSampleRate(clickControl.getClickDetector().getSampleRate());
+		}
+		SettingsDialog<DelayMeasurementParams> dialog = new SettingsDialog<DelayMeasurementParams>(delayOptionsPane);
+		dialog.setParams(dmp.clone());
+		dialog.setTitle("Delay Measurement: " + typeNameStrings[typeIndex]);
+		java.util.Optional<DelayMeasurementParams> result = dialog.showAndWait();
+		if (result.isPresent() && result.get() != null) {
+			delayParams[typeIndex] = result.get();
+			saySettings(typeIndex);
+			enableControls();
+		}
 	}
 
 }
