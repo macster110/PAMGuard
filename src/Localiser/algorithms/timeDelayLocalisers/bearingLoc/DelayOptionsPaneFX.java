@@ -14,7 +14,6 @@ import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.Region;
-import pamViewFX.PamGuiManagerFX;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamSpinner;
 import pamViewFX.fxNodes.PamVBox;
@@ -69,10 +68,6 @@ public class DelayOptionsPaneFX extends SettingsPane<DelayMeasurementParams> {
 
 		PamVBox pane = new PamVBox();
 		pane.setSpacing(5);
-
-		Label title = new Label("Delay measurement options");
-		PamGuiManagerFX.titleFont2style(title);
-		pane.getChildren().add(title);
 
 		//filter
 		filterBearings = new CheckBox("Filter data before measurement");

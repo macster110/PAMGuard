@@ -7,110 +7,259 @@ import PamView.PamSymbol;
 import clickDetector.ClickControl;
 import clickDetector.ClickParameters;
 import clickDetector.ClickClassifiers.ClickIdentifier;
+import javafx.beans.property.ReadOnlyObjectWrapper;
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.geometry.Insets;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
-import javafx.scene.layout.Pane;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.layout.Priority;
 import pamViewFX.PamGuiManagerFX;
-import pamViewFX.fxGlyphs.PamGlyphDude;
 import pamViewFX.fxNodes.PamBorderPane;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamSymbolFX;
-import pamViewFX.fxNodes.PamTilePane;
 import pamViewFX.fxNodes.PamVBox;
-import pamViewFX.fxNodes.utilityPanes.SettingsDialog;
 
 
 /**
- * Pane to chnage click delay settings. 
+ * Pane to change click delay settings. The default settings and each click type are listed in a
+ * table. Selecting a row shows its delay measurement settings to the side. Click types can use the
+ * default settings or their own, as in the Swing click delay panel.
+ *
  * @author Jamie Macaulay
  *
  */
 public class ClickDelayPane extends SettingsPane<ClickParameters> {
 
 	/**
-	 * Reference click control. 
+	 * Reference click control.
 	 */
 	private ClickControl clickControl;
 
 	/**
-	 * List of measurment parametrs.
+	 * Delay measurement parameters for each type. Index 0 is the default. Null for a type
+	 * which uses the default.
 	 */
 	private DelayMeasurementParams[] delayParams;
 
 	/**
-	 * Type list 
+	 * Click type codes. Index 0 is the default.
 	 */
 	private int[] typesList;
 
 	/**
-	 * Type settings. 
+	 * Whether each type uses the default settings.
 	 */
-	private Label[] typeSettings;
+	private boolean[] useDefault;
 
 	/**
-	 * List of name of click types which can have time delay calculation changed
+	 * Names of each type.
 	 */
-	private Label[] typeNames;
+	private String[] typeNames;
 
 	/**
-	 * List of button to chnage settings
+	 * Symbols for each type (null for the default).
 	 */
-	private Button[] typeChange;
+	private PamSymbol[] typeSymbols;
 
 	/**
-	 * List of check boxes. 
+	 * Table of the default and click types.
 	 */
-	private CheckBox[] useDefault;
+	private TableView<Integer> typeTable;
 
 	/**
-	 * Tile pane
+	 * Title of the settings for the selected type.
 	 */
-	private PamTilePane holderPane;
+	private Label selectedTitle;
 
 	/**
-	 * Copy of the current click parameters.
+	 * Use the default settings for the selected type.
 	 */
-	private ClickParameters clickParameters;
-	
-	private PamBorderPane mainPane; 
+	private CheckBox useDefaultCheck;
 
 	/**
-	 * Delay measurement options, shown in a dialog from each type's settings button. 
+	 * Delay measurement settings for the selected type.
 	 */
 	private DelayOptionsPaneFX delayOptionsPane;
 
 	/**
-	 * Names of each type, for dialog titles. 
+	 * The row shown in the settings at the side.
 	 */
-	private String[] typeNameStrings;
+	private int shownIndex = -1;
+
+	/**
+	 * True while the controls are being set up, so changes are not copied back.
+	 */
+	private boolean settingUp = false;
+
+	private PamBorderPane mainPane;
 
 	public ClickDelayPane(ClickControl clickControl){
 		super(null);
 		this.clickControl = clickControl;
-		mainPane= new PamBorderPane(); 
-		mainPane.setCenter(createPane());
+		mainPane= new PamBorderPane();
+		createPane();
 	}
 
 	/**
-	 * Create the pane. 
+	 * Create the pane.
 	 */
-	private Pane createPane(){
-		holderPane = new PamTilePane();
-		holderPane.setHgap(5);
-		holderPane.setVgap(5);
-		return holderPane;
+	private void createPane(){
+		typeTable = new TableView<Integer>();
+		typeTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+		typeTable.setPrefWidth(330);
+		typeTable.setMinWidth(300);
+		typeTable.setPrefHeight(250);
+		typeTable.setPlaceholder(new Label("No click types"));
+
+		TableColumn<Integer, Integer> symbolCol = new TableColumn<Integer, Integer>("");
+		symbolCol.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<Integer>(cell.getValue()));
+		symbolCol.setCellFactory(col -> new javafx.scene.control.TableCell<Integer, Integer>() {
+			@Override
+			protected void updateItem(Integer item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty || item == null || typeSymbols == null || item >= typeSymbols.length || typeSymbols[item] == null) {
+					setGraphic(null);
+				}
+				else {
+					setGraphic(new PamSymbolFX(typeSymbols[item]).getNode(PamGuiManagerFX.iconSize));
+				}
+			}
+		});
+		symbolCol.setMinWidth(30);
+		symbolCol.setPrefWidth(30);
+		symbolCol.setMaxWidth(30);
+		symbolCol.setSortable(false);
+
+		TableColumn<Integer, String> nameCol = new TableColumn<Integer, String>("Click type");
+		nameCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(typeNames[cell.getValue()]));
+		nameCol.setSortable(false);
+		nameCol.setMinWidth(150);
+		nameCol.setPrefWidth(190);
+
+		TableColumn<Integer, String> settingsCol = new TableColumn<Integer, String>("Settings");
+		settingsCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(getSettingsName(cell.getValue())));
+		settingsCol.setSortable(false);
+		settingsCol.setMinWidth(80);
+
+		typeTable.getColumns().add(symbolCol);
+		typeTable.getColumns().add(nameCol);
+		typeTable.getColumns().add(settingsCol);
+
+		typeTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal)->{
+			if (settingUp) return;
+			copySettingsBack();
+			showSettings(newVal);
+		});
+
+		//the settings for the selected type
+		selectedTitle = new Label(" ");
+		PamGuiManagerFX.titleFont2style(selectedTitle);
+
+		useDefaultCheck = new CheckBox("Use default settings");
+		useDefaultCheck.setOnAction((action)->{
+			if (settingUp || shownIndex <= 0) return;
+			useDefault[shownIndex] = useDefaultCheck.isSelected();
+			if (!useDefault[shownIndex] && delayParams[shownIndex] == null && delayParams[0] != null) {
+				// start from the default settings
+				delayParams[shownIndex] = delayParams[0].clone();
+			}
+			showSettings(shownIndex);
+			typeTable.refresh();
+		});
+
+		delayOptionsPane = new DelayOptionsPaneFX();
+
+		PamVBox settingsHolder = new PamVBox();
+		settingsHolder.setSpacing(5);
+		settingsHolder.setPadding(new Insets(0,0,0,10));
+		settingsHolder.getChildren().addAll(selectedTitle, useDefaultCheck, delayOptionsPane.getContentNode());
+
+		PamHBox holder = new PamHBox();
+		holder.setSpacing(5);
+		holder.getChildren().addAll(typeTable, settingsHolder);
+		PamHBox.setHgrow(settingsHolder, Priority.ALWAYS);
+
+		mainPane.setCenter(holder);
 	}
 
 	/**
-	 * Create controls to change the delay measurement settings for current click types. 
+	 * Short description of the settings used for a row.
+	 */
+	private String getSettingsName(int index) {
+		if (index > 0 && useDefault[index]) {
+			return "Default";
+		}
+		if (index == 0) {
+			return "Default";
+		}
+		return "Custom";
+	}
+
+	/**
+	 * Copy the settings in the side pane back to the row they were shown for.
+	 * @return false if the settings are invalid.
+	 */
+	private boolean copySettingsBack() {
+		if (shownIndex < 0 || delayParams == null || shownIndex >= delayParams.length) {
+			return true;
+		}
+		if (shownIndex > 0 && useDefault[shownIndex]) {
+			return true;
+		}
+		DelayMeasurementParams dmp = delayParams[shownIndex];
+		if (dmp == null) {
+			dmp = new DelayMeasurementParams();
+		}
+		DelayMeasurementParams newParams = delayOptionsPane.getParams(dmp.clone());
+		if (newParams == null) {
+			return false;
+		}
+		delayParams[shownIndex] = newParams;
+		typeTable.refresh();
+		return true;
+	}
+
+	/**
+	 * Show the settings for a row at the side.
+	 * @param index - the row.
+	 */
+	private void showSettings(Integer index) {
+		if (index == null || delayParams == null || index < 0 || index >= delayParams.length) {
+			shownIndex = -1;
+			return;
+		}
+		settingUp = true;
+		shownIndex = index;
+		selectedTitle.setText(typeNames[index]);
+		useDefaultCheck.setVisible(index > 0);
+		useDefaultCheck.setManaged(index > 0);
+		useDefaultCheck.setSelected(index > 0 && useDefault[index]);
+		DelayMeasurementParams dmp = delayParams[index];
+		if (dmp == null || (index > 0 && useDefault[index])) {
+			dmp = delayParams[0];
+		}
+		if (dmp == null) {
+			dmp = new DelayMeasurementParams();
+		}
+		if (clickControl.getClickDetector() != null && clickControl.getClickDetector().getSampleRate() > 0) {
+			delayOptionsPane.setSampleRate(clickControl.getClickDetector().getSampleRate());
+		}
+		delayOptionsPane.setParams(dmp);
+		// settings of a type which uses the default can't be changed here.
+		delayOptionsPane.getContentNode().setDisable(index > 0 && useDefault[index]);
+		settingUp = false;
+	}
+
+	/**
+	 * Set up the rows for the current click types.
 	 * @param clickParameters - the click parameters
 	 */
 	private void createPanelControls(ClickParameters clickParameters) {
 		ClickIdentifier clickIdentifier = clickControl.getClickIdentifier();
-		int nTypes = 1; // always a default. 
+		int nTypes = 1; // always a default.
 		int[] codeList = null;
 		if (clickIdentifier != null) {
 			codeList = clickIdentifier.getCodeList();
@@ -118,103 +267,55 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 				nTypes += codeList.length;
 			}
 		}
-		// allocate space for everything we need. 
+		PamSymbol[] symbols = null;
+		if (clickIdentifier != null) {
+			symbols = clickIdentifier.getSymbols();
+		}
+
 		typesList = new int[nTypes];
-		typeNames = new Label[nTypes];
-		useDefault = new CheckBox[nTypes];
-		typeSettings = new Label[nTypes];
-		typeChange = new Button[nTypes];
-		typeNameStrings = new String[nTypes];
+		typeNames = new String[nTypes];
+		typeSymbols = new PamSymbol[nTypes];
+		useDefault = new boolean[nTypes];
 		delayParams = new DelayMeasurementParams[nTypes];
+
 		delayParams[0] = clickParameters.getDelayMeasurementParams(0, true);
+		typeNames[0] = "Unclassified clicks / default";
 		for (int i = 1; i < nTypes; i++) {
 			typesList[i] = codeList[i-1];
+			typeNames[i] = clickIdentifier.getSpeciesName(typesList[i]);
+			if (symbols != null && i-1 < symbols.length) {
+				typeSymbols[i] = symbols[i-1];
+			}
 			delayParams[i] = clickParameters.getDelayMeasurementParams(typesList[i], false);
-		}
-		
-		holderPane.getChildren().clear();
-
-		PamVBox subPanel;
-		// column headings. 
-
-		String typeName;
-		PamSymbol[] typeSymbols = null;
-		if (clickIdentifier != null) {
-			typeSymbols = clickIdentifier.getSymbols();
-		}
-		for (int i = 0; i < nTypes; i++) {
-			
-			// create title
-			if (i == 0) {
-				typeName = "Unclassified clicks / default";
+			// types without their own settings are given the default object. 
+			useDefault[i] = delayParams[i] == null || delayParams[i] == delayParams[0];
+			if (useDefault[i]) {
+				delayParams[i] = null;
 			}
-			else {
-				typeName = clickIdentifier.getSpeciesName(typesList[i]);
-			}
-			
-			typeNameStrings[i] = typeName;
-			Label typeNameTitle = new Label(typeName);
-			
-			//create check box and settings button
-
-			useDefault[i] = new CheckBox("Use Default");
-
-			final int typeIndex=i; 
-			useDefault[i].setOnAction((action)->{
-				defaultButtonPress(typeIndex);
-			});
-						
-			PamHBox hbox=new PamHBox(); 
-			hbox.setSpacing(5);
-			if (i > 0) {
-				hbox.getChildren().add(useDefault[i]);
-				PamSymbolFX icon = new PamSymbolFX(typeSymbols[i-1]);
-				hbox.getChildren().add(icon.getNode(PamGuiManagerFX.iconSize));
-			}
-			
-//			typeChange[i] = new Button("",PamGlyphDude.createPamGlyph(MaterialIcon.SETTINGS,Color.WHITE, PamGuiManagerFX.iconSize));
-			typeChange[i] = new Button("",PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
-			typeChange[i].setTooltip(new javafx.scene.control.Tooltip("Change the delay measurement settings for " + typeName));
-			typeChange[i].getStyleClass().add("icon-button");
-			typeChange[i].setOnAction((action)->{
-				settingsButtonPress(typeIndex);
-			});
-			hbox.getChildren().add(typeChange[i]);
-					
-			//create info string;
-			typeSettings[i] = new Label(" "); 
-					
-			//now create the Pane
-			subPanel = new PamVBox();
-			subPanel.setPadding(new Insets(5,5,5,5));
-			subPanel.setSpacing(5);
-			subPanel.getChildren().addAll(typeNameTitle, hbox, typeSettings[i]);
-			
-			holderPane.getChildren().add(subPanel);
 		}
 	}
 
-
-	
 	public ClickParameters getParams() {
-		return getParams(clickParameters);
+		return getParams(null);
 	}
-	
+
 	/**
-	 * Copies the local list back into the click settings, removing 
-	 * old entries as necessary. 
+	 * Copies the local list back into the click settings, removing
+	 * old entries as necessary.
 	 * @param clickParameters
-	 * @return true unless there are no default params. 
+	 * @return the click parameters, or null if the settings are invalid.
 	 */
 	public ClickParameters getParams(ClickParameters clickParameters) {
-		if (clickParameters==null) return null; 
-		
+		if (clickParameters==null) return null;
 		if (delayParams==null || delayParams[0] == null) {
 			return clickParameters;
 		}
+		if (!copySettingsBack()) {
+			return null;
+		}
 		clickParameters.setDelayMeasurementParams(0, delayParams[0]);
 		for (int i = 1; i < typesList.length; i++) {
-			if (useDefault[i].isSelected()) {
+			if (useDefault[i]) {
 				clickParameters.setDelayMeasurementParams(typesList[i], null);
 			}
 			else {
@@ -226,14 +327,21 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 
 	@Override
 	public void setParams(ClickParameters clickParameters) {
-//		this.clickParameters = clickParameters.clone();
-//		System.out.println("ClickDelayPane: Hello: "+clickParameters.clickClassifierType);
+		settingUp = true;
 		createPanelControls(clickParameters);
+		typeTable.getItems().clear();
 		for (int i = 0; i < typesList.length; i++) {
-			useDefault[i].setSelected(delayParams[i] == null);
+			typeTable.getItems().add(i);
 		}
-		saySettings(0); // will do the lot !
-		enableControls();
+		int select = shownIndex;
+		if (select < 0 || select >= typesList.length) {
+			select = 0;
+		}
+		typeTable.getSelectionModel().select(select);
+		settingUp = false;
+		shownIndex = -1;
+		showSettings(select);
+		typeTable.refresh();
 	}
 
 	@Override
@@ -248,67 +356,6 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 
 	@Override
 	public void paneInitialized() {
-		// TODO Auto-generated method stub
-	}
-
-	void defaultButtonPress(int typeIndex) {
-
-		saySettings(typeIndex);
-		enableControls();
-	}
-
-	private DelayMeasurementParams getParamsForIndex(int index, boolean forceDefault) {
-		DelayMeasurementParams dmp = delayParams[index];
-		if (useDefault[index].isSelected()) {
-			dmp = delayParams[0];
-		}
-		if (forceDefault && dmp == null) {
-			dmp = delayParams[0];
-		}
-		return dmp;
-	}
-
-	private void saySettings(int index) {
-		DelayMeasurementParams dmp = getParamsForIndex(index, true);
-		if (dmp == null) {
-			typeSettings[index].setText("Error - enknown delay settings");
-		}
-		else {
-			typeSettings[index].setText(dmp.toString());
-		}
-		if (index == 0) {
-			for (int i = 1; i < typesList.length; i++) {
-				saySettings(i);
-			}
-		}
-	}
-
-	public void enableControls() {
-		for (int i = 0; i < typesList.length; i++) {
-			typeChange[i].setDisable((i != 0 && useDefault[i].isSelected()));
-		}
-	}
-	
-	void settingsButtonPress(int typeIndex) {
-		DelayMeasurementParams dmp = getParamsForIndex(typeIndex, true);
-		if (dmp == null) {
-			return;
-		}
-		if (delayOptionsPane == null) {
-			delayOptionsPane = new DelayOptionsPaneFX();
-		}
-		if (clickControl.getClickDetector() != null && clickControl.getClickDetector().getSampleRate() > 0) {
-			delayOptionsPane.setSampleRate(clickControl.getClickDetector().getSampleRate());
-		}
-		SettingsDialog<DelayMeasurementParams> dialog = new SettingsDialog<DelayMeasurementParams>(delayOptionsPane);
-		dialog.setParams(dmp.clone());
-		dialog.setTitle("Delay Measurement: " + typeNameStrings[typeIndex]);
-		java.util.Optional<DelayMeasurementParams> result = dialog.showAndWait();
-		if (result.isPresent() && result.get() != null) {
-			delayParams[typeIndex] = result.get();
-			saySettings(typeIndex);
-			enableControls();
-		}
 	}
 
 }
