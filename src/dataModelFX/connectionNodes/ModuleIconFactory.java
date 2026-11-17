@@ -257,14 +257,16 @@ public class ModuleIconFactory {
 	}
 
 
+	/**
+	 * The NMEA icon: a blank file with a smaller location pin inside it. 
+	 */
 	private Node createNMEASymbol(){
-		Font font = new Font(fontSize);
-		Text label = new Text("NMEA");
-		label.setFill(Color.BLACK);
-		label.setFont(font);
+		int size = (int) pamViewFX.fxNodes.connectionPane.StandardConnectionNode.DEFUALT_PREF_WIDTH;
+		Node pin = PamGlyphDude.createPamIcon("mdi2m-map-marker", Color.BLACK, (int) (size * 0.42));
+		// the file's corner fold is top right, so sit the pin a little below the middle. 
+		pin.setTranslateY(size * 0.06);
 		StackPane stackPane=new StackPane();
-//		stackPane.getChildren().addAll(PamGlyphDude.createModuleGlyph(FontAwesomeIcon.FILE_ALT),label);
-		stackPane.getChildren().addAll(PamGlyphDude.createModuleIcon("mdi2f-file-document-outline"),label);
+		stackPane.getChildren().addAll(PamGlyphDude.createModuleIcon("mdi2f-file-outline"), pin);
 		return stackPane;
 	}
 
