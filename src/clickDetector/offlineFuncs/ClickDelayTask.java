@@ -3,6 +3,8 @@ package clickDetector.offlineFuncs;
 import PamguardMVC.PamRawDataBlock;
 import offlineProcessing.OfflineTask;
 import clickDetector.ClickControl;
+import clickDetector.layoutFX.ClickControlGUI;
+import clickDetector.layoutFX.ClickSettingsPane;
 import clickDetector.ClickDetection;
 import clickDetector.ClickDetector;
 import clickDetector.ClickParameters;
@@ -115,6 +117,12 @@ public class ClickDelayTask extends OfflineTask<ClickDetection> {
 		}
 	}
 	
+	@Override
+	public boolean callSettingsFX() {
+		// open the JavaFX click detector settings at the time delay and echo tab. 
+		return ClickControlGUI.showClickSettingsFX(clickControl, ClickSettingsPane.TDOA_TAB);
+	}
+
 	@Override
 	public boolean callSettings() {
 //		DelayMeasurementParams newParams = DelayOptionsDialog.showDialog(clickControl.getPamView().getGuiFrame(), 

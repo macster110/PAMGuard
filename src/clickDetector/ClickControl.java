@@ -686,7 +686,10 @@ public class ClickControl extends PamControlledUnit implements PamSettings, Loca
 		ClickParameters newParams;
 		if ((newParams = ClickClassifyDialog.showDialog(this, pf, clickParameters)) != null) {
 			clickParameters = newParams.clone();
-			tabPanelControl.clickPanel.noteNewSettings();
+			if (tabPanelControl != null) {
+				// there is no Swing click panel in the JavaFX GUI
+				tabPanelControl.clickPanel.noteNewSettings();
+			}
 			newClassifySettings();
 			return true;
 		}

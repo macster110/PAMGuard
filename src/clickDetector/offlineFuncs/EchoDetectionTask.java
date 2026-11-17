@@ -2,6 +2,8 @@ package clickDetector.offlineFuncs;
 
 import offlineProcessing.OfflineTask;
 import clickDetector.ClickControl;
+import clickDetector.layoutFX.ClickControlGUI;
+import clickDetector.layoutFX.ClickSettingsPane;
 import clickDetector.ClickDetection;
 import clickDetector.ClickDetector;
 import clickDetector.ClickDetector.ChannelGroupDetector;
@@ -79,6 +81,12 @@ public class EchoDetectionTask extends OfflineTask<ClickDetection> {
 	public void loadedDataComplete() {
 		// TODO Auto-generated method stub
 
+	}
+
+	@Override
+	public boolean callSettingsFX() {
+		// open the JavaFX click detector settings at the time delay and echo tab. 
+		return ClickControlGUI.showClickSettingsFX(clickControl, ClickSettingsPane.TDOA_TAB);
 	}
 
 	/* (non-Javadoc)

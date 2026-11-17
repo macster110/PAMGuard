@@ -3,10 +3,12 @@ package clickDetector.layoutFX;
 import PamController.PamController;
 import PamController.PamControllerInterface;
 import PamController.SettingsPane;
+import PamController.PamGUIManager;
 import clickDetector.ClickControl;
 import clickDetector.ClickDetector;
 import clickDetector.ClickParameters;
 import pamViewFX.PamControlledGUIFX;
+import pamViewFX.PamGuiManagerFX;
 
 /**
  * Get the FX GUI for the click control 
@@ -69,6 +71,24 @@ public class ClickControlGUI extends PamControlledGUIFX {
 		return  clickSettingsPane; 
 	}
 	
+	/**
+	 * Open the JavaFX click detector settings dialog at one of its tabs, e.g. from the 
+	 * offline processing pane. Call from the JavaFX thread. 
+	 * @param clickControl - the click detector. 
+	 * @param tabName - the tab to show, e.g. ClickSettingsPane.CLASSIFICATION_TAB. 
+	 * @return true if the dialog was opened. 
+	 */
+	public static boolean showClickSettingsFX(ClickControl clickControl, String tabName) {
+		if (clickControl == null || !(clickControl.getGUI(PamGUIManager.FX) instanceof ClickControlGUI)) {
+			return false;
+		}
+		ClickControlGUI gui = (ClickControlGUI) clickControl.getGUI(PamGUIManager.FX);
+		gui.getSettingsPane(); 
+		gui.getClickSettingsPane().selectTab(tabName);
+		PamGuiManagerFX.showModuleSettings(clickControl);
+		return true;
+	}
+
 	@Override
 	public void updateParams() {
 		ClickParameters newParams=clickSettingsPane.getParams(clickControl.getClickParameters()); 

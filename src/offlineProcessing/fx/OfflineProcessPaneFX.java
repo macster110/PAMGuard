@@ -825,7 +825,7 @@ public class OfflineProcessPaneFX {
 					settingsBtn.setTooltip(new Tooltip(
 							"Settings for " + task.getName()));
 					settingsBtn.setOnAction(e -> {
-						task.callSettings();
+						callTaskSettings(task, settingsBtn);
 					});
 					cbEntry.settingsButton = settingsBtn;
 					Region spacer = new Region();
@@ -845,6 +845,34 @@ public class OfflineProcessPaneFX {
 			VBox titledPane = new VBox(3, groupLabel, content);
 			return titledPane;
 		}
+	}
+
+	/**
+	 * Open the settings of a task. Tasks with JavaFX settings open them here. Others open their 
+	 * standard (Swing) settings dialog, which must be shown on the Swing thread and not the JavaFX 
+	 * thread, otherwise the GUI locks up (on macOS both toolkits share the main thread). 
+	 * @param task - the task. 
+	 * @param button - the settings button. 
+	 */
+	private void callTaskSettings(OfflineTask task, Button button) {
+		boolean fx = false;
+		try {
+			fx = task.callSettingsFX();
+		}
+		catch (Exception ex) {
+			ex.printStackTrace();
+		}
+		if (fx) {
+			return;
+		}
+		javax.swing.SwingUtilities.invokeLater(() -> {
+			try {
+				task.callSettings(null, new java.awt.Point(0,0));
+			}
+			catch (Exception ex) {
+				ex.printStackTrace();
+			}
+		});
 	}
 
 	private static final String LOAD_TASK_NAME = "Offline processing";

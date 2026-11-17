@@ -51,6 +51,17 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 	public static double PREF_SPINNER_WIDTH = 140; 
 
 	/**
+	 * Name of the classification tab. 
+	 */
+	public static final String CLASSIFICATION_TAB = "Classification";
+
+	/**
+	 * Name of the time delay and echo tab. 
+	 */
+	public static final String TDOA_TAB = "TDOA and Echoes";
+
+
+	/**
 	 * Group source pane for the click settings pane.
 	 */
 	private GroupedSourcePaneFX sourcePane;
@@ -229,7 +240,7 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 			((Region) echoDetection.getContentNode()).setPadding(new Insets(5,5,5,5));
 			tdoaHolder.getChildren().add(echoDetection.getContentNode()); 
 		}
-		tdoaTab=new Tab("TDOA and Echoes", tdoaHolder);
+		tdoaTab=new Tab(TDOA_TAB, tdoaHolder);
 		tdoaTab.setGraphic(PamGlyphDude.createPamIcon("mdi2a-av-timer")); 
 		pamTabbedPane.getTabs().add(tdoaTab);
 		
@@ -266,7 +277,7 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 		/***Note: FX does not implment click train detection in click detector****/
 
 		//classifiaction pane. 
-		Tab classifierTab =new Tab("Classification", clickClassificationPane=new ClickClassifyPaneFX(clickControl)); 
+		Tab classifierTab =new Tab(CLASSIFICATION_TAB, clickClassificationPane=new ClickClassifyPaneFX(clickControl)); 
 		classifierTab.setGraphic(PamGlyphDude.createPamIcon("mdi2g-graph")); 
 		pamTabbedPane.getTabs().add(classifierTab);
 
@@ -1047,6 +1058,21 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 	 * Get the pane which  holds the different click classifiers 
 	 * @return click classifier pane. 
 	 */
+	/**
+	 * Show one of the tabs of the settings pane. 
+	 * @param tabName - the name of the tab, e.g. CLASSIFICATION_TAB. 
+	 * @return true if the tab was found. 
+	 */
+	public boolean selectTab(String tabName) {
+		for (int i = 0; i < pamTabbedPane.getTabs().size(); i++) {
+			if (pamTabbedPane.getTabs().get(i).getText().equals(tabName)) {
+				pamTabbedPane.setNavigationTab(i);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public ClickClassifyPaneFX getClickClassificationPane() {
 		return clickClassificationPane;
 	}

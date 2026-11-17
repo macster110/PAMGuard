@@ -239,6 +239,17 @@ public abstract class OfflineTask<T extends PamDataUnit> {
 	}
 
 	/**
+	 * Open the task settings in the JavaFX GUI. Called on the JavaFX thread. Tasks which have 
+	 * JavaFX settings should override this, open them and return true. If this returns false 
+	 * the JavaFX GUI opens the standard (Swing) settings from callSettings() on the Swing thread 
+	 * instead. 
+	 * @return true if the task has opened JavaFX settings. 
+	 */
+	public boolean callSettingsFX() {
+		return false;
+	}
+
+	/**
 	 * can the task be run ? This will generally 
 	 * be true, but may be false if the task is dependent on 
 	 * some other module which may not be present.  

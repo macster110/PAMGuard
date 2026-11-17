@@ -2,6 +2,8 @@ package clickDetector.offlineFuncs;
 
 import PamUtils.PamUtils;
 import clickDetector.ClickControl;
+import clickDetector.layoutFX.ClickControlGUI;
+import clickDetector.layoutFX.ClickSettingsPane;
 import clickDetector.ClickDetection;
 import clickDetector.ClickTabPanelControl;
 import clickDetector.ClickClassifiers.ClickIdInformation;
@@ -78,6 +80,12 @@ public class ClickReClassifyTask extends OfflineTask<ClickDetection> {
 		return clickControl.classificationDialog(clickControl.getGuiFrame());
 	}
 
+
+	@Override
+	public boolean callSettingsFX() {
+		// open the JavaFX click detector settings at the classification tab. 
+		return ClickControlGUI.showClickSettingsFX(clickControl, ClickSettingsPane.CLASSIFICATION_TAB);
+	}
 
 	@Override
 	public boolean hasSettings() {
