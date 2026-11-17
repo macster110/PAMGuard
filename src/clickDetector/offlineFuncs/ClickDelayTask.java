@@ -119,7 +119,7 @@ public class ClickDelayTask extends OfflineTask<ClickDetection> {
 	
 	@Override
 	public boolean callSettingsFX() {
-		// open the JavaFX click detector settings at the time delay and echo tab. 
+		// open the JavaFX click detector settings at the time delay tab. 
 		return ClickControlGUI.showClickSettingsFX(clickControl, ClickSettingsPane.TDOA_TAB);
 	}
 
