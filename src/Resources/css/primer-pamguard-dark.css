@@ -336,3 +336,12 @@
 .pam-menu-pane .label {
     -fx-text-fill: -color-fg-default;
 }
+
+/* Module tool tips in the data model (see primer-pamguard.css). In the dark modes
+   the rounded corners and drop shadow showed as a bright border round the tool tip,
+   so these are square, with no shadow and a muted edge. */
+.tooltip.module-tooltip {
+    -fx-background-color: -color-border-muted, -color-bg-default;
+    -fx-background-radius: 0;
+    -fx-effect: null;
+}

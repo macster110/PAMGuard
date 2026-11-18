@@ -3,7 +3,6 @@ package dataModelFX.connectionNodes;
 import java.util.ArrayList;
 
 import PamController.PamControlledUnit;
-import PamController.PamGUIManager;
 import PamController.status.ModuleStatus;
 import PamModel.ModulesMenuGroup;
 import PamModel.PamDependency;
@@ -26,7 +25,7 @@ import javafx.util.Duration;
  * can be added.
  * <p>
  * The tool tip shows the module's name and type, the menu group it belongs to, its
- * description, what data it needs and makes, and whether it has JavaFX settings. The
+ * description, what data it needs and makes and, for modules in use, their status. The
  * tool tips have the style class "module-tooltip", which primer-pamguard.css makes
  * opaque (the Primer theme draws tool tips partly transparent, which made them hard
  * to read over the module icons).
@@ -128,8 +127,6 @@ public class ModuleToolTipFactory {
 			row = addRow(grid, row, "Output", String.join("\n", outputs));
 		}
 
-		row = addRow(grid, row, "Settings", getSettingsText(info));
-
 		String status = getStatusText(pcu);
 		if (status != null) {
 			row = addRow(grid, row, "Status", status);
@@ -155,8 +152,6 @@ public class ModuleToolTipFactory {
 		else {
 			row = addRow(grid, row, "Input", "None needed");
 		}
-
-		row = addRow(grid, row, "Settings", getSettingsText(info));
 
 		String inUse = info.getNInstances() + " in this configuration";
 		if (info.getMaxNumber() > 0) {
@@ -255,18 +250,6 @@ public class ModuleToolTipFactory {
 		ModulesMenuGroup group = info.getModulesMenuGroup();
 		if (group == null) return null;
 		return group.getMenuName();
-	}
-
-	/**
-	 * @return whether the module has JavaFX settings or only Swing ones.
-	 */
-	private static String getSettingsText(PamModuleInfo info) {
-		for (int i = 0; i < info.getNGUIFlags(); i++) {
-			if (info.getGUICompatabilityFlag(i) == PamGUIManager.FX) {
-				return "JavaFX settings";
-			}
-		}
-		return "Swing settings dialog";
 	}
 
 	/**
