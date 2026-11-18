@@ -29,6 +29,7 @@ import pamViewFX.fxNodes.PamBorderPane;
 import pamViewFX.fxNodes.PamHBox;
 import pamViewFX.fxNodes.PamSpinner;
 import pamViewFX.fxNodes.PamSymbolFX;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import pamViewFX.fxNodes.utilityPanes.SimpleFilterPaneFX;
 
 
@@ -166,11 +167,11 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 		typeTable.getColumns().add(symbolCol);
 		typeTable.getColumns().add(nameCol);
 		typeTable.getColumns().add(defaultCol);
-		typeTable.getColumns().add(filterCol);
 		typeTable.getColumns().add(upSampleCol);
 		typeTable.getColumns().add(envelopeCol);
 		typeTable.getColumns().add(leadingEdgeCol);
 		typeTable.getColumns().add(restrictCol);
+		typeTable.getColumns().add(filterCol);
 
 		filterPane = new SimpleFilterPaneFX();
 
@@ -298,10 +299,13 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 	 * Tick box to use the default settings.
 	 */
 	private class DefaultCell extends DelayCell {
-		private CheckBox checkBox = new CheckBox();
+		private PamToggleSwitch checkBox = new PamToggleSwitch("");
 
 		DefaultCell() {
-			checkBox.setOnAction((e)->{
+			checkBox.setAlignment(Pos.CENTER);
+			checkBox.getLabel().setVisible(false);
+			checkBox.getLabel().setManaged(false);
+			checkBox.selectedProperty().addListener((obs, oldV, newV)->{
 				int row = getRow();
 				if (syncing || row <= 0) return;
 				useDefault[row] = checkBox.isSelected();

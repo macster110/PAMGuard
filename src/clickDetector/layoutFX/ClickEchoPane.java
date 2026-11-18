@@ -4,7 +4,7 @@ import PamController.SettingsPane;
 import clickDetector.ClickControl;
 import clickDetector.ClickParameters;
 import javafx.scene.Node;
-import javafx.scene.control.CheckBox;
+import pamViewFX.fxNodes.utilityPanes.PamToggleSwitch;
 import javafx.scene.control.Label;
 import javafx.scene.control.Spinner;
 import javafx.scene.layout.Pane;
@@ -24,12 +24,12 @@ public class ClickEchoPane extends SettingsPane<ClickParameters> {
 	/**
 	 * Check box on whether to run an echo detector. 
 	 */
-	private CheckBox runEchoCheckBox;
+	private PamToggleSwitch runEchoCheckBox;
 
 	/**
 	 * Check box to set whether to discard echoes. 
 	 */
-	private CheckBox discardEchoCheckBox;
+	private PamToggleSwitch discardEchoCheckBox;
 
 	/**
 	 * The intervel in seconds for echo detector. 
@@ -62,12 +62,12 @@ public class ClickEchoPane extends SettingsPane<ClickParameters> {
 		PamGuiManagerFX.titleFont2style(echoLable1);
 		vBox.getChildren().add(echoLable1);
 		
-		vBox.getChildren().add(runEchoCheckBox=new CheckBox("Run Echo Detector online"));
-		runEchoCheckBox.setOnAction((action)->{
-			discardEchoCheckBox.setDisable(!runEchoCheckBox.isSelected());
-			if (!runEchoCheckBox.isSelected()) discardEchoCheckBox.setSelected(false);
+		vBox.getChildren().add(runEchoCheckBox=new PamToggleSwitch("Run Echo Detector online"));
+		vBox.getChildren().add(discardEchoCheckBox=new PamToggleSwitch("Discard Echoes"));
+		runEchoCheckBox.selectedProperty().addListener((obs, oldV, newV)->{
+			discardEchoCheckBox.setDisable(!newV);
+			if (!newV) discardEchoCheckBox.setSelected(false);
 		});
-		vBox.getChildren().add(discardEchoCheckBox=new CheckBox("Discard Echoes"));
 
 		
 		Label echoLabe2 = new Label("Echo Detection Settings");

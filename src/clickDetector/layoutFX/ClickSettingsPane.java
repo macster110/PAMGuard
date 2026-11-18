@@ -8,6 +8,7 @@ import clickDetector.ClickParameters;
 import clickDetector.layoutFX.clickClassifiers.ClickClassifyPaneFX;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.control.CheckBox;
@@ -226,24 +227,27 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 
 		//noise and background sampling have their own tab, as they take a lot of space. 
 		Node noisePane = createNoisePane(); 
-		((Region) noisePane).setPadding(new Insets(5,5,5,5));
-		Tab noiseTab = new Tab("Noise", noisePane);
+		// centre the noise settings in the tab.
+		PamHBox noiseHolder = new PamHBox(noisePane);
+		noiseHolder.setAlignment(Pos.TOP_CENTER);
+		noiseHolder.setPadding(new Insets(5,5,5,5));
+		Tab noiseTab = new Tab("Noise", noiseHolder);
 		noiseTab.setGraphic(PamGlyphDude.createPamIcon("mdi2v-volume-high")); 
 		pamTabbedPane.getTabs().add(noiseTab);
 		
 		
 		clickDelayPane=createDelayPane();
-		((Region) clickDelayPane.getContentNode()).setPadding(new Insets(5,5,5,5));
 		PamVBox tdoaHolder = new PamVBox(); 
 		tdoaHolder.setSpacing(5);
+		tdoaHolder.setPadding(new Insets(5,5,5,5));
+		// section titles in the same style and position as the other tabs. 
 		Label delayLabel = new Label("Time Delay Measurement");
 		PamGuiManagerFX.titleFont2style(delayLabel);
-		delayLabel.setPadding(new Insets(5,5,0,5));
 		tdoaHolder.getChildren().addAll(delayLabel, clickDelayPane.getContentNode()); 
 		//echo detection settings, as in the Swing dialog. 
 		if (clickControl.getEchoDetectionSystem() != null) {
 			echoDetection= new ClickEchoPane(clickControl); 
-			((Region) echoDetection.getContentNode()).setPadding(new Insets(15,5,5,5));
+			PamVBox.setMargin(echoDetection.getContentNode(), new Insets(15,0,0,0));
 			tdoaHolder.getChildren().add(echoDetection.getContentNode()); 
 		}
 		tdoaTab=new Tab(TDOA_TAB, tdoaHolder);
