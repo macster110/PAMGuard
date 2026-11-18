@@ -130,6 +130,16 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 	
 	private PamBorderPane mainPane = new PamBorderPane();
 
+	/**
+	 * Space between the sections in each tab. 
+	 */
+	private static final double SECTION_SPACING = 20;
+
+	/**
+	 * Style of the section titles, smaller than the standard titles.
+	 */
+	private static final String SECTION_TITLE_STYLE = "-fx-font-weight: bold; -fx-font-size: 1.1em;";
+
 
 	public int classifierItemRow;
 
@@ -149,7 +159,7 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 	private Node createSweepPane(){
 
 		PamVBox holder=new PamVBox();
-		holder.setSpacing(15);
+		holder.setSpacing(20);
 		holder.setPadding(new Insets(10,0,0,0));
 
 		optionBox=new OptionsBox();
@@ -157,8 +167,8 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 		/*********Waveform Tab************/
 		Tab waveformTab=new Tab("Waveform"); 
 		waveformTab.setGraphic(PamGlyphDude.createPamIcon("mdi2w-waveform",	PamGuiManagerFX.iconSize));
-		PamVBox waveformHolder=new PamVBox(5); 
-		waveformHolder.setPadding(new Insets(10,0,0,0));
+		PamVBox waveformHolder=new PamVBox(SECTION_SPACING); 
+		waveformHolder.setPadding(new Insets(15,5,5,5));
 
 		clickLength=new ClickLengthBox(); 
 		filterBox=new FilterBox();
@@ -171,26 +181,25 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 		/*********Spectrum Tab****************/
 		Tab spectrumTab=new Tab("Spectrum"); 
 		spectrumTab.setGraphic(PamGlyphDude.createPamIcon("mdi2c-chart-bell-curve",	PamGuiManagerFX.iconSize));
-		PamVBox spectrumHolder=new PamVBox(5); 
+		PamVBox spectrumHolder=new PamVBox(SECTION_SPACING); 
 
 		energyBox=new EnergyBandBox();
 		freqBox=new FrequencySearchBlock();
 		spectrumHolder.getChildren().addAll(energyBox, freqBox); 
-		spectrumHolder.setPadding(new Insets(10,0,0,0));
+		spectrumHolder.setPadding(new Insets(15,5,5,5));
 		spectrumTab.setContent(spectrumHolder);
 		
 		/*********Bearing Tab****************/
 		Tab bearingTab=new Tab("Bearing"); 
 		bearingTab.setGraphic(PamGlyphDude.createPamIcon("mdi2c-compass-outline",	PamGuiManagerFX.iconSize));
-		bearingTab.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
 		
-		PamVBox bearingHolder=new PamVBox(5); 
+		PamVBox bearingHolder=new PamVBox(SECTION_SPACING); 
 
 		bearingBox=new BearingBlock();
 		xCorrBox=new XCorrBlock();
 
 		bearingHolder.getChildren().addAll(bearingBox, xCorrBox); 
-		bearingHolder.setPadding(new Insets(10,0,0,0));
+		bearingHolder.setPadding(new Insets(15,5,5,5));
 		bearingTab.setContent(bearingHolder);
 
 
@@ -198,6 +207,8 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 
 		TabPane tabPane= new TabPane(); 
 		tabPane.setTabClosingPolicy(TabClosingPolicy.UNAVAILABLE);
+		// classic tabs with a border, so the tabs and their content stand out from the rest of the pane. 
+		tabPane.getStyleClass().add(atlantafx.base.theme.Styles.TABS_CLASSIC);
 		tabPane.getTabs().addAll(waveformTab, spectrumTab, bearingTab); 
 
 		holder.getChildren().add(optionBox);
@@ -249,7 +260,8 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 			if (borderTitle != null) {
 				label=new Label(borderTitle); 
 
-				PamGuiManagerFX.titleFont2style(label);
+				// these are sections within the click type settings, so use a smaller title. 
+				label.setStyle(SECTION_TITLE_STYLE);
 
 				hBox.getChildren().add(label);
 			}
@@ -444,6 +456,18 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 			pamGridPane.add(nameField, 1, 0);
 			PamGridPane.setColumnSpan(nameField, 8);
 			PamGridPane.setHgrow(nameField, Priority.ALWAYS);
+
+			// default settings for some species, as in the Swing dialog. 
+			javafx.scene.control.MenuButton defaultsButton = new javafx.scene.control.MenuButton("Defaults");
+			defaultsButton.setTooltip(new Tooltip("Set this click type to the default settings for a species"));
+			for (String species : SweepClassifierSet.defaultSpecies) {
+				javafx.scene.control.MenuItem item = new javafx.scene.control.MenuItem(species);
+				item.setOnAction((action)->{
+					setSpeciesDefaults(species);
+				});
+				defaultsButton.getItems().add(item);
+			}
+			pamGridPane.add(defaultsButton, 9, 0);
 
 			getValidator().createCheck()
 			.dependsOn("speciesname", nameField.textProperty())
@@ -1955,6 +1979,21 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 		currentClickProperty.setClickType(sweepClassifierSet);
 
 		return currentClickProperty;
+	}
+
+	/**
+	 * Set the click type to the default settings for a species. Keeps the species code, as 
+	 * the Swing dialog does. 
+	 * @param species - one of SweepClassifierSet.defaultSpecies. 
+	 */
+	private void setSpeciesDefaults(String species) {
+		if (sweepClassifierSet == null || currentClickProperty == null) {
+			return;
+		}
+		int code = optionBox.getCode();
+		sweepClassifierSet.setSpeciesDefaults(species);
+		setParams(currentClickProperty);
+		optionBox.setCode(code);
 	}
 
 	@Override
