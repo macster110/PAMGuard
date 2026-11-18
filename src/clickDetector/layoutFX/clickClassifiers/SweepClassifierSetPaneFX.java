@@ -1163,9 +1163,9 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 	 */
 	private class FrequencySearchBlock extends SweepBox {
 
-		private PamToggleSwitch peakFreqCheckBox;
-		private PamToggleSwitch peakWidthCheckBox;
-		private PamToggleSwitch meanFreqCheckBox;
+		private CheckBox peakFreqCheckBox;
+		private CheckBox peakWidthCheckBox;
+		private CheckBox meanFreqCheckBox;
 
 
 		/**
@@ -1221,7 +1221,7 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 
 			gridy++;
 			//peak frequency
-			peakFreqCheckBox=new PamToggleSwitch("");
+			peakFreqCheckBox = new CheckBox();
 			peakFreqCheckBox.selectedProperty().addListener((obsVal, oldVal, newVal)->{
 				peakFreqPane.setDisableFreqPane(!peakFreqCheckBox.isSelected());
 			});
@@ -1242,7 +1242,7 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 			gridy++;
 
 			//peak width
-			peakWidthCheckBox=new PamToggleSwitch("");
+			peakWidthCheckBox = new CheckBox();
 			peakWidthCheckBox.selectedProperty().addListener((obsVal, oldVal, newVal)->{
 				//peakWidthPane.setDisable(!peakWidthCheckBox.isSelected());
 				peakWidthPane.setDisableFreqPane(!peakWidthCheckBox.isSelected());
@@ -1277,7 +1277,7 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 			gridy++;
 			
 			//mean frequency
-			meanFreqCheckBox=new PamToggleSwitch("");
+			meanFreqCheckBox = new CheckBox();
 			meanFreqCheckBox.selectedProperty().addListener((obsVal, oldVal, newVal)->{
 				meanFreq.setDisableFreqPane(!meanFreqCheckBox.isSelected());
 			});
@@ -1850,9 +1850,9 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 		
 		private PamSpinner<Double> minPeakTorugh;
 
-		private PamToggleSwitch minXCorrEnable;
+		private CheckBox minXCorrEnable;
 
-		private PamToggleSwitch minPeakTroughEnable;
+		private CheckBox minPeakTroughEnable;
 
 		private PamSpinner<Double> minPeakFactor;
 		
@@ -1867,7 +1867,7 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 		XCorrBlock() {
 			super("Cross Correlation", true);
 			
-			minXCorrEnable = new PamToggleSwitch(""); 
+			minXCorrEnable = new CheckBox(); 
 			minXCorrEnable.selectedProperty().addListener((obsVal, oldVal, newVal)->{
 				disbleControls(!newVal);
 			});
@@ -1875,7 +1875,7 @@ public class SweepClassifierSetPaneFX extends SettingsPane<ClickTypeProperty> {
 			minCorrelation = new PamSpinner<Double>(-Double.MAX_VALUE, Double.MAX_VALUE, 0, 0.1);
 			minCorrelation.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
 
-			minPeakTroughEnable = new PamToggleSwitch(""); 
+			minPeakTroughEnable = new CheckBox(); 
 			minPeakTroughEnable.selectedProperty().addListener((obsVal, oldVal, newVal)->{
 				disbleControls(!newVal);
 			});
