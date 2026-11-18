@@ -109,12 +109,14 @@
 }
 
 #label-title1 {
-    -fx-font: bold 16pt  -fx-font-family;
+    -fx-font-weight: bold;
+    -fx-font-size: 16pt;
     -fx-text-fill: -fx-text;
 }
 
 #label-title2 {
-    -fx-font: bold 13pt  -fx-font-family;
+    -fx-font-weight: bold;
+    -fx-font-size: 13pt;
     -fx-text-fill: -fx-text;
 }
 
