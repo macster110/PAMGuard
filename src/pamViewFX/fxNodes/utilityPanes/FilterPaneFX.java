@@ -175,6 +175,12 @@ public class FilterPaneFX extends SettingsPane<FilterParams> {
 			enableControls();
 		});
 		filterTypes.setMaxWidth(Double.MAX_VALUE);
+		/*
+		 * Without a preferred width the combo box asks for the width of its pop up list, which grows to 
+		 * the width the combo box was last laid out at. Settings dialogs can't be narrower than their 
+		 * content asks for, so the filter panes then never get narrower. 
+		 */
+		filterTypes.setPrefWidth(250);
 		HBox.setHgrow(filterTypes, Priority.ALWAYS);
 		controlPane.getChildren().add(filterTypes);
 

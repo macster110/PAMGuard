@@ -85,8 +85,8 @@ public class EchoDetectionTask extends OfflineTask<ClickDetection> {
 
 	@Override
 	public boolean callSettingsFX() {
-		// open the JavaFX click detector settings at the echo detection tab. 
-		return ClickControlGUI.showClickSettingsFX(clickControl, ClickSettingsPane.ECHO_TAB);
+		// open the JavaFX click detector settings at the time delay and echo tab. 
+		return ClickControlGUI.showClickSettingsFX(clickControl, ClickSettingsPane.TDOA_TAB);
 	}
 
 	/* (non-Javadoc)

@@ -56,14 +56,9 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 	public static final String CLASSIFICATION_TAB = "Classification";
 
 	/**
-	 * Name of the time delay tab. 
+	 * Name of the time delay and echo tab. 
 	 */
-	public static final String TDOA_TAB = "TDOA";
-
-	/**
-	 * Name of the echo detection tab. 
-	 */
-	public static final String ECHO_TAB = "Echo Detection";
+	public static final String TDOA_TAB = "TDOA and Echoes";
 
 
 	/**
@@ -222,13 +217,19 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 
 		detectionPane.getChildren().add(createTriggerGraph()); 
 		
-		detectionPane.getChildren().add(createNoisePane()); 
 
 		//add everything to tabs.
 		Tab clickDetectionTabe =new Tab("Click Detection", detectionPane);
 		clickDetectionTabe.setGraphic(PamGlyphDude.createPamIcon("mdi2w-waveform")); 
 		detectionPane.setPadding(new Insets(5,5,5,5));
 		pamTabbedPane.getTabs().add(clickDetectionTabe);
+
+		//noise and background sampling have their own tab, as they take a lot of space. 
+		Node noisePane = createNoisePane(); 
+		((Region) noisePane).setPadding(new Insets(5,5,5,5));
+		Tab noiseTab = new Tab("Noise", noisePane);
+		noiseTab.setGraphic(PamGlyphDude.createPamIcon("mdi2v-volume-high")); 
+		pamTabbedPane.getTabs().add(noiseTab);
 		
 		
 		clickDelayPane=createDelayPane();
@@ -239,18 +240,15 @@ public class ClickSettingsPane extends SettingsPane<ClickParameters>{
 		PamGuiManagerFX.titleFont2style(delayLabel);
 		delayLabel.setPadding(new Insets(5,5,0,5));
 		tdoaHolder.getChildren().addAll(delayLabel, clickDelayPane.getContentNode()); 
+		//echo detection settings, as in the Swing dialog. 
+		if (clickControl.getEchoDetectionSystem() != null) {
+			echoDetection= new ClickEchoPane(clickControl); 
+			((Region) echoDetection.getContentNode()).setPadding(new Insets(15,5,5,5));
+			tdoaHolder.getChildren().add(echoDetection.getContentNode()); 
+		}
 		tdoaTab=new Tab(TDOA_TAB, tdoaHolder);
 		tdoaTab.setGraphic(PamGlyphDude.createPamIcon("mdi2a-av-timer")); 
 		pamTabbedPane.getTabs().add(tdoaTab);
-
-		//echo detection settings, as in the Swing dialog, in their own tab. 
-		if (clickControl.getEchoDetectionSystem() != null) {
-			echoDetection= new ClickEchoPane(clickControl); 
-			((Region) echoDetection.getContentNode()).setPadding(new Insets(5,5,5,5));
-			Tab echoTab = new Tab(ECHO_TAB, echoDetection.getContentNode());
-			echoTab.setGraphic(PamGlyphDude.createPamIcon("mdi2w-waves")); 
-			pamTabbedPane.getTabs().add(echoTab);
-		}
 		
 		tdoaTab.setOnSelectionChanged((event)->{
 			if (pamTabbedPane.getSelectionModel().getSelectedItem()==tdoaTab){

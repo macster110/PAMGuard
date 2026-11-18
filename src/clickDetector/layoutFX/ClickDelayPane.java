@@ -1,32 +1,42 @@
 package clickDetector.layoutFX;
 
+import org.controlsfx.control.PopOver;
+
 import Localiser.DelayMeasurementParams;
-import Localiser.algorithms.timeDelayLocalisers.bearingLoc.DelayOptionsPaneFX;
 import PamController.SettingsPane;
 import PamView.PamSymbol;
 import clickDetector.ClickControl;
 import clickDetector.ClickParameters;
 import clickDetector.ClickClassifiers.ClickIdentifier;
+import fftFilter.FFTFilterParams;
 import javafx.beans.property.ReadOnlyObjectWrapper;
-import javafx.beans.property.ReadOnlyStringWrapper;
+import javafx.beans.property.SimpleIntegerProperty;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Spinner;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
-import javafx.scene.layout.Priority;
+import javafx.scene.control.Tooltip;
 import pamViewFX.PamGuiManagerFX;
+import pamViewFX.fxGlyphs.PamGlyphDude;
 import pamViewFX.fxNodes.PamBorderPane;
 import pamViewFX.fxNodes.PamHBox;
+import pamViewFX.fxNodes.PamSpinner;
 import pamViewFX.fxNodes.PamSymbolFX;
-import pamViewFX.fxNodes.PamVBox;
+import pamViewFX.fxNodes.utilityPanes.SimpleFilterPaneFX;
 
 
 /**
- * Pane to change click delay settings. The default settings and each click type are listed in a
- * table. Selecting a row shows its delay measurement settings to the side. Click types can use the
- * default settings or their own, as in the Swing click delay panel.
+ * Pane to change click delay settings. The default settings and each click type are rows of a
+ * table, with a column for each delay measurement setting. The filter is set up in a pop over from
+ * a settings button in its column. Click types can use the default settings or their own, as in the
+ * Swing click delay panel.
  *
  * @author Jamie Macaulay
  *
@@ -39,28 +49,28 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 	private ClickControl clickControl;
 
 	/**
-	 * Delay measurement parameters for each type. Index 0 is the default. Null for a type
-	 * which uses the default.
+	 * Delay measurement parameters for each row. Row 0 is the default. Click types which use the
+	 * default keep their own settings here too, so they come back if Default is unticked.
 	 */
 	private DelayMeasurementParams[] delayParams;
 
 	/**
-	 * Click type codes. Index 0 is the default.
+	 * Click type codes. Row 0 is the default.
 	 */
 	private int[] typesList;
 
 	/**
-	 * Whether each type uses the default settings.
+	 * Whether each click type uses the default settings.
 	 */
 	private boolean[] useDefault;
 
 	/**
-	 * Names of each type.
+	 * Names of each row.
 	 */
 	private String[] typeNames;
 
 	/**
-	 * Symbols for each type (null for the default).
+	 * Symbols for each row (null for the default).
 	 */
 	private PamSymbol[] typeSymbols;
 
@@ -70,31 +80,18 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 	private TableView<Integer> typeTable;
 
 	/**
-	 * Title of the settings for the selected type.
+	 * Incremented whenever settings change, so that every cell shows the current values. Rows
+	 * which use the default follow changes to the default row.
 	 */
-	private Label selectedTitle;
+	private SimpleIntegerProperty changeCount = new SimpleIntegerProperty(0);
 
 	/**
-	 * Use the default settings for the selected type.
+	 * Filter settings shown in the pop over.
 	 */
-	private CheckBox useDefaultCheck;
-
-	/**
-	 * Delay measurement settings for the selected type.
-	 */
-	private DelayOptionsPaneFX delayOptionsPane;
-
-	/**
-	 * The row shown in the settings at the side.
-	 */
-	private int shownIndex = -1;
-
-	/**
-	 * True while the controls are being set up, so changes are not copied back.
-	 */
-	private boolean settingUp = false;
+	private SimpleFilterPaneFX filterPane;
 
 	private PamBorderPane mainPane;
+
 
 	public ClickDelayPane(ClickControl clickControl){
 		super(null);
@@ -108,15 +105,12 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 	 */
 	private void createPane(){
 		typeTable = new TableView<Integer>();
-		typeTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-		typeTable.setPrefWidth(330);
-		typeTable.setMinWidth(300);
-		typeTable.setPrefHeight(250);
+		typeTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
 		typeTable.setPlaceholder(new Label("No click types"));
+		typeTable.setFixedCellSize(34);
 
-		TableColumn<Integer, Integer> symbolCol = new TableColumn<Integer, Integer>("");
-		symbolCol.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<Integer>(cell.getValue()));
-		symbolCol.setCellFactory(col -> new javafx.scene.control.TableCell<Integer, Integer>() {
+		TableColumn<Integer, Integer> symbolCol = column("", 30, null);
+		symbolCol.setCellFactory(col -> new TableCell<Integer, Integer>() {
 			@Override
 			protected void updateItem(Integer item, boolean empty) {
 				super.updateItem(item, empty);
@@ -128,136 +122,448 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 				}
 			}
 		});
-		symbolCol.setMinWidth(30);
-		symbolCol.setPrefWidth(30);
-		symbolCol.setMaxWidth(30);
-		symbolCol.setSortable(false);
 
-		TableColumn<Integer, String> nameCol = new TableColumn<Integer, String>("Click type");
-		nameCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(typeNames[cell.getValue()]));
-		nameCol.setSortable(false);
-		nameCol.setMinWidth(150);
-		nameCol.setPrefWidth(190);
+		TableColumn<Integer, Integer> nameCol = column("Click type", 180, null);
+		nameCol.setCellFactory(col -> new TableCell<Integer, Integer>() {
+			@Override
+			protected void updateItem(Integer item, boolean empty) {
+				super.updateItem(item, empty);
+				if (empty || item == null || typeNames == null || item >= typeNames.length) {
+					setText(null);
+				}
+				else {
+					setText(typeNames[item]);
+				}
+			}
+		});
 
-		TableColumn<Integer, String> settingsCol = new TableColumn<Integer, String>("Settings");
-		settingsCol.setCellValueFactory(cell -> new ReadOnlyStringWrapper(getSettingsName(cell.getValue())));
-		settingsCol.setSortable(false);
-		settingsCol.setMinWidth(80);
+		TableColumn<Integer, Integer> defaultCol = column("Default", 90,
+				"Use the default (unclassified clicks) settings for this click type");
+		defaultCol.setCellFactory(col -> new DefaultCell());
+
+		TableColumn<Integer, Integer> filterCol = column("Filter", 80,
+				"Filter data before measurement to improve accuracy. Press the settings button to set up the filter");
+		filterCol.setCellFactory(col -> new FilterCell());
+
+		TableColumn<Integer, Integer> upSampleCol = column("Up\nsample", 90,
+				"Up sampling data to a higher frequency can improve timing accuracy for narrow band clicks (i.e. harbour porpoise)");
+		upSampleCol.setCellFactory(col -> new UpSampleCell());
+
+		TableColumn<Integer, Integer> envelopeCol = column("Envelope", 108,
+				"Use the waveform envelope. This can provide more accurate bearings for some narrowband pulses");
+		envelopeCol.setCellFactory(col -> new EnvelopeCell(false));
+
+		TableColumn<Integer, Integer> leadingEdgeCol = column("Leading\nedge", 95,
+				"Use the leading edge of the envelope only. For long pulses, or where there are echoes");
+		leadingEdgeCol.setCellFactory(col -> new EnvelopeCell(true));
+
+		TableColumn<Integer, Integer> restrictCol = column("Restrict length\n(samples)", 165,
+				"Only use the first samples of each click. In environments where echoes are an issue this is a simple but effective "
+				+ "way to increase the accuracy of time delay calculations. WARNING: Remember that this must cover the potential "
+				+ "time delay in grouped detections");
+		restrictCol.setCellFactory(col -> new RestrictCell());
 
 		typeTable.getColumns().add(symbolCol);
 		typeTable.getColumns().add(nameCol);
-		typeTable.getColumns().add(settingsCol);
+		typeTable.getColumns().add(defaultCol);
+		typeTable.getColumns().add(filterCol);
+		typeTable.getColumns().add(upSampleCol);
+		typeTable.getColumns().add(envelopeCol);
+		typeTable.getColumns().add(leadingEdgeCol);
+		typeTable.getColumns().add(restrictCol);
 
-		typeTable.getSelectionModel().selectedItemProperty().addListener((obs, oldVal, newVal)->{
-			if (settingUp) return;
-			copySettingsBack();
-			showSettings(newVal);
-		});
+		filterPane = new SimpleFilterPaneFX();
 
-		//the settings for the selected type
-		selectedTitle = new Label(" ");
-		PamGuiManagerFX.titleFont2style(selectedTitle);
+		mainPane.setCenter(typeTable);
+	}
 
-		useDefaultCheck = new CheckBox("Use default settings");
-		useDefaultCheck.setOnAction((action)->{
-			if (settingUp || shownIndex <= 0) return;
-			useDefault[shownIndex] = useDefaultCheck.isSelected();
-			if (!useDefault[shownIndex] && delayParams[shownIndex] == null && delayParams[0] != null) {
-				// start from the default settings
-				delayParams[shownIndex] = delayParams[0].clone();
+	/**
+	 * Make a table column whose value is the row index.
+	 * @param title - the column title.
+	 * @param width - the column width.
+	 * @param tip - tool tip for the column header. Can be null.
+	 * @return the column.
+	 */
+	private TableColumn<Integer, Integer> column(String title, double width, String tip) {
+		TableColumn<Integer, Integer> col = new TableColumn<Integer, Integer>();
+		Label header = new Label(title);
+		header.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
+		if (tip != null) {
+			header.setTooltip(new Tooltip(tip));
+		}
+		col.setGraphic(header);
+		col.setCellValueFactory(cell -> new ReadOnlyObjectWrapper<Integer>(cell.getValue()));
+		col.setPrefWidth(width);
+		col.setMinWidth(width);
+		col.setSortable(false);
+		col.setReorderable(false);
+		return col;
+	}
+
+	/**
+	 * Whether the settings of a row can be changed.
+	 */
+	private boolean isRowEditable(int row) {
+		return row == 0 || !useDefault[row];
+	}
+
+	/**
+	 * The settings used by a row: the default settings for click types which use the default.
+	 */
+	private DelayMeasurementParams getUsedParams(int row) {
+		if (row > 0 && useDefault[row]) {
+			return delayParams[0];
+		}
+		return delayParams[row];
+	}
+
+	/**
+	 * Called after settings change so that all cells show the current values.
+	 */
+	private void settingsChanged() {
+		changeCount.set(changeCount.get()+1);
+	}
+
+	/**
+	 * Base class for cells which show and change a delay setting. Controls are made once and
+	 * updated whenever the row or the settings change.
+	 */
+	private abstract class DelayCell extends TableCell<Integer, Integer> {
+
+		/**
+		 * True while the controls are being set from the settings.
+		 */
+		protected boolean syncing = false;
+
+		DelayCell() {
+			setAlignment(Pos.CENTER);
+			changeCount.addListener((obs, oldV, newV) -> sync());
+		}
+
+		@Override
+		protected void updateItem(Integer item, boolean empty) {
+			super.updateItem(item, empty);
+			if (empty || item == null || delayParams == null || item >= delayParams.length) {
+				setGraphic(null);
 			}
-			showSettings(shownIndex);
-			typeTable.refresh();
-		});
+			else {
+				setGraphic(getControl());
+				sync();
+			}
+		}
 
-		delayOptionsPane = new DelayOptionsPaneFX();
+		/**
+		 * The row this cell is on, or -1.
+		 */
+		protected int getRow() {
+			Integer item = getItem();
+			if (item == null || isEmpty() || delayParams == null || item >= delayParams.length) {
+				return -1;
+			}
+			return item;
+		}
 
-		PamVBox settingsHolder = new PamVBox();
-		settingsHolder.setSpacing(5);
-		settingsHolder.setPadding(new Insets(0,0,0,10));
-		settingsHolder.getChildren().addAll(selectedTitle, useDefaultCheck, delayOptionsPane.getContentNode());
+		private void sync() {
+			int row = getRow();
+			if (row < 0) {
+				return;
+			}
+			syncing = true;
+			DelayMeasurementParams dmp = getUsedParams(row);
+			if (dmp == null) {
+				dmp = new DelayMeasurementParams();
+			}
+			setValues(row, dmp, isRowEditable(row));
+			syncing = false;
+		}
 
-		PamHBox holder = new PamHBox();
-		holder.setSpacing(5);
-		holder.getChildren().addAll(typeTable, settingsHolder);
-		PamHBox.setHgrow(settingsHolder, Priority.ALWAYS);
+		/**
+		 * Change the settings of this cell's row, if they can be changed.
+		 * @return the settings to change, or null.
+		 */
+		protected DelayMeasurementParams getEditParams() {
+			int row = getRow();
+			if (syncing || row < 0 || !isRowEditable(row) || delayParams[row] == null) {
+				return null;
+			}
+			return delayParams[row];
+		}
 
-		mainPane.setCenter(holder);
+		abstract Node getControl();
+
+		abstract void setValues(int row, DelayMeasurementParams dmp, boolean editable);
 	}
 
 	/**
-	 * Short description of the settings used for a row.
+	 * Tick box to use the default settings.
 	 */
-	private String getSettingsName(int index) {
-		if (index > 0 && useDefault[index]) {
-			return "Default";
+	private class DefaultCell extends DelayCell {
+		private CheckBox checkBox = new CheckBox();
+
+		DefaultCell() {
+			checkBox.setOnAction((e)->{
+				int row = getRow();
+				if (syncing || row <= 0) return;
+				useDefault[row] = checkBox.isSelected();
+				if (!useDefault[row] && delayParams[row] == null) {
+					// start from the default settings.
+					delayParams[row] = delayParams[0].clone();
+				}
+				settingsChanged();
+			});
 		}
-		if (index == 0) {
-			return "Default";
+
+		@Override
+		Node getControl() {
+			return checkBox;
 		}
-		return "Custom";
+
+		@Override
+		void setValues(int row, DelayMeasurementParams dmp, boolean editable) {
+			checkBox.setVisible(row > 0);
+			checkBox.setSelected(row > 0 && useDefault[row]);
+		}
 	}
 
 	/**
-	 * Copy the settings in the side pane back to the row they were shown for.
-	 * @return false if the settings are invalid.
+	 * Tick box to filter the data, and a button which shows the filter settings in a pop over.
 	 */
-	private boolean copySettingsBack() {
-		if (shownIndex < 0 || delayParams == null || shownIndex >= delayParams.length) {
-			return true;
+	private class FilterCell extends DelayCell {
+		private CheckBox checkBox = new CheckBox();
+		private Button settingsButton = new Button();
+		private PamHBox holder = new PamHBox(checkBox, settingsButton);
+
+		FilterCell() {
+			holder.setSpacing(3);
+			holder.setAlignment(Pos.CENTER);
+			settingsButton.setGraphic(PamGlyphDude.createPamIcon("mdi2c-cog", PamGuiManagerFX.iconSize));
+			checkBox.setOnAction((e)->{
+				DelayMeasurementParams dmp = getEditParams();
+				if (dmp == null) return;
+				dmp.filterBearings = checkBox.isSelected();
+				if (dmp.filterBearings && dmp.delayFilterParams == null) {
+					dmp.delayFilterParams = new FFTFilterParams();
+				}
+				settingsChanged();
+				if (dmp.filterBearings) {
+					showFilter(settingsButton, getRow());
+				}
+			});
+			settingsButton.setOnAction((e)->{
+				showFilter(settingsButton, getRow());
+			});
 		}
-		if (shownIndex > 0 && useDefault[shownIndex]) {
-			return true;
+
+		@Override
+		Node getControl() {
+			return holder;
 		}
-		DelayMeasurementParams dmp = delayParams[shownIndex];
-		if (dmp == null) {
-			dmp = new DelayMeasurementParams();
+
+		@Override
+		void setValues(int row, DelayMeasurementParams dmp, boolean editable) {
+			checkBox.setSelected(dmp.filterBearings);
+			checkBox.setDisable(!editable);
+			settingsButton.setDisable(!editable || !dmp.filterBearings);
+			String filter = "No filter";
+			if (dmp.delayFilterParams != null) {
+				filter = dmp.delayFilterParams.toString();
+			}
+			settingsButton.setTooltip(new Tooltip("Filter settings: " + filter));
 		}
-		DelayMeasurementParams newParams = delayOptionsPane.getParams(dmp.clone());
-		if (newParams == null) {
-			return false;
-		}
-		delayParams[shownIndex] = newParams;
-		typeTable.refresh();
-		return true;
 	}
 
 	/**
-	 * Show the settings for a row at the side.
-	 * @param index - the row.
+	 * Up sampling factor.
 	 */
-	private void showSettings(Integer index) {
-		if (index == null || delayParams == null || index < 0 || index >= delayParams.length) {
-			shownIndex = -1;
+	private class UpSampleCell extends DelayCell {
+		private ComboBox<String> comboBox = new ComboBox<String>();
+
+		UpSampleCell() {
+			comboBox.getItems().addAll("None", "x2", "x3", "x4");
+			comboBox.setOnAction((e)->{
+				DelayMeasurementParams dmp = getEditParams();
+				if (dmp == null) return;
+				dmp.setUpSample(comboBox.getSelectionModel().getSelectedIndex()+1);
+				settingsChanged();
+			});
+		}
+
+		@Override
+		Node getControl() {
+			return comboBox;
+		}
+
+		@Override
+		void setValues(int row, DelayMeasurementParams dmp, boolean editable) {
+			int ind = Math.min(4, Math.max(1, dmp.getUpSample())) - 1;
+			comboBox.getSelectionModel().select(ind);
+			comboBox.setDisable(!editable);
+		}
+	}
+
+	/**
+	 * Tick box to use the envelope, or the envelope leading edge.
+	 */
+	private class EnvelopeCell extends DelayCell {
+		private CheckBox checkBox = new CheckBox();
+		private boolean leadingEdge;
+
+		EnvelopeCell(boolean leadingEdge) {
+			this.leadingEdge = leadingEdge;
+			checkBox.setOnAction((e)->{
+				DelayMeasurementParams dmp = getEditParams();
+				if (dmp == null) return;
+				if (leadingEdge) {
+					dmp.useLeadingEdge = checkBox.isSelected();
+				}
+				else {
+					dmp.envelopeBearings = checkBox.isSelected();
+				}
+				settingsChanged();
+			});
+		}
+
+		@Override
+		Node getControl() {
+			return checkBox;
+		}
+
+		@Override
+		void setValues(int row, DelayMeasurementParams dmp, boolean editable) {
+			if (leadingEdge) {
+				checkBox.setSelected(dmp.useLeadingEdge);
+				// the leading edge can only be used with the envelope.
+				checkBox.setDisable(!editable || !dmp.envelopeBearings);
+			}
+			else {
+				checkBox.setSelected(dmp.envelopeBearings);
+				checkBox.setDisable(!editable);
+			}
+		}
+	}
+
+	/**
+	 * Tick box to restrict the number of samples used, and the number of samples.
+	 */
+	private class RestrictCell extends DelayCell {
+		private CheckBox checkBox = new CheckBox();
+		private PamSpinner<Integer> spinner = new PamSpinner<Integer>(10, 1000000, 80, 10);
+		private PamHBox holder = new PamHBox(checkBox, spinner);
+
+		RestrictCell() {
+			holder.setSpacing(5);
+			holder.setAlignment(Pos.CENTER);
+			spinner.setEditable(true);
+			spinner.getStyleClass().add(Spinner.STYLE_CLASS_SPLIT_ARROWS_HORIZONTAL);
+			spinner.setPrefWidth(110);
+			checkBox.setOnAction((e)->{
+				DelayMeasurementParams dmp = getEditParams();
+				if (dmp == null) return;
+				dmp.useRestrictedBins = checkBox.isSelected();
+				settingsChanged();
+			});
+			spinner.valueProperty().addListener((obs, oldV, newV)->{
+				DelayMeasurementParams dmp = getEditParams();
+				if (dmp == null || newV == null) return;
+				dmp.restrictedBins = newV;
+				// only rows which follow the default need to change.
+				if (getRow() == 0) {
+					settingsChanged();
+				}
+			});
+		}
+
+		@Override
+		Node getControl() {
+			return holder;
+		}
+
+		@Override
+		void setValues(int row, DelayMeasurementParams dmp, boolean editable) {
+			checkBox.setSelected(dmp.useRestrictedBins);
+			checkBox.setDisable(!editable);
+			spinner.getValueFactory().setValue(Math.max(10, dmp.restrictedBins));
+			spinner.setDisable(!editable || !dmp.useRestrictedBins);
+		}
+	}
+
+	/**
+	 * Show the filter settings of a row in a pop over.
+	 * @param button - the button to show the pop over by.
+	 * @param row - the row.
+	 */
+	private void showFilter(Button button, int row) {
+		if (row < 0 || !isRowEditable(row) || delayParams[row] == null) {
 			return;
 		}
-		settingUp = true;
-		shownIndex = index;
-		selectedTitle.setText(typeNames[index]);
-		useDefaultCheck.setVisible(index > 0);
-		useDefaultCheck.setManaged(index > 0);
-		useDefaultCheck.setSelected(index > 0 && useDefault[index]);
-		DelayMeasurementParams dmp = delayParams[index];
-		if (dmp == null || (index > 0 && useDefault[index])) {
-			dmp = delayParams[0];
-		}
-		if (dmp == null) {
-			dmp = new DelayMeasurementParams();
+		DelayMeasurementParams dmp = delayParams[row];
+		if (dmp.delayFilterParams == null) {
+			dmp.delayFilterParams = new FFTFilterParams();
 		}
 		if (clickControl.getClickDetector() != null && clickControl.getClickDetector().getSampleRate() > 0) {
-			delayOptionsPane.setSampleRate(clickControl.getClickDetector().getSampleRate());
+			filterPane.setSampleRate(clickControl.getClickDetector().getSampleRate());
 		}
-		delayOptionsPane.setParams(dmp);
-		// settings of a type which uses the default can't be changed here.
-		delayOptionsPane.getContentNode().setDisable(index > 0 && useDefault[index]);
-		settingUp = false;
+		filterPane.setParams(dmp.delayFilterParams);
+
+		Label title = new Label("Filter: " + typeNames[row]);
+		PamGuiManagerFX.titleFont2style(title);
+		PamBorderPane content = new PamBorderPane();
+		content.setTop(title);
+		content.setCenter(filterPane.getContentNode());
+		javafx.scene.layout.BorderPane.setMargin(title, new Insets(0,0,5,0));
+		content.setPadding(new Insets(5,10,10,10));
+
+		PopOver popOver = new PopOver();
+		popOver.setContentNode(content);
+		popOver.setArrowLocation(PopOver.ArrowLocation.TOP_CENTER);
+		// a pop over is a window of its own, so give it the same style as the settings dialog. 
+		popOver.getScene().getStylesheets().addAll(pamViewFX.fxStyles.PamStylesManagerFX.getPamStylesManagerFX().getCurStyle().getDialogCSS());
+		popOver.setOnHidden((e)->{
+			FFTFilterParams newParams = filterPane.getParams(dmp.delayFilterParams.clone());
+			if (newParams != null) {
+				dmp.delayFilterParams = newParams;
+			}
+			// the filter pane can only be in one pop over at a time.
+			content.setCenter(null);
+			settingsChanged();
+		});
+		popOver.show(button);
+		// colour the pop over like the window it comes from. The ControlsFX style draws it white and 
+		// the Primer colours don't resolve in the pop over window. An inline style takes priority. 
+		String fill = getWindowColour(button);
+		if (fill != null && popOver.getSkin() != null) {
+			Node border = popOver.getSkin().getNode().lookup(".border");
+			if (border != null) {
+				border.setStyle("-fx-fill: " + fill + ";");
+			}
+		}
+	}
+
+	/**
+	 * Get the background colour of the window a node is in. 
+	 * @param node - the node. 
+	 * @return the colour as CSS, or null. 
+	 */
+	private static String getWindowColour(Node node) {
+		try {
+			javafx.scene.layout.Background bg = ((javafx.scene.layout.Region) node.getScene().getRoot()).getBackground();
+			if (bg != null && !bg.getFills().isEmpty() && bg.getFills().get(0).getFill() instanceof javafx.scene.paint.Color) {
+				javafx.scene.paint.Color c = (javafx.scene.paint.Color) bg.getFills().get(0).getFill();
+				return String.format("rgb(%d,%d,%d)", (int) Math.round(c.getRed()*255), 
+						(int) Math.round(c.getGreen()*255), (int) Math.round(c.getBlue()*255));
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 
 	/**
 	 * Set up the rows for the current click types.
 	 * @param clickParameters - the click parameters
 	 */
-	private void createPanelControls(ClickParameters clickParameters) {
+	private void createRows(ClickParameters clickParameters) {
 		ClickIdentifier clickIdentifier = clickControl.getClickIdentifier();
 		int nTypes = 1; // always a default.
 		int[] codeList = null;
@@ -278,19 +584,22 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 		useDefault = new boolean[nTypes];
 		delayParams = new DelayMeasurementParams[nTypes];
 
-		delayParams[0] = clickParameters.getDelayMeasurementParams(0, true);
-		typeNames[0] = "Unclassified clicks / default";
+		delayParams[0] = clickParameters.getDelayMeasurementParams(0, true).clone();
+		typeNames[0] = "Unclassified / default";
 		for (int i = 1; i < nTypes; i++) {
 			typesList[i] = codeList[i-1];
 			typeNames[i] = clickIdentifier.getSpeciesName(typesList[i]);
 			if (symbols != null && i-1 < symbols.length) {
 				typeSymbols[i] = symbols[i-1];
 			}
-			delayParams[i] = clickParameters.getDelayMeasurementParams(typesList[i], false);
-			// types without their own settings are given the default object. 
-			useDefault[i] = delayParams[i] == null || delayParams[i] == delayParams[0];
+			DelayMeasurementParams dmp = clickParameters.getDelayMeasurementParams(typesList[i], false);
+			// types without their own settings are given the default object.
+			useDefault[i] = dmp == null || dmp == clickParameters.getDelayMeasurementParams(0, true);
 			if (useDefault[i]) {
 				delayParams[i] = null;
+			}
+			else {
+				delayParams[i] = dmp.clone();
 			}
 		}
 	}
@@ -300,7 +609,7 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 	}
 
 	/**
-	 * Copies the local list back into the click settings, removing
+	 * Copies the settings back into the click settings, removing
 	 * old entries as necessary.
 	 * @param clickParameters
 	 * @return the click parameters, or null if the settings are invalid.
@@ -310,8 +619,13 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 		if (delayParams==null || delayParams[0] == null) {
 			return clickParameters;
 		}
-		if (!copySettingsBack()) {
-			return null;
+		for (int i = 0; i < typesList.length; i++) {
+			DelayMeasurementParams dmp = getUsedParams(i);
+			if (dmp != null && dmp.filterBearings && dmp.delayFilterParams == null) {
+				pamViewFX.fxNodes.pamDialogFX.PamDialogFX.showWarning(null, "Delay measurement settings",
+						"Filter parameters have not been set for " + typeNames[i]);
+				return null;
+			}
 		}
 		clickParameters.setDelayMeasurementParams(0, delayParams[0]);
 		for (int i = 1; i < typesList.length; i++) {
@@ -327,21 +641,14 @@ public class ClickDelayPane extends SettingsPane<ClickParameters> {
 
 	@Override
 	public void setParams(ClickParameters clickParameters) {
-		settingUp = true;
-		createPanelControls(clickParameters);
+		createRows(clickParameters);
 		typeTable.getItems().clear();
 		for (int i = 0; i < typesList.length; i++) {
 			typeTable.getItems().add(i);
 		}
-		int select = shownIndex;
-		if (select < 0 || select >= typesList.length) {
-			select = 0;
-		}
-		typeTable.getSelectionModel().select(select);
-		settingUp = false;
-		shownIndex = -1;
-		showSettings(select);
-		typeTable.refresh();
+		// show all the rows without a scroll bar where possible.
+		typeTable.setPrefHeight(typeTable.getFixedCellSize() * (typesList.length + 2.2));
+		settingsChanged();
 	}
 
 	@Override
