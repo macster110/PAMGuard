@@ -72,3 +72,16 @@ Before running the command line, you should:
 - Adjust the paths to your Java and JavaFX installations as needed. Ensure you replace the JAR file name with the actual version you have built.
 
 - Include the required plugins in the /target directory.
+
+## Display scaling on Linux
+
+Java doesn't always pick the right display scale on high resolution Linux screens. The
+`.deb` package starts PAMGuard with `/usr/share/pamguard/pamguard.sh`, which works out the
+scale before Java starts (from `PAMGUARD_UI_SCALE`, the scale saved from the start up dialog,
+`GDK_SCALE`, `Xft.dpi` from `xrdb`, or the GNOME scaling factor, in that order) and passes it
+as `-Dsun.java2d.uiScale` and `-Dglass.gtk.uiScale`.
+
+The scale can also be chosen with the "Scale" button at the top of the start up dialog (`-c`),
+which offers Automatic, 1x, 2x, 3x or 4x. The choice is saved in `~/Pamguard/uiScale.txt` and
+overrides any `-Dsun.java2d.uiScale` on the command line, so it works when PAMGuard is run with
+`java -jar` too. Changing it restarts PAMGuard. Java on Linux only supports whole number scales.

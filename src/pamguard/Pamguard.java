@@ -70,6 +70,7 @@ import binaryFileStorage.BinaryStore;
 import dataPlotsFX.JamieDev;
 import generalDatabase.DBControl;
 import pamViewFX.fxStartup.StartupDialogFX;
+import PamController.startup.LinuxUIScale;
 import PamController.startup.StartupSelection;
 import networkTransfer.send.NetworkSender;
 import offlineProcessing.OfflineTaskManager;
@@ -110,6 +111,12 @@ public class Pamguard {
 	 * @param args
 	 */
 	public static void main(String[] args) {
+		
+		/*
+		 * On Linux, use the display scale chosen in the start up dialog. Must be the
+		 * very first thing, since Swing and JavaFX read the scale when they start.
+		 */
+		LinuxUIScale.applySavedScale();
 		
 		CommandLine.create(args);
 		
@@ -524,6 +531,9 @@ public class Pamguard {
 		writePropertyString("os.arch");
 		writePropertyString("os.version");
 		writePropertyString("java.library.path");
+		if (LinuxUIScale.isLinux()) {
+			System.out.println(LinuxUIScale.getScaleDescription());
+		}
 		System.out.println("Logging system messages to " + getSettingsFolder() + File.separator + ProxyPrintStream.getLogfileName());
 		//		Pam3DUtils.say3DVersion();
 		System.out.println("For further information and bug reporting visit " + PamguardVersionInfo.webAddress);

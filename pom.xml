@@ -127,6 +127,17 @@
 										<prefix>/usr/share/pamguard</prefix>
 									</mapper>
 								</data>
+								<!---Launcher script which works out the display scale before starting Java-->
+								<data>
+									<src>
+										${basedir}/build/deb/pamguard.sh</src>
+									<type>file</type>
+									<mapper>
+										<type>perm</type>
+										<prefix>/usr/share/pamguard</prefix>
+										<filemode>755</filemode>
+									</mapper>
+								</data>
 								<!---THe desktop file will create a PAMGuard icon in the applications tray-->
 								<data>
 									<src>

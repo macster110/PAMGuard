@@ -17,6 +17,7 @@ import org.kordamp.ikonli.javafx.FontIcon;
 
 import PamController.PamSettingManager;
 import PamController.PamguardVersionInfo;
+import PamController.startup.LinuxUIScale;
 import PamController.startup.StartupEntry;
 import PamController.startup.StartupHistory;
 import PamController.startup.StartupSelection;
@@ -33,9 +34,13 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar.ButtonData;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.RadioMenuItem;
 import javafx.scene.control.SeparatorMenuItem;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
@@ -218,6 +223,10 @@ public class StartupDialogFX {
 			table.refresh();
 		});
 		HBox header = new HBox(10, headerText, darkButton);
+		if (LinuxUIScale.isLinux()) {
+			// Linux doesn't always get the display scaling right, so let the user choose.
+			header.getChildren().add(1, createScaleButton());
+		}
 		header.setAlignment(Pos.TOP_LEFT);
 		header.getStyleClass().add("startup-header");
 
@@ -523,6 +532,106 @@ public class StartupDialogFX {
 		tip.setWrapText(true);
 		tip.setMaxWidth(320);
 		button.setTooltip(tip);
+	}
+
+	/*
+	 * ------------------------------------------------------------------------
+	 * Display scale (Linux only)
+	 * ------------------------------------------------------------------------
+	 */
+
+	/**
+	 * Create the menu button for choosing the display scale on Linux.
+	 */
+	private MenuButton createScaleButton() {
+		MenuButton button = new MenuButton();
+		button.getStyleClass().add("startup-plain");
+		button.setGraphic(new FontIcon("mdi2m-magnify-plus-outline"));
+
+		int saved = LinuxUIScale.getSavedScale();
+		int detected = LinuxUIScale.detectDesktopScale();
+		ToggleGroup group = new ToggleGroup();
+
+		RadioMenuItem auto = new RadioMenuItem(detected > 0 ? 
+				String.format("Automatic (desktop suggests %dx)", detected) : "Automatic");
+		auto.setUserData(LinuxUIScale.SCALE_AUTO);
+		auto.setToggleGroup(group);
+		button.getItems().addAll(auto, new SeparatorMenuItem());
+		for (int i = 1; i <= LinuxUIScale.MAX_SCALE; i++) {
+			RadioMenuItem item = new RadioMenuItem(String.format("%dx (%d%%)", i, i * 100));
+			item.setUserData(i);
+			item.setToggleGroup(group);
+			button.getItems().add(item);
+		}
+		for (Toggle t : group.getToggles()) {
+			if ((int) t.getUserData() == saved) {
+				t.setSelected(true);
+			}
+		}
+		for (MenuItem item : button.getItems()) {
+			if (item instanceof RadioMenuItem) {
+				item.setOnAction(e -> chooseScale(button, group, (int) item.getUserData()));
+			}
+		}
+		updateScaleButton(button);
+		return button;
+	}
+
+	private void updateScaleButton(MenuButton button) {
+		double current = LinuxUIScale.getCurrentScale();
+		int saved = LinuxUIScale.getSavedScale();
+		button.setText(current > 0 ? String.format("Scale %.0fx", current) : "Scale");
+		Tooltip tip = new Tooltip("Display scale for PAMGuard. Use a larger scale if text and "
+				+ "controls are too small to read on a high resolution screen, or 1x if they are too large. "
+				+ (saved == LinuxUIScale.SCALE_AUTO ? "Currently automatic." : String.format("Currently set to %dx.", saved))
+				+ " Changing the scale restarts PAMGuard.");
+		tip.setWrapText(true);
+		tip.setMaxWidth(320);
+		button.setTooltip(tip);
+	}
+
+	/**
+	 * The user picked a display scale. Save it and, if it changes the display,
+	 * offer to restart PAMGuard.
+	 */
+	private void chooseScale(MenuButton button, ToggleGroup group, int scale) {
+		int saved = LinuxUIScale.getSavedScale();
+		if (scale == saved) {
+			return;
+		}
+		if (!LinuxUIScale.needsRestart(scale)) {
+			LinuxUIScale.saveScale(scale);
+			updateScaleButton(button);
+			return;
+		}
+		String name = scale == LinuxUIScale.SCALE_AUTO ? "automatic" : scale + "x";
+		ButtonType restart = new ButtonType("Restart now", ButtonData.OK_DONE);
+		ButtonType later = new ButtonType("Next time", ButtonData.OTHER);
+		ButtonType cancel = new ButtonType("Cancel", ButtonData.CANCEL_CLOSE);
+		Alert alert = new Alert(AlertType.CONFIRMATION, 
+				"PAMGuard needs to restart to change the display scale to " + name + ". Restart now, "
+				+ "or use the new scale the next time PAMGuard starts?", restart, later, cancel);
+		alert.setTitle("Display scale");
+		alert.setHeaderText(null);
+		alert.initOwner(stage);
+		alert.getDialogPane().getStylesheets().addAll(stage.getScene().getStylesheets());
+		ButtonType ans = alert.showAndWait().orElse(cancel);
+		if (ans == cancel) {
+			// put the selection back.
+			for (Toggle t : group.getToggles()) {
+				t.setSelected((int) t.getUserData() == saved);
+			}
+			return;
+		}
+		if (!LinuxUIScale.saveScale(scale)) {
+			showWarning("Display scale", "Unable to save the display scale to " + LinuxUIScale.getScaleFile());
+			return;
+		}
+		updateScaleButton(button);
+		if (ans == restart && !LinuxUIScale.restartPamguard()) {
+			showWarning("Display scale", "PAMGuard was unable to restart itself. The new display scale will be used "
+					+ "the next time PAMGuard starts.");
+		}
 	}
 
 	/**
