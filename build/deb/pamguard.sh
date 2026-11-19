@@ -79,7 +79,7 @@ while true; do
 	echo "Starting PAMGuard with display scale $UI_SCALE"
 	# shellcheck disable=SC2086
 	java $JAVA_MEMORY \
-		-Dsun.java2d.uiScale="$UI_SCALE" -Dglass.gtk.uiScale="$UI_SCALE" \
+		-Dsun.java2d.uiScale="$UI_SCALE" \
 		-Dawt.useSystemAAFontSettings=on -Dswing.aatext=true \
 		-jar "$PAMGUARD_JAR" "$@"
 	code=$?

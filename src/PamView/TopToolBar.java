@@ -67,7 +67,7 @@ public class TopToolBar extends PamToolBar implements ColorManaged {
 			stopButton.setToolTipText("Stop sound playback");
 		}
 		else {
-			add(startButton = new PamButton(FontIcon.of(MaterialDesignR.RECORD_CIRCLE, PamSettingsIconButton.NORMAL_SIZE, Color.RED)));
+			add(startButton = new PamButton(FontIcon.of(MaterialDesignR.RECORD_CIRCLE, UIScaling.scale(PamSettingsIconButton.NORMAL_SIZE), Color.RED)));
 			startButton.setDisabledIcon(PamFontIcon.of(MaterialDesignR.RECORD_CIRCLE, PamSettingsIconButton.NORMAL_SIZE, IconColour.DISABLED));
 			startButton.setToolTipText("Start processing");
 			startButton.addMouseListener(new StartButtonMouse());

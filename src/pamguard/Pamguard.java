@@ -533,6 +533,7 @@ public class Pamguard {
 		writePropertyString("java.library.path");
 		if (LinuxUIScale.isLinux()) {
 			System.out.println(LinuxUIScale.getScaleDescription());
+			System.out.println("Text and icon scale factor " + PamView.UIScaling.getScaleFactor());
 		}
 		System.out.println("Logging system messages to " + getSettingsFolder() + File.separator + ProxyPrintStream.getLogfileName());
 		//		Pam3DUtils.say3DVersion();

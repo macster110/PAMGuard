@@ -14,15 +14,14 @@ import java.util.List;
 /**
  * Display (UI) scaling for PAMGuard on Linux.
  * <p>
- * Java only scales Swing and JavaFX on Linux if it's told to, through the
- * sun.java2d.uiScale (Swing / AWT) and glass.gtk.uiScale (JavaFX) system properties,
- * or if it can work the scale out from GDK_SCALE or the GNOME settings. Some
+ * Java only scales Swing on Linux if it's told to, through the
+ * sun.java2d.uiScale system property, or if it can work the scale out from GDK_SCALE or the GNOME settings. Some
  * systems get this right and some don't, so the user can choose the scale in the
  * start up dialog. The choice is saved in a small text file in the PAMGuard
  * settings folder (~/Pamguard/uiScale.txt) which holds either "auto" or a whole
  * number scale factor. The Linux launcher script reads the same file.
  * <p>
- * The properties are only read when AWT and JavaFX start, so {@link #applySavedScale()}
+ * The property is only read when AWT starts, so {@link #applySavedScale()}
  * must be called at the very start of main, before anything touches AWT, Swing or
  * JavaFX. Changing the scale once PAMGuard is running means a restart, see
  * {@link #restartPamguard()}.
@@ -39,11 +38,6 @@ public class LinuxUIScale {
 	 * Swing / AWT scale property.
 	 */
 	public static final String AWT_SCALE_PROPERTY = "sun.java2d.uiScale";
-
-	/**
-	 * JavaFX scale property on Linux (GTK).
-	 */
-	public static final String FX_SCALE_PROPERTY = "glass.gtk.uiScale";
 
 	/**
 	 * Value saved for automatic scaling.
@@ -193,7 +187,7 @@ public class LinuxUIScale {
 	 * command line. With automatic scaling, the command line (or launcher script) value is kept,
 	 * and if there isn't one, Java works the scale out for itself.
 	 * <p>
-	 * The JavaFX scale is set to match the Swing one unless it was set on the command line.
+	 * JavaFX (e.g. the start up dialog) works out its own scale, so isn't changed.
 	 */
 	public static void applySavedScale() {
 		launchScale = System.getProperty(AWT_SCALE_PROPERTY);
@@ -203,16 +197,6 @@ public class LinuxUIScale {
 		int saved = getSavedScale();
 		if (saved != SCALE_AUTO && System.getenv(SCALE_ENV) == null) {
 			System.setProperty(AWT_SCALE_PROPERTY, Integer.toString(saved));
-			System.setProperty(FX_SCALE_PROPERTY, Integer.toString(saved));
-		}
-		else {
-			String awt = System.getProperty(AWT_SCALE_PROPERTY);
-			if (awt != null && System.getProperty(FX_SCALE_PROPERTY) == null) {
-				int s = parseScale(awt);
-				if (s != SCALE_AUTO) {
-					System.setProperty(FX_SCALE_PROPERTY, Integer.toString(s));
-				}
-			}
 		}
 	}
 

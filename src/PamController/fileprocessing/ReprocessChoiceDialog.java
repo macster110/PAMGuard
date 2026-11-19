@@ -39,7 +39,7 @@ public class ReprocessChoiceDialog extends PamDialog {
 	private StoreChoiceSummary choiceSummary;
 	
 	public static FontIcon warnIcon =  FontIcon.of(MaterialDesignA.ALERT_CIRCLE_OUTLINE, 
-			PamSettingsIconButton.SMALL_SIZE, new Color(0.9290f, 0.6940f, 0.1250f));
+			PamView.UIScaling.scale(PamSettingsIconButton.SMALL_SIZE), new Color(0.9290f, 0.6940f, 0.1250f));
 
 	
 	private ReprocessChoiceDialog(Window parentFrame, StoreChoiceSummary choiceSummary) {

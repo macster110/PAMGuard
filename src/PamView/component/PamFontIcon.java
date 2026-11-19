@@ -11,6 +11,7 @@ import org.kordamp.ikonli.swing.FontIcon;
 
 import PamView.ColourScheme;
 import PamView.PamColors;
+import PamView.UIScaling;
 import PamView.PamColors.PamColor;
 
 /**
@@ -112,7 +113,8 @@ public class PamFontIcon extends FontIcon {
 	private PamFontIcon(Ikon ikon, int iconSize, IconColour iconColour) {
 		this.iconColour = iconColour;
 		setIkon(ikon);
-		setIconSize(iconSize);
+		// scale with the text, see UIScaling.
+		setIconSize(UIScaling.scale(iconSize));
 	}
 
 	/**

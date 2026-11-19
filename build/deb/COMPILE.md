@@ -79,9 +79,10 @@ Java doesn't always pick the right display scale on high resolution Linux screen
 `.deb` package starts PAMGuard with `/usr/share/pamguard/pamguard.sh`, which works out the
 scale before Java starts (from `PAMGUARD_UI_SCALE`, the scale saved from the start up dialog,
 `GDK_SCALE`, `Xft.dpi` from `xrdb`, or the GNOME scaling factor, in that order) and passes it
-as `-Dsun.java2d.uiScale` and `-Dglass.gtk.uiScale`.
+as `-Dsun.java2d.uiScale`. JavaFX works out its own scale, so it is left alone.
 
 The scale can also be chosen with the "Scale" button at the top of the start up dialog (`-c`),
 which offers Automatic, 1x, 2x, 3x or 4x. The choice is saved in `~/Pamguard/uiScale.txt` and
 overrides any `-Dsun.java2d.uiScale` on the command line, so it works when PAMGuard is run with
-`java -jar` too. Changing it restarts PAMGuard. Java on Linux only supports whole number scales.
+`java -jar` too. With a scale of 1 on a high resolution screen FlatLaf still enlarges the text,
+and PAMGuard's font icons are scaled by the same factor so they keep in step. Changing it restarts PAMGuard. Java on Linux only supports whole number scales.

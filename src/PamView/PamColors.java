@@ -641,7 +641,7 @@ public class PamColors implements PamSettings {
 	public Font getBoldFont() {
 		if (boldFont == null) {
 			double scaling = PamSettingManager.getInstance().getCurrentDisplayScaling();
-			int fontSize = (int) (12 * scaling);
+			int fontSize = UIScaling.scale((int) (12 * scaling));
 			boldFont = new Font("system", Font.BOLD, fontSize);
 		}
 		return boldFont;
