@@ -1250,16 +1250,31 @@ public class PamGui extends PamView implements WindowListener, PamSettings {
 //						JOptionPane.INFORMATION_MESSAGE);
 //			}
 			
+			File folder = new File(pamguard.Pamguard.getSettingsFolder());
+			String name = pamguard.Pamguard.getLogFileName();
+			File theFile = name == null ? null : new File(folder, name);
+			boolean selectFile = theFile != null && theFile.exists();
+			String os = System.getProperty("os.name", "").toLowerCase();
 			try {
-				String name = pamguard.Pamguard.getLogFileName();
-				if (name == null) {
-					Runtime.getRuntime().exec("explorer.exe " + pamguard.Pamguard.getSettingsFolder());
+				if (os.startsWith("win")) {
+					if (selectFile) {
+						new ProcessBuilder("explorer.exe", "/select,", theFile.getAbsolutePath()).start();
+					} else {
+						new ProcessBuilder("explorer.exe", folder.getAbsolutePath()).start();
+					}
+				} else if (os.startsWith("mac")) {
+					if (selectFile) {
+						new ProcessBuilder("open", "-R", theFile.getAbsolutePath()).start();
+					} else {
+						new ProcessBuilder("open", folder.getAbsolutePath()).start();
+					}
+				} else if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+					Desktop.getDesktop().open(folder);
 				} else {
-					File theFile = new File(pamguard.Pamguard.getSettingsFolder(), name);
-					Runtime.getRuntime().exec("explorer.exe /select," + theFile);
+					new ProcessBuilder("xdg-open", folder.getAbsolutePath()).start();
 				}
 			} catch (IOException e) {
-				e.printStackTrace();
+				System.err.println("Unable to open " + folder + ": " + e.getMessage());
 			}
 		}
 	}
