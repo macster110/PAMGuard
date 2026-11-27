@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
+import Acquisition.AcquisitionProcess;
 import PamController.PamController;
 import PamController.PamControllerInterface;
 import PamUtils.complex.ComplexArray;
@@ -240,6 +241,51 @@ public abstract class MaskedFFTProcess extends PamProcess {
             if (pendingBatches > 0) pendingBatches--;
             pendingLock.notifyAll();
         }
+    }
+
+    /**
+     * When the source sends its last data notification, wait for any batches still
+     * being masked on the worker thread before passing the notification on. The
+     * notification arrives in order after the last FFT slice, but the masked output
+     * for the last few blocks is still being computed. Without this wait, downstream
+     * modules (e.g. the Whistle and Moan detector) and PAMGuard itself think the
+     * data have ended, so the binary files are closed while masked data, and the
+     * contours detected from them, are still arriving.
+     */
+    @Override
+    public void receiveSourceNotification(int type, Object object) {
+        if (type == AcquisitionProcess.LASTDATA) {
+            if (!waitForPendingBatches(60000)) {
+                System.err.println("MaskedFFTProcess: timed out waiting for the mask to finish the last batches");
+            }
+        }
+        super.receiveSourceNotification(type, object);
+    }
+
+    /**
+     * Block until every batch submitted to the mask worker has been processed and
+     * its output added to the masked FFT data block.
+     *
+     * @param maxWaitMillis - the longest time to wait.
+     * @return true if all batches finished, false on timeout or interrupt.
+     */
+    public boolean waitForPendingBatches(long maxWaitMillis) {
+        long endTime = System.currentTimeMillis() + maxWaitMillis;
+        synchronized (pendingLock) {
+            while (pendingBatches > 0) {
+                long remaining = endTime - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    return false;
+                }
+                try {
+                    pendingLock.wait(Math.min(remaining, 50L));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     @Override
