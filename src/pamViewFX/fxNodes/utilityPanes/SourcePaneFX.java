@@ -370,6 +370,8 @@ public class SourcePaneFX extends PamBorderPane {
 		} 
 		this.layout();
 		rePackOwner(channels);
+		// the available channels have changed, so re-check the channel selection.
+		channelValidator.validate();
 	}
 	
 	private int currentNShown = 0;
@@ -672,6 +674,10 @@ public class SourcePaneFX extends PamBorderPane {
 			channelBoxes[i].setSelected((channelList & (1<<i)) > 0);  //Xiao Yan Deng
 		}
 		setAllChanStatus();
+		// re-run every channel check. Each check only re-runs when its own box changes,
+		// so boxes that were not changed here would otherwise keep a stale error
+		// (e.g. from before a source was set) even though a channel is now selected.
+		channelValidator.validate();
 	}
 	
 	/**

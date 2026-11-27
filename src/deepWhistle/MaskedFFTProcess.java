@@ -7,6 +7,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
+import PamController.PamController;
+import PamController.PamControllerInterface;
 import PamUtils.complex.ComplexArray;
 import PamguardMVC.PamConstants;
 import PamguardMVC.PamDataBlock;
@@ -252,13 +254,7 @@ public abstract class MaskedFFTProcess extends PamProcess {
         
         //System.out.println("MaskedFFTProcess: preparing process");
         
-        params = control.getDeepWhistleParameters();
-        
-        inputFFTData = (FFTDataBlock) control.getPamConfiguration().getDataBlockByLongName(params.dataSourceName);
-        
-        setParentDataBlock(inputFFTData);
-        
-        if (inputFFTData == null) {
+        if (!setupDataBlocks()) {
             System.err.println("MaskedFFTProcess: no input FFT data block found: " + params.dataSourceName);
             prepOk = false;
             return;
@@ -266,17 +262,6 @@ public abstract class MaskedFFTProcess extends PamProcess {
 
         // drop any stale buffered units (may be from a previous FFT length)
         clearBuffers();
-
-        System.out.println("MaskedFFTProcess: input params channels: " + (params.channelMap & inputFFTData.getChannelMap()) + params.channelMap);
-
-        // copy information from input block
-        maskedFFTDataBlock.setChannelMap(params.channelMap & inputFFTData.getChannelMap());
-        maskedFFTDataBlock.setFftHop(inputFFTData.getFftHop());
-        maskedFFTDataBlock.setFftLength(inputFFTData.getFftLength());
-        setSampleRate(inputFFTData.getSampleRate(), false);
-
-        // the channels we process, batched together into a single mask call.
-        activeChannels = PamUtils.PamUtils.getChannelArray(maskedFFTDataBlock.getChannelMap());
 
         // create the mask based on the selected mask type. Only recreate the mask
         // if the user has selected a different mask type so we don't needlessly
@@ -323,6 +308,57 @@ public abstract class MaskedFFTProcess extends PamProcess {
         preparedFftHop = inputFFTData.getFftHop();
 
         prepOk = true;
+    }
+
+    /**
+     * Connect to the source FFT data block and copy its channel map, FFT length, hop
+     * and sample rate onto the masked FFT output block. This is light weight (it does
+     * not load the mask or model) so it is called when the settings are loaded and
+     * whenever the data model changes, so that displays such as the spectrogram see
+     * the masked FFT channels straight away rather than only after the settings
+     * dialog has been opened and closed.
+     *
+     * @return true if the source FFT data block was found.
+     */
+    public boolean setupDataBlocks() {
+        params = control.getDeepWhistleParameters();
+
+        inputFFTData = (FFTDataBlock) control.getPamConfiguration().getDataBlockByLongName(params.dataSourceName);
+
+        setParentDataBlock(inputFFTData);
+
+        if (inputFFTData == null) {
+            return false;
+        }
+
+        // copy information from input block
+        maskedFFTDataBlock.setChannelMap(params.channelMap & inputFFTData.getChannelMap());
+        maskedFFTDataBlock.setFftHop(inputFFTData.getFftHop());
+        maskedFFTDataBlock.setFftLength(inputFFTData.getFftLength());
+        setSampleRate(inputFFTData.getSampleRate(), false);
+
+        // the channels we process, batched together into a single mask call.
+        activeChannels = PamUtils.PamUtils.getChannelArray(maskedFFTDataBlock.getChannelMap());
+
+        return true;
+    }
+
+    @Override
+    public void notifyModelChanged(int changeType) {
+        super.notifyModelChanged(changeType);
+        switch (changeType) {
+        case PamControllerInterface.INITIALIZATION_COMPLETE:
+            setupDataBlocks();
+            break;
+        case PamControllerInterface.ADD_CONTROLLEDUNIT:
+        case PamControllerInterface.REMOVE_CONTROLLEDUNIT:
+        case PamControllerInterface.CHANGED_PROCESS_SETTINGS:
+            // the source FFT module may have been added, removed or changed.
+            if (PamController.getInstance().isInitializationComplete()) {
+                setupDataBlocks();
+            }
+            break;
+        }
     }
 
     /**
