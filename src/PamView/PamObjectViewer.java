@@ -107,8 +107,22 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 	
 	private Color processColour = new Color(255, 192, 0);
 	
-	private static final Color instArrowColour = Color.BLUE;
-	private static final Color arrowColour = Color.DARK_GRAY;
+	/**
+	 * Arrow colours for the light schemes. The dark schemes take theirs from the
+	 * colour scheme, see {@link #getArrowColour()} and {@link #getInstArrowColour()}.
+	 */
+	private static final Color lightInstArrowColour = Color.BLUE;
+	private static final Color lightArrowColour = Color.DARK_GRAY;
+	/**
+	 * Data modifier (instant observer) arrows in the Dark scheme: a light blue that
+	 * stands out on the dark grey background.
+	 */
+	private static final Color darkInstArrowColour = new Color(110, 160, 255);
+	/**
+	 * Data modifier arrows in the Night scheme: amber rather than blue so as not to
+	 * spoil night vision, but still distinct from the red standard arrows.
+	 */
+	private static final Color nightInstArrowColour = new Color(220, 140, 60);
 
 	public static final int arrowSize = 6;
 	public static final int instArrowSize = arrowSize;
@@ -563,11 +577,11 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 			Graphics2D g2d = (Graphics2D) g;
 			if (hasInstant) {
 				g2d.setStroke(instantArrowStroke);
-				drawKeyLine(g, x, y, s2, lineLen, gap, instArrowColour, arrowSize, instArrowSize);
+				drawKeyLine(g, x, y, s2, lineLen, gap, getInstArrowColour(), arrowSize, instArrowSize);
 				y -= fh;
 			}
 			g2d.setStroke(arrowStroke);
-			drawKeyLine(g, x, y, s1, lineLen, gap, arrowColour, 0, arrowSize);
+			drawKeyLine(g, x, y, s1, lineLen, gap, getArrowColour(), 0, arrowSize);
 			
 		}
 
@@ -631,18 +645,18 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 					Graphics2D g2d = (Graphics2D) g;
 					if (sourceControllerView == pamControllerView) {
 						bestYGap = orig.y;
-						g.setColor(arrowColour);
+						g.setColor(getArrowColour());
 						g2d.setStroke(arrowStroke);
 						drawArrow(g, orig.x, orig.y, dest.x, dest.y, bestYGap, 0, arrowSize);
 					} 
 					else if (instant){
 						g2d.setStroke(instantArrowStroke);
-						g.setColor(instArrowColour);
+						g.setColor(getInstArrowColour());
 						drawArrow(g, orig.x, orig.y, dest.x, dest.y, bestYGap, arrowSize, instArrowSize);
 					}
 					else {
 						g2d.setStroke(arrowStroke);
-						g.setColor(arrowColour);
+						g.setColor(getArrowColour());
 						drawArrow(g, orig.x, orig.y, dest.x, dest.y, bestYGap, 0, arrowSize);
 					}
 				}
@@ -696,13 +710,13 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 					boolean instant = thisProcess.getParentDataBlock().isInstantObserver(thisProcess);
 					Graphics2D g2d = (Graphics2D) g;
 					if (instant) {
-						g.setColor(instArrowColour);
+						g.setColor(getInstArrowColour());
 						g2d.setStroke(instantArrowStroke);
 						drawArrow(g, sourcePoint.x, sourcePoint.y, destPoint.x,
 								destPoint.y, bestYGap, arrowSize, instArrowSize);
 					}
 					else {
-						g.setColor(arrowColour);
+						g.setColor(getArrowColour());
 						g2d.setStroke(arrowStroke);
 						drawArrow(g, sourcePoint.x, sourcePoint.y, destPoint.x,
 								destPoint.y, bestYGap, 0, arrowSize);
@@ -831,6 +845,34 @@ public class PamObjectViewer implements PamViewInterface, ComponentListener,
 			processList.get(i).FillProcessContent();
 			processList.get(i).pack();
 		}
+	}
+
+	/**
+	 * Colour for the standard data consumer arrows. Dark grey on the light
+	 * schemes, the scheme's plain text colour on the dark ones, where dark grey
+	 * can't be seen against the background.
+	 */
+	private Color getArrowColour() {
+		ColourScheme scheme = PamColors.getInstance().getColourScheme();
+		if (scheme != null && scheme.isDark()) {
+			return PamColors.getInstance().getColor(PamColor.PLAIN);
+		}
+		return lightArrowColour;
+	}
+
+	/**
+	 * Colour for the data modifier (instant observer) arrows, which must stay
+	 * visible and distinct from the standard arrows in every scheme.
+	 */
+	private Color getInstArrowColour() {
+		ColourScheme scheme = PamColors.getInstance().getColourScheme();
+		if (scheme != null && scheme.isDark()) {
+			if (ColourScheme.NIGHTSCHEME.equalsIgnoreCase(scheme.getName())) {
+				return nightInstArrowColour;
+			}
+			return darkInstArrowColour;
+		}
+		return lightInstArrowColour;
 	}
 
 	Color getProcessColour(PamProcess pamProcess) {
