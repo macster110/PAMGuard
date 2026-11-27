@@ -181,4 +181,18 @@ public class SpectrogramNoiseDialogPanel {
 		return false;
 	}
 
+	/**
+	 * Check whether any noise reduction method is selected to run in this panel
+	 * (methods already applied upstream are not counted).
+	 * @return true if at least one method is selected.
+	 */
+	public boolean isAnyMethodSelected() {
+		for (int i = 0; i < enableMethod.length; i++) {
+			if (enableMethod[i].isSelected() && enableMethod[i].isEnabled()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 }

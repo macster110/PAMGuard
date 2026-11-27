@@ -28,6 +28,7 @@ import PamguardMVC.PamDataBlock;
 import PamguardMVC.PamProcess;
 import cepstrum.CepstrumProcess;
 import dataPlotsFX.data.DataTypeInfo;
+import PamView.dialog.warn.WarnOnce;
 import deepWhistle.MaskedFFTProcess;
 import fftManager.FFTDataUnit;
 import spectrogramNoiseReduction.SpectrogramNoiseDialogPanel;
@@ -318,6 +319,23 @@ public class WhistleToneDialog extends PamDialog {
 					"Average Subtraction\n" +
 					"Thresholding\n";
 			return showWarning(msg);
+		}
+
+		/*
+		 * Deep learning masks (e.g. DeepWhistle) already remove the noise, so extra
+		 * spectrogram noise reduction generally makes the output worse. Warn, but let
+		 * the user carry on if they want to.
+		 */
+		if (isAISource() && spectrogramNoiseDialogPanel.isAnyMethodSelected()) {
+			String msg = "<html>The source of this Whistle and Moan detector is a DeepWhistle (deep learning) mask, " +
+					"and spectrogram noise reduction methods are selected.<br><br>" +
+					"DeepWhistle models generally should not be used with noise reduction methods. " +
+					"Consider unticking the methods in the Noise and Thresholding tab.<br><br>" +
+					"Press OK to keep these settings anyway, or Cancel to go back and change them.</html>";
+			int ans = WarnOnce.showWarning(this, "Whistle and Moan Detector: DeepWhistle source", msg, WarnOnce.OK_CANCEL_OPTION);
+			if (ans == WarnOnce.CANCEL_OPTION) {
+				return false;
+			}
 		}
 		
 		return ok;
