@@ -51,15 +51,15 @@
     {
       "name": "median_equalizer",
       "params": {
-        "window_duration": 60.0
+        "window_duration": 30.0
       },
       "contparams": {
-        "timewindow": 60.0,
-        "lookahead": 0.0
+        "timewindow": 30.0,
+        "lookahead": 5.0
       }
     }
   ],
-  "description": "North Atlantic minke whale pulse-train detector (version 20240829), continuous 60 s trailing median equalizer. Mouy X, Awbery T, Davis G, Fernandez-Betelu O, Iorio-Merlo V, Transue L, Van Parijs S, Risch D (2025). Zenodo. https://doi.org/10.5281/zenodo.15151160",
+  "description": "North Atlantic minke whale pulse-train detector (version 20240829), continuous 30 s median equalizer with a 5 s lookahead. Mouy X, Awbery T, Davis G, Fernandez-Betelu O, Iorio-Merlo V, Transue L, Van Parijs S, Risch D (2025). Zenodo. https://doi.org/10.5281/zenodo.15151160",
   "version_info": {
     "version": 1
   },

@@ -5,9 +5,10 @@ package rawDeepLearningClassifier.dlClassification.contTransforms;
  * (possibly overlapping) segments.
  * <p>
  * Each new segment adds only the samples after the current end of the buffer, so
- * segment overlap does not matter. If there is a gap between segments, or a segment
- * ends before the end of the buffer (e.g. the data has jumped backwards in time),
- * the buffer is reset and starts again from the new segment.
+ * segment overlap does not matter, and a segment which is already in the buffer is
+ * ignored. If there is a gap between segments, or a segment starts before the start of
+ * the buffer (e.g. the data has jumped backwards in time), the buffer is reset and
+ * starts again from the new segment.
  *
  * @author Jamie Macaulay
  */
@@ -62,10 +63,9 @@ public class RawSoundBuffer {
 	public boolean addSegment(long segStart, double[] segment) {
 
 		long end = startSample + n;
-		long segEnd = segStart + segment.length;
 
 		boolean reset = false;
-		if (n == 0 || segStart > end || segStart < startSample || segEnd < end) {
+		if (wouldReset(segStart, segment.length)) {
 			// first data, a gap or data going backwards - start again.
 			if (n > 0) nResets++;
 			reset = true;
@@ -93,6 +93,19 @@ public class RawSoundBuffer {
 		}
 
 		return reset;
+	}
+
+	/**
+	 * Check whether adding a segment would reset the buffer, i.e. the segment is not
+	 * continuous with the data in the buffer.
+	 *
+	 * @param segStart - the absolute start sample of the segment.
+	 * @param segLen   - the length of the segment in samples.
+	 * @return true if adding the segment would reset the buffer.
+	 */
+	public boolean wouldReset(long segStart, int segLen) {
+		long end = startSample + n;
+		return n == 0 || segStart > end || segStart < startSample;
 	}
 
 	/**

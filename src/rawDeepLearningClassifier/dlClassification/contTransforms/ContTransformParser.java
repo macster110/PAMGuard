@@ -82,9 +82,10 @@ public class ContTransformParser {
 			}
 
 			double lookahead = jsonContParams.optDouble(ContTransformParams.LOOKAHEAD_KEY, 0.0);
-			if (lookahead > 0) {
-				System.err.println("ContTransformParser: " + name + " has a lookahead of " + lookahead
-						+ " s. PAMGuard does not support forward looking transforms so a trailing window is used.");
+			if (Double.isNaN(lookahead) || lookahead < 0 || lookahead > timeWindow) {
+				System.err.println("ContTransformParser: " + name + " has an invalid lookahead of " + lookahead
+						+ " s. It must be between 0 and the " + ContTransformParams.TIME_WINDOW_KEY + " - a trailing window is used.");
+				lookahead = 0;
 			}
 
 			contParams.add(new ContTransformParams(transformIndex, type, timeWindow, lookahead, jsonContParams));

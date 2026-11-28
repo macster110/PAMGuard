@@ -13,9 +13,11 @@ import org.json.JSONObject;
  * </pre>
  *
  * A transform with contparams is calculated using a longer time window of data than
- * the segment, e.g. a 60 second running median. The window is trailing i.e. it uses
- * the timewindow seconds of data before (and including) the segment. Older versions
- * of PAMGuard ignore contparams and calculate the transform on each segment.
+ * the segment, e.g. a 60 second running median. The window is timewindow seconds long
+ * and ends lookahead seconds after the segment, i.e. it uses (timewindow - lookahead)
+ * seconds of data before the segment and lookahead seconds after it. A lookahead means
+ * results are delayed by that amount. Older versions of PAMGuard ignore contparams and
+ * calculate the transform on each segment.
  *
  * @author Jamie Macaulay
  */
@@ -47,14 +49,13 @@ public class ContTransformParams {
 	public final DLTransformType transformType;
 
 	/**
-	 * The length of the trailing window of data used to calculate the transform in seconds.
+	 * The length of the window of data used to calculate the transform in seconds, including the lookahead.
 	 */
 	public final double timeWindow;
 
 	/**
 	 * The length of data after the segment used to calculate the transform in seconds.
-	 * Look ahead models are not currently supported by PAMGuard so this is always treated
-	 * as zero but is kept so the JSON format can support it in future.
+	 * Results are delayed by this amount. Zero for a trailing window.
 	 */
 	public final double lookahead;
 
@@ -69,6 +70,15 @@ public class ContTransformParams {
 		this.timeWindow = timeWindow;
 		this.lookahead = lookahead;
 		this.json = json;
+	}
+
+	/**
+	 * Get the length of data before the segment used to calculate the transform.
+	 *
+	 * @return the time window minus the lookahead in seconds.
+	 */
+	public double getPreWindow() {
+		return Math.max(0, timeWindow - lookahead);
 	}
 
 	@Override

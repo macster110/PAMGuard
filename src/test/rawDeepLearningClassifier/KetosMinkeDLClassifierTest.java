@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 
 import rawDeepLearningClassifier.DLStatus;
 import rawDeepLearningClassifier.dlClassification.contTransforms.ContTransformParams;
+import rawDeepLearningClassifier.dlClassification.contTransforms.ContTransformRunner;
 import rawDeepLearningClassifier.dlClassification.contTransforms.TrailingMedianEqualizer;
 import rawDeepLearningClassifier.dlClassification.genericModel.StandardPrediction;
 import rawDeepLearningClassifier.dlClassification.ketos.KetosDLParams;
@@ -53,7 +54,8 @@ import rawDeepLearningClassifier.segmenter.GroupedRawData;
  * <li>model_NAMW_20240523.ktpb - the median equalizer is applied to each 5 s segment.</li>
  * <li>model_NAMW_20240523_60s.ktpb - a 60 s segment which is trimmed to the centre 5 s.</li>
  * <li>model_NAMW_20240523_cont.ktpb - the median equalizer has "contparams" so PAMGuard
- * buffers the raw sound data and uses a 60 s trailing window of data for the median.</li>
+ * buffers the raw sound data and uses a 30 s window of data, ending 5 s after each time
+ * bin, for the median.</li>
  * </ul>
  */
 public class KetosMinkeDLClassifierTest {
@@ -249,14 +251,14 @@ public class KetosMinkeDLClassifierTest {
 
 	/**
 	 * Test the continuous version of the model (model_NAMW_20240523_cont.ktpb). The median
-	 * equalizer has contparams with a 60 s time window so PAMGuard buffers the raw sound
-	 * data and calculates the median over the 60 s of data before (and including) each time
-	 * bin. The python detector uses a centred window (+/- 30 s) so the scores are not
-	 * identical, but this does not need data from the future and so works in real time.
-	 * Note that for this model a trailing window agrees less well with python than applying
-	 * the median equalizer to each 5 s segment.
+	 * equalizer has contparams with a 30 s time window and a 5 s lookahead, so PAMGuard
+	 * buffers the raw sound data and calculates the median over the 25 s of data before and
+	 * 5 s after each time bin. Results are delayed by 5 s. The python detector uses a 60 s
+	 * centred window (+/- 30 s) so the scores are not identical, but it would delay results
+	 * by 30 s.
 	 * <p>
-	 * Segments are passed to the model in time order with a 2 s hop, as the segmenter would.
+	 * Segments are passed to the continuous transform runner in time order with a 2 s hop, as
+	 * the segmenter would, and the segments it says are ready are classified.
 	 */
 	@Test
 	public void ketosMinkeContTest() throws Exception {
@@ -284,7 +286,8 @@ public class KetosMinkeDLClassifierTest {
 		List<ContTransformParams> contParams = ketosWorker2.getContTransformRunner().getContParams();
 		assertEquals(1, contParams.size());
 		assertEquals(DLTransformType.MEDIAN_EQUALIZER, contParams.get(0).transformType);
-		assertEquals(60.0, contParams.get(0).timeWindow, 1e-9);
+		assertEquals(30.0, contParams.get(0).timeWindow, 1e-9);
+		assertEquals(5.0, contParams.get(0).lookahead, 1e-9);
 
 		AudioData soundData = DLUtils.loadWavFile(wavFilePath);
 		double[] soundDataD = soundData.getScaledSampleAmplitudes();
@@ -298,14 +301,21 @@ public class KetosMinkeDLClassifierTest {
 		double sumDiff = 0, sumDiff60 = 0;
 		long timeStart = System.currentTimeMillis();
 
-		ArrayList<GroupedRawData> groupedData = new ArrayList<GroupedRawData>();
+		ContTransformRunner runner = ketosWorker2.getContTransformRunner();
+		ArrayList<GroupedRawData> newData = new ArrayList<GroupedRawData>();
 		for (int startSample = 0; startSample + segSamples <= soundDataD.length; startSample += hopSamples) {
 
 			GroupedRawData groupedRawData = new GroupedRawData(0, 1, startSample, segSamples, segSamples);
 			groupedRawData.copyRawData(soundDataD, startSample, segSamples, 0);
-			groupedData.add(groupedRawData);
+			newData.add(groupedRawData);
 
-			if (groupedData.size() == BATCH_SIZE || startSample + hopSamples + segSamples > soundDataD.length) {
+			boolean last = startSample + hopSamples + segSamples > soundDataD.length;
+			if (newData.size() == BATCH_SIZE || last) {
+				// buffer the data - only segments with 5 s of data after them are ready.
+				ArrayList<GroupedRawData> groupedData = runner.addSegments(newData, soundData.sampleRate);
+				newData = new ArrayList<GroupedRawData>();
+				if (last) groupedData.addAll(runner.flush());
+				if (groupedData.isEmpty()) continue;
 				ArrayList<StandardPrediction> predictions = ketosWorker2.runModel(groupedData, soundData.sampleRate, 0);
 				for (int j = 0; j < groupedData.size(); j++) {
 					int segIndex = (int) (groupedData.get(j).getStartSample() / FFT_HOP);
@@ -326,10 +336,10 @@ public class KetosMinkeDLClassifierTest {
 						if (detMatch) nDetMatch60++;
 					}
 				}
-				groupedData = new ArrayList<GroupedRawData>();
 			}
 		}
 
+		assertEquals(0, runner.getNumPending());
 		// the buffer should never have been reset because the segments are continuous.
 		assertEquals(0, ketosWorker2.getContTransformRunner().getBuffer(1, 0).getNumResets());
 
@@ -341,17 +351,17 @@ public class KetosMinkeDLClassifierTest {
 		System.out.println(String.format("File denoise (after 60 s): %.1f%% within 0.1, %.1f%% agree at 0.5 threshold, mean abs diff %.4f",
 				100. * nMatch60 / nTested60, 100. * nDetMatch60 / nTested60, sumDiff60 / nTested60));
 
-		// measured (28/11/2026) 59.6% within 0.1, 78.2% agree at 0.5, mean abs diff 0.20. The python detector
-		// uses a centred window which needs 30 s of future data. Using the same pipeline with a centred window
-		// gives 100% agreement so the differences are due to the trailing window, not the transforms. For
-		// comparison, the 5 s model (median equalizer on each segment) agrees 83.4% of the time.
-		assertTrue(nDetMatch / (double) nTested > 0.75);
+		// Offline tests (28/11/2026) with the same transforms, % agreement at 0.5: 60 s centred window (as python)
+		// 100%, 30 s window with 5 s lookahead 90.1%, 60 s trailing window 78.2%, median equalizer on each 5 s
+		// segment 83.4%.
+		assertTrue(nDetMatch / (double) nTested > 0.88);
 	}
 
 	/**
 	 * Check the continuous transforms give exactly the same model input as transforming the
-	 * whole file at once and then applying a trailing median equalizer i.e. the buffering,
-	 * segment overlap, context alignment and trimming are all correct.
+	 * whole file at once and then applying the median equalizer (30 s window with a 5 s
+	 * lookahead) i.e. the buffering, segment overlap, lookahead, context alignment and
+	 * trimming are all correct.
 	 */
 	@Test
 	public void ketosMinkeContTransformTest() throws Exception {
@@ -368,8 +378,9 @@ public class KetosMinkeDLClassifierTest {
 		double[] soundDataD = soundData.getScaledSampleAmplitudes();
 		int segSamples = (int) Math.round((params.defaultSegmentLen / 1000.) * soundData.sampleRate);
 
-		// use the first 3 minutes of the file.
-		int nSamples = (int) (180 * soundData.sampleRate);
+		// use about the first 3 minutes of the file, ending at the end of the last segment.
+		int hopSamples = 25 * FFT_HOP;
+		int nSamples = segSamples + ((int) (180 * soundData.sampleRate) - segSamples) / hopSamples * hopSamples;
 		double[] wav = java.util.Arrays.copyOf(soundDataD, nSamples);
 
 		// transform the whole 3 minutes at once.
@@ -382,7 +393,9 @@ public class KetosMinkeDLClassifierTest {
 				// the Ketos spectrogram has a fixed duration - set it to the whole sound.
 				Number[] specParams = ((SimpleTransform) transforms.get(i)).getParams();
 				Number[] origParams = specParams.clone();
-				int nFrames = (nSamples - specParams[0].intValue()) / specParams[1].intValue() + 1;
+				// the same number of frames as the segments cover (the Ketos spectrogram of a 5.128 s segment
+				// has 125 frames, one less than would fit).
+				int nFrames = (nSamples - segSamples) / specParams[1].intValue() + 125;
 				specParams[2] = (specParams[0].doubleValue() + (nFrames - 0.5) * specParams[1].doubleValue()) / soundData.sampleRate;
 				transform = transforms.get(i).transformData(transform);
 				((SimpleTransform) transforms.get(i)).setParams(origParams);
@@ -392,18 +405,34 @@ public class KetosMinkeDLClassifierTest {
 			}
 		}
 		double[][] wholeSpec = ((FreqTransform) transform).getSpecTransfrom().getTransformedData();
-		int windowBins = (int) Math.round(60.0 / (FFT_HOP / (double) soundData.sampleRate));
-		double[][] wholeEqualized = TrailingMedianEqualizer.medianEqualize(wholeSpec, 0, windowBins);
+		double timeRes = FFT_HOP / (double) soundData.sampleRate;
+		int windowBins = (int) Math.round(cp.timeWindow / timeRes);
+		int lookaheadBins = (int) Math.round(cp.lookahead / timeRes);
+		double[][] wholeEqualized = TrailingMedianEqualizer.medianEqualize(wholeSpec, 0, wholeSpec.length, windowBins, lookaheadBins);
 
-		// now pass overlapping segments through the model's transforms. A hop of 1 s, which is not a whole
-		// number of segments, tests that segment overlap is handled.
-		int hopSamples = 25 * FFT_HOP;
+		// now pass overlapping segments through the continuous transform runner, in batches. A hop of 1 s, which
+		// is not a whole number of segments, tests that segment overlap is handled.
+		ContTransformRunner runner = ketosWorker2.getContTransformRunner();
 		ArrayList<GroupedRawData> groupedData = new ArrayList<GroupedRawData>();
+		ArrayList<GroupedRawData> batch = new ArrayList<GroupedRawData>();
 		for (int startSample = 0; startSample + segSamples <= nSamples; startSample += hopSamples) {
 			GroupedRawData groupedRawData = new GroupedRawData(0, 1, startSample, segSamples, segSamples);
 			groupedRawData.copyRawData(wav, startSample, segSamples, 0);
-			groupedData.add(groupedRawData);
+			batch.add(groupedRawData);
+			if (batch.size() == 7) {
+				ArrayList<GroupedRawData> ready = runner.addSegments(batch, soundData.sampleRate);
+				// a segment is only ready once there is 5 s of data after it.
+				for (GroupedRawData r : ready) {
+					assertTrue(r.getStartSample() + segSamples + cp.lookahead * soundData.sampleRate <= startSample + segSamples);
+				}
+				groupedData.addAll(ready);
+				batch = new ArrayList<GroupedRawData>();
+			}
 		}
+		groupedData.addAll(runner.addSegments(batch, soundData.sampleRate));
+		assertTrue(runner.getNumPending() > 0);
+		groupedData.addAll(runner.flush());
+		assertEquals(0, runner.getNumPending());
 		float[][][] modelInput = ketosWorker2.dataUnits2ModelInput(groupedData, soundData.sampleRate, 0);
 
 		double maxDiff = 0;

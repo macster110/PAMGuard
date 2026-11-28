@@ -103,25 +103,25 @@ Some models use transforms which need more data than a single segment, for examp
 ```
 {
   "name": "median_equalizer",
-  "params": {"window_duration": 60.0},
-  "contparams": {"timewindow": 60.0, "lookahead": 0.0}
+  "params": {"window_duration": 30.0},
+  "contparams": {"timewindow": 30.0, "lookahead": 5.0}
 }
 ```
 
-* `timewindow` is the length of the time window of data, in seconds, that the transform uses. If it is missing then the transform's own window (e.g. `window_duration`) is used.
-* `lookahead` is the amount of data after the segment, in seconds, that the transform would use. PAMGuard runs in real time so does not support forward looking transforms. A trailing window is always used and a lookahead greater than zero is ignored with a warning.
+* `timewindow` is the length of the time window of data, in seconds, that the transform uses, including the lookahead. If it is missing then the transform's own window (e.g. `window_duration`) is used.
+* `lookahead` (optional, default 0) is the amount of data after the segment, in seconds, that the transform uses. The window therefore uses (`timewindow` - `lookahead`) seconds of data before the segment. A segment cannot be classified until the lookahead has arrived so **results are delayed by the lookahead**. A lookahead of zero gives a trailing window with no delay.
 
-When a model has a transform with `contparams` the deep learning module keeps a buffer of the raw sound data for each channel, built from the segments, so the segment overlap does not matter. For each new segment, the transforms before the `contparams` transform are calculated on the segment plus up to `timewindow` seconds of data before it. The `contparams` transform then uses all of this data, e.g. the median equalizer calculates the median over the 60 seconds before each time bin, and its output is trimmed back to the segment for the rest of the transforms and the model. This means the segment length and hop can be set as normal. If there is less data than the time window, e.g. when processing starts or after a gap in the data, the transform uses whatever data is available. The buffer is cleared when processing starts and whenever there is a gap in the data.
+When a model has a transform with `contparams` the deep learning module keeps a buffer of the raw sound data for each channel, built from the segments, so the segment overlap does not matter. Segments wait until there is `lookahead` seconds of data after them. The transforms before the `contparams` transform are then calculated on the segment plus up to (`timewindow` - `lookahead`) seconds of data before it and `lookahead` seconds after it. The `contparams` transform then uses all of this data, e.g. the median equalizer calculates the median over the 25 seconds before and 5 seconds after each time bin, and its output is trimmed back to the segment for the rest of the transforms and the model. This means the segment length and hop can be set as normal. If there is less data than the time window, e.g. when processing starts, before a gap in the data or at the end of the data, the transform uses whatever data is available. The buffer is cleared when processing starts and whenever there is a gap in the data.
 
 Note that
 
-* The results will differ from a model in Python which uses a window centred on each segment (i.e. data from the future) and models should be tested to see how much this matters.
+* The results will differ from a model in Python which uses a different window, e.g. a window centred on each time bin. Models should be tested to see how much this matters and to choose a window and lookahead.
 * Only the median equalizer has a dedicated continuous implementation. Other transforms with `contparams` are calculated over the whole time window and then trimmed.
-* If there is more than one `contparams` transform then the buffer holds the sum of their time windows.
+* If there is more than one `contparams` transform then the buffer holds the sum of their time windows and the delay is the sum of their lookaheads.
 * The data must be continuous raw sound data split into segments, e.g. from the Sound Acquisition module. Continuous transforms are not suitable for classifying detections such as clicks.
 * Older versions of PAMGuard ignore `contparams` and calculate the transform on each segment.
 
-The North Atlantic minke whale detector (model_NAMW_20240523_cont.ktpb in the PAMGuard test resources) is an example.
+The North Atlantic minke whale detector (model_NAMW_20240523_cont.ktpb in the PAMGuard test resources) is an example. The original Python detector uses a 60 second window centred on each time bin. In PAMGuard the model uses a 30 second window with a 5 second lookahead, which agrees with the Python detector 90% of the time and delays results by 5 seconds.
 
 ### Exanmple Models
 

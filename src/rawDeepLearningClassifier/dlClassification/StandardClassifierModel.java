@@ -17,6 +17,7 @@ import javafx.stage.FileChooser.ExtensionFilter;
 import rawDeepLearningClassifier.DLControl;
 import rawDeepLearningClassifier.DLStatus;
 import rawDeepLearningClassifier.dlClassification.animalSpot.StandardModelParams;
+import rawDeepLearningClassifier.dlClassification.contTransforms.ContTransformRunner;
 import rawDeepLearningClassifier.dlClassification.genericModel.DLModelWorker;
 import rawDeepLearningClassifier.dlClassification.genericModel.GenericDLClassifier;
 import rawDeepLearningClassifier.dlClassification.genericModel.StandardPrediction;
@@ -70,6 +71,58 @@ public abstract class StandardClassifierModel implements DLClassiferModel, PamSe
 	@SuppressWarnings("rawtypes")
 	public ArrayList<ArrayList<? extends PredictionResult>> runModel( ArrayList<? extends PamDataUnit> groupedRawData) {
 		if (getDLWorker().isModelNull()) return null; 
+
+		ContTransformRunner contRunner = getContRunner(groupedRawData);
+		if (contRunner!=null) {
+			/*
+			 * The model has continuous transforms (contparams). The sound data is buffered and only
+			 * segments which have enough data after them for any lookahead are classified, so results
+			 * may be for earlier segments than the ones passed here. The results are therefore sent to
+			 * the process here and null is returned.
+			 */
+			ArrayList<GroupedRawData> ready = contRunner.addSegments(groupedRawData, groupedRawData.get(0).getParentDataBlock().getSampleRate());
+			runReadyContSegments(ready);
+			return null;
+		}
+
+		return runModelNow(groupedRawData);
+	}
+
+	/**
+	 * Get the continuous transform runner if the data should be classified using it.
+	 * @param groupedRawData - the data to classify.
+	 * @return the runner, or null if the model has no continuous transforms or the data are not raw sound segments.
+	 */
+	private ContTransformRunner getContRunner(ArrayList<? extends PamDataUnit> groupedRawData) {
+		if (getDLWorker()==null || dlControl==null || dlControl.isGroupDetections()) return null;
+		ContTransformRunner contRunner = getDLWorker().getContTransformRunner();
+		if (contRunner==null || groupedRawData==null || groupedRawData.size()==0) return null;
+		if (!(groupedRawData.get(0) instanceof GroupedRawData) || groupedRawData.get(0).getParentDataBlock()==null) return null;
+		return contRunner;
+	}
+
+	/**
+	 * Classify segments which are ready to be classified by the continuous transform runner and
+	 * send the results to the process.
+	 * @param ready - the segments.
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private void runReadyContSegments(ArrayList<GroupedRawData> ready) {
+		if (ready==null || ready.size()==0) return;
+		ArrayList<ArrayList<? extends PredictionResult>> results = runModelNow(ready);
+		if (results!=null) {
+			//viewer mode - in real time the worker thread sends the results.
+			dlControl.getDLClassifyProcess().newRawModelResults(results, ready);
+		}
+	}
+
+	/**
+	 * Run the model on data units, or add them to the worker thread queue in real time.
+	 * @param groupedRawData - the data units.
+	 * @return the results, or null if the data are being processed on the worker thread.
+	 */
+	@SuppressWarnings("rawtypes")
+	private ArrayList<ArrayList<? extends PredictionResult>> runModelNow( ArrayList<? extends PamDataUnit> groupedRawData) {
 
 		//		System.out.println("SoundSpotClassifier: PamCalendar.isSoundFile(): " 
 		//		+ PamCalendar.isSoundFile() + "   " + (PamCalendar.isSoundFile() && !forceQueue));
@@ -453,6 +506,10 @@ public abstract class StandardClassifierModel implements DLClassiferModel, PamSe
 
 	@Override
 	public boolean flushModel(long maxWaitMillis) {
+		//classify any segments still waiting for data after them (continuous transforms with a lookahead). 
+		if (getDLWorker()!=null && getDLWorker().getContTransformRunner()!=null && dlControl!=null && !dlControl.isGroupDetections()) {
+			runReadyContSegments(getDLWorker().getContTransformRunner().flush());
+		}
 		//only real time (non viewer) mode queues data on the worker thread. 
 		if (workerThread==null) return true; 
 		boolean ok = workerThread.waitForIdle(maxWaitMillis); 
