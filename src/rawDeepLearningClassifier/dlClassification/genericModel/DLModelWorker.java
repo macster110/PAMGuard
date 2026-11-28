@@ -2,6 +2,7 @@ package rawDeepLearningClassifier.dlClassification.genericModel;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import org.jamdev.jdl4pam.animalSpot.*;
 import org.jamdev.jdl4pam.transforms.DLTransform;
@@ -15,6 +16,9 @@ import PamguardMVC.PamDataUnit;
 import rawDeepLearningClassifier.DLControl;
 import rawDeepLearningClassifier.DLStatus;
 import rawDeepLearningClassifier.dlClassification.animalSpot.StandardModelParams;
+import rawDeepLearningClassifier.dlClassification.contTransforms.ContTransformParams;
+import rawDeepLearningClassifier.dlClassification.contTransforms.ContTransformParser;
+import rawDeepLearningClassifier.dlClassification.contTransforms.ContTransformRunner;
 import rawDeepLearningClassifier.segmenter.GroupedRawData;
 
 
@@ -42,6 +46,12 @@ public abstract class DLModelWorker<T> {
 	 * True to enable normalisation of results using softmax; 
 	 */
 	private boolean enableSoftMax = true;
+
+	/**
+	 * Runs the transforms if the model has continuous transforms (contparams) which need
+	 * a longer window of data than the segment. Null if the model has none.
+	 */
+	private ContTransformRunner contTransformRunner;
 	
 	
 	/**
@@ -80,7 +90,11 @@ public abstract class DLModelWorker<T> {
 //			+ " Decimate Params: " + ((WaveTransform) modelTransforms.get(0)).getParams()[0] + "max amplitude sound: " + PamArrayUtils.max(soundData.samples));
 
 			DLTransform transform = modelTransforms.get(0); 
-			for (int i =0; i<modelTransforms.size(); i++) {
+			if (contTransformRunner!=null) {
+				//the model has continuous transforms which use buffered data from previous segments.
+				transform = contTransformRunner.runTransforms(rawDataUnits.get(j), iChan, sampleRate);
+			}
+			else for (int i =0; i<modelTransforms.size(); i++) {
 				transform = modelTransforms.get(i).transformData(transform); 
 
 //				//TEMP
@@ -258,6 +272,42 @@ public abstract class DLModelWorker<T> {
 	 */
 	public void setModelTransforms(ArrayList<DLTransform> modelTransforms) {
 		this.modelTransforms = modelTransforms;
+	}
+
+	/**
+	 * Set up continuous transforms from a model's JSON metadata. If any transform has
+	 * "contparams" then the transforms are run using a buffer of previous data
+	 * (see ContTransformRunner). Otherwise the transforms are run on each segment. This also
+	 * clears any buffered data so should be called whenever processing starts.
+	 * @param jsonString - the model's JSON metadata. Can be null.
+	 * @return the continuous parameters (empty if there are none).
+	 */
+	public List<ContTransformParams> setupContTransforms(String jsonString) {
+		List<ContTransformParams> contParams = ContTransformParser.parse(jsonString, modelTransforms);
+		if (contParams.isEmpty()) {
+			contTransformRunner = null;
+		}
+		else {
+			contTransformRunner = new ContTransformRunner(modelTransforms, contParams);
+			System.out.println("Deep learning model has continuous transforms: " + contParams);
+		}
+		return contParams;
+	}
+
+	/**
+	 * Get the continuous transform runner.
+	 * @return the runner, or null if the model has no continuous transforms.
+	 */
+	public ContTransformRunner getContTransformRunner() {
+		return contTransformRunner;
+	}
+
+	/**
+	 * Set the continuous transform runner.
+	 * @param contTransformRunner - the runner, or null to run transforms on each segment.
+	 */
+	public void setContTransformRunner(ContTransformRunner contTransformRunner) {
+		this.contTransformRunner = contTransformRunner;
 	}
 
 	/**

@@ -46,3 +46,19 @@ Results (25/09/2026), compared to the whole file denoised python scores:
   (104 segments).
 
 Both models use identical weights - only the metadata (audio_repr.json) inside the zip differs.
+
+Continuous version of the model (model_NAMW_20240523_cont.ktpb)
+This uses the 5 s metadata (audio_repr_pg_cont.json) but the median_equalizer transform has
+"contparams": {"timewindow": 60.0}. PAMGuard buffers the raw sound data and the median equalizer uses
+the 60 s of data before (and including) each time bin, so the segmenter can be set up as normal (e.g. a 5 s
+segment with any hop). PAMGuard is real time so the window is trailing, whereas the python detector uses a
+window centred on each time bin (+/- 30 s, i.e. 30 s of future data).
+
+Results (28/11/2026), compared to the whole file denoised python scores, 2 s hop (416-445 segments):
+- Continuous transforms vs transforming the whole file at once with a trailing median: max difference 2e-6.
+- Trailing 60 s window (the continuous model): 59.6% within 0.1, 78.2% agree at 0.5, mean abs diff 0.20.
+- The same pipeline with a centred window (offline only, for comparison): 100% within 0.1, 100% agree at 0.5.
+- Window shifted to use some future data (offline experiment, % agree at 0.5): 5 s 81.0%, 10 s 85.3%,
+  20 s 93.3%, 30 s (centred) 99.3%.
+So for this model the trailing window agrees less well with python than applying the median equalizer to
+each 5 s segment (83.4%), probably because the model was trained on data denoised with a centred window.

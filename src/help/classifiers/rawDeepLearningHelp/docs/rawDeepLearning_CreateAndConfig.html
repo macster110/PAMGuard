@@ -160,6 +160,61 @@
 			settings. These is no need to use the advanced pane but it is there
 			in case users wish to change transform settings for some reason</em>
 	</p>
+	<h4 id="contparams">Transforms which need a longer time window (contparams)</h4>
+	<p>Some models use transforms which need more data than a single
+		segment, for example a 60 second running median used to remove
+		background noise. A transform in a model&#39;s JSON metadata can have
+		an optional <code>contparams</code> object alongside its
+		<code>params</code>. For example</p>
+	<pre>
+{
+  "name": "median_equalizer",
+  "params": {"window_duration": 60.0},
+  "contparams": {"timewindow": 60.0, "lookahead": 0.0}
+}</pre>
+	<ul>
+		<li><code>timewindow</code> is the length of the time window of
+			data, in seconds, that the transform uses. If it is missing then the
+			transform&#39;s own window (e.g. <code>window_duration</code>) is used.</li>
+		<li><code>lookahead</code> is the amount of data after the segment,
+			in seconds, that the transform would use. PAMGuard runs in real time
+			so does not support forward looking transforms. A trailing window is
+			always used and a lookahead greater than zero is ignored with a
+			warning.</li>
+	</ul>
+	<p>When a model has a transform with <code>contparams</code> the deep
+		learning module keeps a buffer of the raw sound data for each channel,
+		built from the segments, so the segment overlap does not matter. For
+		each new segment, the transforms before the <code>contparams</code>
+		transform are calculated on the segment plus up to
+		<code>timewindow</code> seconds of data before it. The
+		<code>contparams</code> transform then uses all of this data, e.g. the
+		median equalizer calculates the median over the 60 seconds before each
+		time bin, and its output is trimmed back to the segment for the rest of
+		the transforms and the model. This means the segment length and hop can
+		be set as normal. If there is less data than the time window, e.g. when
+		processing starts or after a gap in the data, the transform uses
+		whatever data is available. The buffer is cleared when processing
+		starts and whenever there is a gap in the data.</p>
+	<p>Note that</p>
+	<ul>
+		<li>The results will differ from a model in Python which uses a
+			window centred on each segment (i.e. data from the future) and models
+			should be tested to see how much this matters.</li>
+		<li>Only the median equalizer has a dedicated continuous
+			implementation. Other transforms with <code>contparams</code> are
+			calculated over the whole time window and then trimmed.</li>
+		<li>If there is more than one <code>contparams</code> transform then
+			the buffer holds the sum of their time windows.</li>
+		<li>The data must be continuous raw sound data split into segments,
+			e.g. from the Sound Acquisition module. Continuous transforms are not
+			suitable for classifying detections such as clicks.</li>
+		<li>Older versions of PAMGuard ignore <code>contparams</code> and
+			calculate the transform on each segment.</li>
+	</ul>
+	<p>The North Atlantic minke whale detector
+		(model_NAMW_20240523_cont.ktpb in the PAMGuard test resources) is an
+		example.</p>
 	<h3 id="default-models">Default Models</h3>
 	<p>Default models are selectable from the menu button in the Deep
 		Learning Pane. Default models are deep learning classifiers which are

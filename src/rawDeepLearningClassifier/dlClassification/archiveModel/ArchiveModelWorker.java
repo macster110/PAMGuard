@@ -159,6 +159,10 @@ public class ArchiveModelWorker extends GenericModelWorker {
 			//set whether a wave or spectrogram model 
 			//this is important for setting the input stack into the model.
 			 setWaveFreqModel(dlParams);
+
+			//set up any continuous transforms (contparams) which need a longer window of data than the
+			//segment. This also clears any data buffered from previous runs.
+			setupContTransforms(jsonString);
 			
 //			//enable softmax? - TODO
 //			this.setEnableSoftMax(true);
